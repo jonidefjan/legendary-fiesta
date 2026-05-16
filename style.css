@@ -30,6 +30,21 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Touch-friendly adjustments */
+button,
+.item-slot {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html {
+  overflow-x: hidden;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -536,4 +551,411 @@ h3,
 /* ─── CANVAS STYLE ─── */
 canvas {
   image-rendering: pixelated;
+}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE DESIGN
+   ═══════════════════════════════════════ */
+
+/* ─── TABLET (max-width: 1024px) ─── */
+@media (max-width: 1024px) {
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto auto;
+    grid-template-areas:
+      "header"
+      "arena"
+      "log"
+      "inventory";
+    max-width: 100%;
+  }
+
+  #inventory {
+    max-height: 400px;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  #log-panel {
+    height: 150px;
+    border-right: none;
+  }
+
+  #header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  #stats-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .stat-pill {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  #game-controls {
+    top: 12px;
+    right: 12px;
+    gap: 6px;
+  }
+
+  .control-btn {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+}
+
+/* ─── MOBILE (max-width: 768px) ─── */
+@media (max-width: 768px) {
+  #header {
+    padding: 10px 16px;
+  }
+
+  #header h1 {
+    font-size: 18px;
+  }
+
+  #header .subtitle {
+    font-size: 11px;
+  }
+
+  #stats-header {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .stat-pill {
+    font-size: 10px;
+    padding: 5px 8px;
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .stat-pill span {
+    display: block;
+  }
+
+  #arena {
+    min-height: 400px;
+  }
+
+  #game-controls {
+    top: 8px;
+    right: 8px;
+    gap: 4px;
+  }
+
+  .control-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  #log-panel {
+    height: 120px;
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .log-entry {
+    padding: 4px 6px;
+    margin-bottom: 3px;
+    font-size: 11px;
+  }
+
+  #inventory {
+    padding: 12px;
+    max-height: 500px;
+  }
+
+  .bars-container {
+    margin-bottom: 12px;
+  }
+
+  .bar-row {
+    margin-bottom: 8px;
+    gap: 6px;
+  }
+
+  .bar-label {
+    font-size: 11px;
+    min-width: 24px;
+  }
+
+  .bar-track {
+    height: 16px;
+  }
+
+  .bar-val {
+    font-size: 10px;
+    min-width: 50px;
+  }
+
+  .wave-info {
+    padding: 6px 12px;
+  }
+
+  .wave-num,
+  .gold-display {
+    font-size: 11px;
+  }
+
+  .enemy-count {
+    font-size: 10px;
+  }
+
+  .inv-section {
+    margin-bottom: 14px;
+  }
+
+  .inv-section-title {
+    font-size: 12px;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+  }
+
+  .slots-grid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 8px;
+  }
+
+  .item-slot {
+    min-height: 60px;
+  }
+
+  .item-icon {
+    font-size: 2rem;
+  }
+
+  .rarity-gem {
+    width: 6px;
+    height: 6px;
+    top: 3px;
+    right: 3px;
+  }
+
+  .cooldown-overlay {
+    font-size: 0.8rem;
+  }
+
+  .tooltip {
+    max-width: 240px;
+    padding: 10px;
+    font-size: 0.85rem;
+  }
+
+  .tooltip .tt-name {
+    font-size: 1rem;
+  }
+
+  .tooltip .tt-rarity {
+    font-size: 0.75rem;
+  }
+
+  .tooltip .tt-enchant {
+    font-size: 0.8rem;
+    padding: 5px 6px;
+  }
+
+  .tooltip .tt-cd {
+    font-size: 0.75rem;
+  }
+}
+
+/* ─── MOBILE PEQUENO (max-width: 480px) ─── */
+@media (max-width: 480px) {
+  #header h1 {
+    font-size: 16px;
+  }
+
+  #header .subtitle {
+    display: none;
+  }
+
+  #stats-header {
+    gap: 4px;
+  }
+
+  .stat-pill {
+    font-size: 9px;
+    padding: 4px 6px;
+    border-radius: 4px;
+  }
+
+  .stat-pill .val {
+    font-size: 10px;
+  }
+
+  #arena {
+    min-height: 300px;
+  }
+
+  #game-controls {
+    top: 6px;
+    right: 6px;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .control-btn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  #log-panel {
+    height: 100px;
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .log-entry {
+    padding: 3px 5px;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  #inventory {
+    padding: 8px;
+  }
+
+  .bars-container {
+    margin-bottom: 10px;
+  }
+
+  .bar-row {
+    margin-bottom: 6px;
+    gap: 4px;
+  }
+
+  .bar-label {
+    font-size: 10px;
+    min-width: 22px;
+  }
+
+  .bar-track {
+    height: 14px;
+  }
+
+  .bar-val {
+    font-size: 9px;
+    min-width: 45px;
+  }
+
+  .wave-info {
+    padding: 5px 8px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .wave-num,
+  .gold-display {
+    font-size: 10px;
+  }
+
+  .enemy-count {
+    font-size: 9px;
+  }
+
+  .inv-section {
+    margin-bottom: 12px;
+  }
+
+  .inv-section-title {
+    font-size: 11px;
+    margin-bottom: 5px;
+  }
+
+  .slots-grid {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    gap: 6px;
+  }
+
+  .item-slot {
+    min-height: 50px;
+  }
+
+  .item-icon {
+    font-size: 1.6rem;
+  }
+
+  .rarity-gem {
+    width: 5px;
+    height: 5px;
+    top: 2px;
+    right: 2px;
+  }
+
+  .cooldown-overlay {
+    font-size: 0.7rem;
+  }
+
+  .cd-bar {
+    height: 3px;
+  }
+
+  .tooltip {
+    max-width: 200px;
+    padding: 8px;
+    font-size: 0.8rem;
+  }
+
+  .tooltip .tt-name {
+    font-size: 0.95rem;
+    margin-bottom: 3px;
+  }
+
+  .tooltip .tt-rarity {
+    font-size: 0.7rem;
+    margin-bottom: 8px;
+  }
+
+  .tooltip .tt-desc {
+    margin-bottom: 8px;
+    font-size: 0.75rem;
+  }
+
+  .tooltip .tt-effect {
+    margin-bottom: 6px;
+    font-size: 0.75rem;
+  }
+
+  .tooltip .tt-enchant {
+    font-size: 0.75rem;
+    padding: 4px 5px;
+    margin-bottom: 6px;
+  }
+
+  .tooltip .tt-cd {
+    font-size: 0.7rem;
+  }
+}
+
+/* ─── LANDSCAPE MOBILE ─── */
+@media (max-width: 768px) and (orientation: landscape) {
+  #app {
+    grid-template-columns: 1fr 320px;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "header header"
+      "arena  inventory"
+      "log    inventory";
+  }
+
+  #arena {
+    min-height: 100%;
+  }
+
+  #inventory {
+    max-height: none;
+    border-left: 1px solid var(--border);
+    border-top: none;
+  }
+
+  #log-panel {
+    height: 120px;
+  }
 }
