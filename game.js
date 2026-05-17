@@ -23,191 +23,14 @@ const RARITIES = {
   legendary: { label: "Lendário", color: "#c9a84c" },
 };
 
-const ITEMS = [
-  // WEAPONS
-  {
-    id: "rusted_sword",
-    type: "weapon",
-    icon: "⚔️",
-    name: "Espada Enferrujada",
-    rarity: "common",
-    desc: "Uma lâmina velha e desgastada. Ainda corta o suficiente.",
-    effect: "Ataque básico: 8 de dano físico.",
-    enchant: null,
-    cooldown: 2200,
-    baseDmg: 8,
-    dmgType: "physical",
-    anim: "slash",
-  },
-  {
-    id: "ember_blade",
-    type: "weapon",
-    icon: "🔥",
-    name: "Lâmina de Brasa",
-    rarity: "rare",
-    desc: "Forjada no núcleo de um vulcão adormecido.",
-    effect: "Ataque: 14 de dano físico + 6 de fogo.",
-    enchant: "✦ Ignição: Chance de 25% de queimar o alvo por 3 turnos.",
-    cooldown: 3000,
-    baseDmg: 14,
-    bonusDmg: 6,
-    dmgType: "fire",
-    anim: "fire_slash",
-  },
-  {
-    id: "shadow_dagger",
-    type: "weapon",
-    icon: "🗡️",
-    name: "Adaga das Sombras",
-    rarity: "epic",
-    desc: "Destila o vazio entre os mundos em cada golpe.",
-    effect: "Duplo golpe: 2× 9 de dano + ignora 40% de armadura.",
-    enchant: "✦ Sombra: Cada acerto crítico reduz o recarga em 0.5s.",
-    cooldown: 2400,
-    baseDmg: 9,
-    dmgType: "shadow",
-    hits: 2,
-    anim: "double_slash",
-  },
-  {
-    id: "thunder_staff",
-    type: "weapon",
-    icon: "⚡",
-    name: "Cajado do Trovão",
-    rarity: "legendary",
-    desc: "O primeiro raio que caiu sobre a terra cristalizou nesta haste.",
-    effect:
-      "Relâmpago em cadeia: 22 de dano mágico, ricocheteando em até 2 alvos.",
-    enchant: "✦ Tempestade: A cada 4 usos, invoca uma tempestade +50% de dano.",
-    cooldown: 4500,
-    baseDmg: 22,
-    dmgType: "lightning",
-    anim: "lightning",
-  },
-
-  // ARMOR
-  {
-    id: "leather_vest",
-    type: "armor",
-    icon: "🛡️",
-    name: "Colete de Couro",
-    rarity: "common",
-    desc: "Proteção básica feita de peles curtidas.",
-    effect: "Passivo: +12 de armadura. Reduz dano físico em 12%.",
-    enchant: null,
-    cooldown: 0,
-    armor: 12,
-    passive: true,
-    anim: "block",
-  },
-  {
-    id: "iron_shield",
-    type: "armor",
-    icon: "🔰",
-    name: "Escudo de Ferro",
-    rarity: "uncommon",
-    desc: "Pesado mas confiável nos momentos de perigo.",
-    effect: "A cada 8s: bloqueia o próximo ataque completamente.",
-    enchant: "✦ Parry: Bloquear perfeitamente retorna 5 de dano ao atacante.",
-    cooldown: 8000,
-    armor: 8,
-    blockNext: true,
-    anim: "shield_block",
-  },
-  {
-    id: "mage_robe",
-    type: "armor",
-    icon: "🧥",
-    name: "Manto do Arcano",
-    rarity: "rare",
-    desc: "Tecido de fios etéreos que absorve energia mágica.",
-    effect: "Passivo: +20 de Mana Máxima. +15% de dano mágico.",
-    enchant: "✦ Absorção: Ao receber dano mágico, converte 30% em Mana.",
-    cooldown: 0,
-    manaBonus: 20,
-    magicBoost: 0.15,
-    passive: true,
-    anim: "block",
-  },
-  {
-    id: "dragonscale",
-    type: "armor",
-    icon: "🐉",
-    name: "Escama Dracônica",
-    rarity: "legendary",
-    desc: "A última escama arrancada de Vorathex, o Destruidor.",
-    effect: "A cada 12s: Barreira de 30 HP que reflete 20% do dano absorvido.",
-    enchant: "✦ Fúria Dracônica: Abaixo de 40% de HP, +30% de dano.",
-    cooldown: 12000,
-    barrier: 30,
-    reflectPct: 0.2,
-    anim: "dragon_roar",
-  },
-
-  // RELICS
-  {
-    id: "health_crystal",
-    type: "relic",
-    icon: "💎",
-    name: "Cristal Vital",
-    rarity: "uncommon",
-    desc: "Pulsa com uma energia restauradora suave.",
-    effect: "A cada 5s: Restaura 8 HP.",
-    enchant: "✦ Ressonância: Cura extra de +3 HP a cada 10 cargas.",
-    cooldown: 5000,
-    healAmt: 8,
-    anim: "heal",
-  },
-  {
-    id: "mana_stone",
-    type: "relic",
-    icon: "🔮",
-    name: "Pedra de Mana",
-    rarity: "rare",
-    desc: "Condensa energia arcana em forma cristalina.",
-    effect: "A cada 4s: Regenera 12 de Mana.",
-    enchant: "✦ Transbordamento: Com Mana cheia, próximo ataque +25% de dano.",
-    cooldown: 4000,
-    manaRegen: 12,
-    anim: "mana_orb",
-  },
-  {
-    id: "berserker_totem",
-    type: "relic",
-    icon: "🪬",
-    name: "Totem Berserker",
-    rarity: "epic",
-    desc: "Esculpido em osso de gigante, emana raiva primitiva.",
-    effect: "A cada 7s: +40% de velocidade de ataque por 3s.",
-    enchant: "✦ Frenesi: Abaixo de 25% de HP, o Totem ativa automaticamente.",
-    cooldown: 7000,
-    atkSpeedBoost: 0.4,
-    duration: 3000,
-    anim: "berserk",
-  },
-  {
-    id: "phoenix_feather",
-    type: "relic",
-    icon: "🪶",
-    name: "Pena de Fênix",
-    rarity: "legendary",
-    desc: "Da cinza renascida – uma vez por batalha, nega a morte.",
-    effect:
-      "Passivo: Ao ser morto, ressuscita com 40% de HP. (Uma vez por onda)",
-    enchant:
-      "✦ Renascimento: Ao ressuscitar, todos os itens têm recarga zerada.",
-    cooldown: 0,
-    revive: true,
-    reviveAmt: 0.4,
-    passive: true,
-    anim: "phoenix",
-  },
-];
+// ITEMS será carregado do arquivo JSON
+let ITEMS = [];
 
 // ═══════════════════════════════════════════
 //  GAME STATE
 // ═══════════════════════════════════════════
 const PLAYER_BASE = { maxHp: 100, maxMana: 100, armor: 0, magicBoost: 0 };
+const SAVE_KEY = "reliquary_save_v1";
 
 const state = {
   wave: 1,
@@ -247,13 +70,94 @@ const state = {
 };
 
 // ═══════════════════════════════════════════
+//  SAVE/LOAD SYSTEM
+// ═══════════════════════════════════════════
+function saveGameState() {
+  try {
+    const saveData = {
+      wave: state.wave,
+      kills: state.kills,
+      score: state.score,
+      gold: state.gold,
+      fragments: state.fragments,
+      items: state.items,
+      itemTimers: state.itemTimers,
+      playerHp: state.player.hp,
+      playerMaxHp: state.player.maxHp,
+      playerMana: state.player.mana,
+      playerMaxMana: state.player.maxMana,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+    console.log("💾 Jogo salvo!");
+  } catch (error) {
+    console.error("❌ Erro ao salvar:", error);
+  }
+}
+
+function loadGameState() {
+  try {
+    const saved = localStorage.getItem(SAVE_KEY);
+    if (!saved) return false;
+
+    const saveData = JSON.parse(saved);
+
+    // Restaurar estado
+    state.wave = saveData.wave || 1;
+    state.kills = saveData.kills || 0;
+    state.score = saveData.score || 0;
+    state.gold = saveData.gold || 0;
+    state.fragments = saveData.fragments || 0;
+    state.items = saveData.items || [];
+    state.itemTimers = saveData.itemTimers || {};
+    state.player.hp = saveData.playerHp || 100;
+    state.player.maxHp = saveData.playerMaxHp || 100;
+    state.player.mana = saveData.playerMana || 0;
+    state.player.maxMana = saveData.playerMaxMana || 100;
+
+    console.log(`✅ Jogo carregado! Wave ${state.wave}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Erro ao carregar:", error);
+    return false;
+  }
+}
+
+function resetGameState() {
+  if (
+    !confirm(
+      "⚠️ Tem certeza que deseja resetar todo o progresso? Esta ação não pode ser desfeita!",
+    )
+  ) {
+    return;
+  }
+
+  try {
+    localStorage.removeItem(SAVE_KEY);
+    addLog("🔄 Progresso resetado! Recarregando...", "item");
+
+    setTimeout(() => {
+      location.reload();
+    }, 1000);
+  } catch (error) {
+    console.error("❌ Erro ao resetar:", error);
+  }
+}
+
+// ═══════════════════════════════════════════
 //  INVENTORY SETUP
 // ═══════════════════════════════════════════
 function buildInventory() {
-  const weapons = ITEMS.filter((i) => i.type === "weapon").slice(0, 4);
-  const armors = ITEMS.filter((i) => i.type === "armor").slice(0, 4);
-  const relics = ITEMS.filter((i) => i.type === "relic").slice(0, 4);
-  state.items = [...weapons, ...armors, ...relics];
+  // Se é a primeira vez, inicializar com itens básicos
+  if (state.items.length === 0) {
+    const weapons = ITEMS.filter(
+      (i) => i.type === "weapon" && i.rarity === "common",
+    ).slice(0, 1);
+    const armors = ITEMS.filter(
+      (i) => i.type === "armor" && i.rarity === "common",
+    ).slice(0, 1);
+    state.items = [...weapons, ...armors];
+  }
 
   // Apply passive bonuses
   state.player.armor = 0;
@@ -266,7 +170,7 @@ function buildInventory() {
       if (item.magicBoost) state.player.magicBoost += item.magicBoost;
     }
     if (item.cooldown > 0) {
-      state.itemTimers[item.id] = {
+      state.itemTimers[item.id] = state.itemTimers[item.id] || {
         elapsed: item.cooldown,
         cooldown: item.cooldown,
       };
@@ -291,9 +195,15 @@ function renderInventory() {
         <div class="cooldown-overlay" id="cd-text-${item.id}"></div>
         <div class="cd-bar" id="cd-bar-${item.id}" style="width:100%"></div>
       `;
+      // Desktop: mouse events
       slot.addEventListener("mouseenter", (e) => showTooltip(item, e));
       slot.addEventListener("mouseleave", hideTooltip);
       slot.addEventListener("mousemove", (e) => moveTooltip(e));
+      // Mobile: touch events
+      slot.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        showTooltip(item, e.touches[0]);
+      });
       el.appendChild(slot);
     });
   });
@@ -304,6 +214,7 @@ function renderInventory() {
 // ═══════════════════════════════════════════
 const tooltip = document.getElementById("tooltip");
 let tooltipItem = null;
+const isMobile = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
 function showTooltip(item, e) {
   tooltipItem = item;
@@ -316,22 +227,49 @@ function showTooltip(item, e) {
     ${item.enchant ? `<div class="tt-enchant">${item.enchant}</div>` : ""}
     ${item.cooldown > 0 ? `<div class="tt-cd">⏱ Recarga: ${(item.cooldown / 1000).toFixed(1)}s</div>` : ""}
   `;
-  moveTooltip(e);
+
+  if (isMobile) {
+    // Mobile: posição fixa centralizada
+    tooltip.classList.add("mobile");
+  } else {
+    // Desktop: segue o cursor
+    tooltip.classList.remove("mobile");
+    moveTooltip(e);
+  }
+
   tooltip.classList.add("show");
 }
+
 function hideTooltip() {
   tooltip.classList.remove("show");
   tooltipItem = null;
 }
+
 function moveTooltip(e) {
-  const tw = 280,
-    th = 200;
+  if (isMobile) return; // Não move em mobile
+
+  const tw = 280;
+  const th = 200;
   let x = e.clientX + 14;
   let y = e.clientY - 20;
+
+  // Ajusta se sair da tela
   if (x + tw > window.innerWidth) x = e.clientX - tw - 14;
   if (y + th > window.innerHeight) y = window.innerHeight - th - 10;
+  if (x < 0) x = 10;
+  if (y < 0) y = 10;
+
   tooltip.style.left = x + "px";
   tooltip.style.top = y + "px";
+}
+
+// Fechar tooltip ao tocar fora em mobile
+if (isMobile) {
+  document.addEventListener("touchstart", (e) => {
+    if (tooltip.classList.contains("show") && !e.target.closest(".item-slot")) {
+      hideTooltip();
+    }
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -1144,6 +1082,11 @@ function spawnWave(waveNum) {
   const hpScale = 1 + (waveNum - 1) * 0.2;
   const dmgScale = 1 + (waveNum - 1) * 0.15;
 
+  // Ajustes para mobile
+  const mobileMultiplier = isMobile ? 1.4 : 1.0; // Inimigos começam mais longe
+  const mobileSpeedReduction = isMobile ? 0.7 : 1.0; // Velocidade reduzida em mobile
+  const mobileDmgReduction = isMobile ? 0.85 : 1.0; // Dano reduzido em mobile
+
   for (let i = 0; i < count; i++) {
     const typeIdx = Math.floor(
       Math.random() * Math.min(ENEMY_TYPES.length, Math.ceil(waveNum / 2)),
@@ -1153,8 +1096,9 @@ function spawnWave(waveNum) {
       ...base,
       hp: Math.round(base.hp * hpScale),
       maxHp: Math.round(base.hp * hpScale),
-      dmg: Math.round(base.dmg * dmgScale),
-      x: W * 0.6 + i * 90 + Math.random() * 40,
+      dmg: Math.round(base.dmg * dmgScale * mobileDmgReduction),
+      speed: base.speed * mobileSpeedReduction,
+      x: W * 0.6 * mobileMultiplier + i * 90 + Math.random() * 40,
       y: groundY,
       phase: Math.random() * Math.PI * 2,
       hurtTimer: 0,
@@ -1414,20 +1358,358 @@ function checkWaveComplete() {
     const goldEarned = state.enemies.reduce((s, e) => s + (e.gold || 5), 0);
     state.gold += goldEarned;
     state.score += state.wave * 50;
-    addLog(
-      `✨ Onda ${state.wave} concluída! +${goldEarned} ouro. Próxima onda em 3s...`,
-      "kill",
-    );
-    setTimeout(() => {
-      state.wave++;
-      state.player.reviveUsed = false;
-      state.player.berserking = false;
-      state.player.hp = Math.min(state.player.maxHp, state.player.hp + 20);
-      spawnWave(state.wave);
-      state.waveTransition = false;
-      state.player.anim = "idle";
-    }, 3000);
+
+    // Salvar progresso após completar wave
+    saveGameState();
+
+    // Verificar se deve oferecer recompensa (a cada 2 waves)
+    const shouldOfferReward = state.wave % 2 === 0;
+
+    if (shouldOfferReward) {
+      addLog(
+        `✨ Onda ${state.wave} concluída! +${goldEarned} ouro. 🎁 Escolha sua recompensa!`,
+        "kill",
+      );
+      setTimeout(() => {
+        showWaveRewardSelection();
+      }, 1500);
+    } else {
+      addLog(
+        `✨ Onda ${state.wave} concluída! +${goldEarned} ouro. Próxima onda em 3s...`,
+        "kill",
+      );
+      setTimeout(() => {
+        startNextWave();
+      }, 3000);
+    }
   }
+}
+
+function startNextWave() {
+  state.wave++;
+  state.player.reviveUsed = false;
+  state.player.berserking = false;
+  state.player.hp = Math.min(state.player.maxHp, state.player.hp + 20);
+  spawnWave(state.wave);
+  state.waveTransition = false;
+  state.player.anim = "idle";
+  updateUI();
+}
+
+// ═══════════════════════════════════════════
+//  SISTEMA DE RECOMPENSA DE WAVE (a cada 2 waves)
+// ═══════════════════════════════════════════
+function showWaveRewardSelection() {
+  state.isPaused = true;
+
+  const modal = document.getElementById("item-choice-modal");
+  const container = document.getElementById("item-choices-container");
+  const header = modal.querySelector("h2");
+  const instruction = modal.querySelector("p");
+
+  // Atualizar textos do modal
+  header.textContent = "🎁 Recompensa da Onda!";
+  instruction.innerHTML = `
+    <div style="text-align: center; line-height: 1.6;">
+      <strong>Escolha 1 item de 3 opções</strong><br>
+      <span style="font-size: 0.9em; opacity: 0.8;">Wave ${state.wave} concluída</span>
+    </div>
+  `;
+
+  container.innerHTML = "";
+
+  // Gerar 3 itens aleatórios
+  const rewardItems = generateRandomItems(3);
+
+  rewardItems.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "item-choice-card";
+    card.dataset.itemId = item.id;
+    card.onclick = () => selectWaveReward(item, card);
+
+    const rarityInfo = RARITIES[item.rarity];
+
+    card.innerHTML = `
+      <div class="item-choice-type">${getTypeLabel(item.type)}</div>
+      <div class="item-choice-icon">${item.icon}</div>
+      <div class="item-choice-name">${item.name}</div>
+      <div class="item-choice-rarity rarity-${item.rarity}">${rarityInfo.label}</div>
+      <div class="item-choice-desc">${item.desc}</div>
+      <div class="item-choice-effect">${item.effect}</div>
+      ${item.enchant ? `<div class="item-choice-enchant">${item.enchant}</div>` : ""}
+      <div class="selection-indicator">✓</div>
+    `;
+
+    container.appendChild(card);
+  });
+
+  modal.style.display = "flex";
+}
+
+function selectWaveReward(item, card) {
+  // Adicionar item ao inventário
+  state.items.push(item);
+
+  // Inicializar timer se necessário
+  if (item.cooldown > 0) {
+    state.itemTimers[item.id] = {
+      elapsed: item.cooldown,
+      cooldown: item.cooldown,
+    };
+  }
+
+  // Reconstruir inventário
+  buildInventory();
+
+  // Fechar modal
+  const modal = document.getElementById("item-choice-modal");
+  modal.style.display = "none";
+
+  // Log
+  addLog(`✨ ${item.icon} ${item.name} adicionado ao inventário!`, "item");
+
+  // Salvar
+  saveGameState();
+
+  // Iniciar próxima wave após breve delay
+  setTimeout(() => {
+    startNextWave();
+    resumeGame();
+  }, 800);
+}
+
+// ═══════════════════════════════════════════
+//  SISTEMA DE ESCOLHA DE ITEM
+// ═══════════════════════════════════════════
+const itemSelectionState = {
+  selectedItems: [],
+  maxSelections: 4,
+  availableItems: [],
+};
+
+function showInitialItemSelection() {
+  // Pausar o jogo
+  state.isPaused = true;
+
+  // Resetar seleção
+  itemSelectionState.selectedItems = [];
+  itemSelectionState.maxSelections = 4;
+
+  // Gerar 12 itens aleatórios
+  itemSelectionState.availableItems = generateRandomItems(12);
+
+  // Renderizar modal
+  const modal = document.getElementById("item-choice-modal");
+  const container = document.getElementById("item-choices-container");
+
+  // Atualizar header
+  const modalHeader = modal.querySelector(".modal-header");
+  modalHeader.innerHTML = `
+    <h2>⚔️ Escolha Seus Itens Iniciais</h2>
+    <p class="modal-subtitle">Selecione até 4 itens para começar sua jornada</p>
+    <div class="selection-counter">
+      <span id="selection-count">0</span> / ${itemSelectionState.maxSelections} selecionados
+    </div>
+  `;
+
+  container.innerHTML = "";
+
+  itemSelectionState.availableItems.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "item-choice-card";
+    card.dataset.itemId = item.id;
+    card.onclick = () => toggleItemSelection(item, card);
+
+    const rarityInfo = RARITIES[item.rarity];
+
+    card.innerHTML = `
+      <div class="item-choice-type">${getTypeLabel(item.type)}</div>
+      <div class="item-choice-icon">${item.icon}</div>
+      <div class="item-choice-name">${item.name}</div>
+      <div class="item-choice-rarity rarity-${item.rarity}">${rarityInfo.label}</div>
+      <div class="item-choice-desc">${item.desc}</div>
+      <div class="item-choice-effect">${item.effect}</div>
+      ${item.enchant ? `<div class="item-choice-enchant">${item.enchant}</div>` : ""}
+      <div class="selection-indicator">✓</div>
+    `;
+
+    container.appendChild(card);
+  });
+
+  // Adicionar botão de confirmação
+  const confirmBtn = document.createElement("div");
+  confirmBtn.className = "confirm-selection-btn";
+  confirmBtn.id = "confirm-selection-btn";
+  confirmBtn.innerHTML = "Iniciar Jogo";
+  confirmBtn.onclick = confirmItemSelection;
+  container.appendChild(confirmBtn);
+
+  modal.style.display = "flex";
+}
+
+function toggleItemSelection(item, card) {
+  const isSelected = itemSelectionState.selectedItems.some(
+    (i) => i.id === item.id,
+  );
+
+  if (isSelected) {
+    // Remover seleção
+    itemSelectionState.selectedItems = itemSelectionState.selectedItems.filter(
+      (i) => i.id !== item.id,
+    );
+    card.classList.remove("selected");
+  } else {
+    // Adicionar seleção se não atingiu o limite
+    if (
+      itemSelectionState.selectedItems.length < itemSelectionState.maxSelections
+    ) {
+      itemSelectionState.selectedItems.push(item);
+      card.classList.add("selected");
+    } else {
+      addLog(
+        `⚠️ Você já selecionou o máximo de ${itemSelectionState.maxSelections} itens!`,
+        "item",
+      );
+      return;
+    }
+  }
+
+  // Atualizar contador
+  const counter = document.getElementById("selection-count");
+  if (counter) {
+    counter.textContent = itemSelectionState.selectedItems.length;
+  }
+
+  // Atualizar botão de confirmação
+  const confirmBtn = document.getElementById("confirm-selection-btn");
+  if (confirmBtn) {
+    if (itemSelectionState.selectedItems.length > 0) {
+      confirmBtn.classList.add("active");
+    } else {
+      confirmBtn.classList.remove("active");
+    }
+  }
+}
+
+function confirmItemSelection() {
+  if (itemSelectionState.selectedItems.length === 0) {
+    addLog("⚠️ Selecione pelo menos 1 item para continuar!", "item");
+    return;
+  }
+
+  // Adicionar itens selecionados ao inventário
+  state.items = [...itemSelectionState.selectedItems];
+
+  // Inicializar timers
+  state.items.forEach((item) => {
+    if (item.cooldown > 0) {
+      state.itemTimers[item.id] = {
+        elapsed: item.cooldown,
+        cooldown: item.cooldown,
+      };
+    }
+  });
+
+  // Reconstruir inventário
+  buildInventory();
+
+  // Fechar modal
+  const modal = document.getElementById("item-choice-modal");
+  modal.style.display = "none";
+
+  // Iniciar o jogo
+  addLog(
+    `🎮 Jogo iniciado com ${state.items.length} itens! Boa sorte!`,
+    "item",
+  );
+  spawnWave(1);
+
+  // Salvar itens selecionados
+  saveGameState();
+
+  // Retomar jogo
+  setTimeout(() => {
+    resumeGame();
+  }, 500);
+}
+
+function generateRandomItems(count) {
+  // Pesos de raridade (maior = mais comum)
+  const rarityWeights = {
+    common: 40,
+    uncommon: 30,
+    rare: 18,
+    epic: 9,
+    legendary: 3,
+  };
+
+  const selectedItems = [];
+  const usedIds = new Set();
+
+  for (let i = 0; i < count; i++) {
+    let item = null;
+    let attempts = 0;
+
+    // Tentar até 20 vezes para encontrar um item não repetido
+    while (!item && attempts < 20) {
+      // Sortear raridade baseado nos pesos
+      const rarity = getWeightedRarity(rarityWeights);
+
+      // Pegar itens dessa raridade
+      const itemsOfRarity = ITEMS.filter((i) => i.rarity === rarity);
+
+      if (itemsOfRarity.length > 0) {
+        const randomItem =
+          itemsOfRarity[Math.floor(Math.random() * itemsOfRarity.length)];
+
+        if (!usedIds.has(randomItem.id)) {
+          item = randomItem;
+          usedIds.add(randomItem.id);
+        }
+      }
+
+      attempts++;
+    }
+
+    // Se não encontrou, pegar qualquer item aleatório
+    if (!item) {
+      const remainingItems = ITEMS.filter((i) => !usedIds.has(i.id));
+      if (remainingItems.length > 0) {
+        item =
+          remainingItems[Math.floor(Math.random() * remainingItems.length)];
+        usedIds.add(item.id);
+      }
+    }
+
+    if (item) {
+      selectedItems.push(item);
+    }
+  }
+
+  return selectedItems;
+}
+
+function getWeightedRarity(weights) {
+  const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+  let random = Math.random() * totalWeight;
+
+  for (const [rarity, weight] of Object.entries(weights)) {
+    random -= weight;
+    if (random <= 0) {
+      return rarity;
+    }
+  }
+
+  return "common"; // Fallback
+}
+
+function getTypeLabel(type) {
+  const labels = {
+    weapon: "Arma",
+    armor: "Armadura",
+    relic: "Relíquia",
+  };
+  return labels[type] || type;
 }
 
 // ═══════════════════════════════════════════
@@ -1529,6 +1811,35 @@ function processDots() {
       return dot.duration > 0;
     });
   });
+}
+
+// ═══════════════════════════════════════════
+//  UI UPDATE
+// ═══════════════════════════════════════════
+function updateUI() {
+  const p = state.player;
+
+  // Player bars
+  document.getElementById("hp-bar").style.width = (p.hp / p.maxHp) * 100 + "%";
+  document.getElementById("hp-val").textContent =
+    `${Math.max(0, Math.round(p.hp))}/${p.maxHp}`;
+  document.getElementById("mana-bar").style.width =
+    (p.mana / p.maxMana) * 100 + "%";
+  document.getElementById("mana-val").textContent =
+    `${Math.round(p.mana)}/${p.maxMana}`;
+
+  // Header stats
+  document.getElementById("hdr-wave").textContent = state.wave;
+  document.getElementById("hdr-kills").textContent = state.kills;
+  document.getElementById("hdr-score").textContent = state.score;
+  document.getElementById("hdr-fragments").textContent = state.fragments;
+
+  // Wave info bar
+  document.getElementById("inv-wave").textContent = `Onda ${state.wave}`;
+  const alive = state.enemies.filter((e) => !e.dead).length;
+  document.getElementById("inv-enemies").textContent =
+    `${alive} inimigo${alive !== 1 ? "s" : ""}`;
+  document.getElementById("inv-gold").textContent = `⚙ ${state.gold} ouro`;
 }
 
 // ═══════════════════════════════════════════
@@ -1834,9 +2145,23 @@ function restartGame() {
 function init() {
   state.player.x = canvas.width * 0.22;
   state.player.y = canvas.height * 0.55;
-  buildInventory();
-  spawnWave(1);
-  addLog("🏰 Bem-vindo ao Reliquary! Pressione Play para iniciar.", "item");
+
+  // Tentar carregar jogo salvo
+  const hasSavedGame = loadGameState();
+
+  if (hasSavedGame) {
+    // Jogo carregado - reconstruir inventário e iniciar wave atual
+    addLog(`🏰 Bem-vindo de volta! Continuando da Wave ${state.wave}.`, "item");
+    buildInventory();
+    spawnWave(state.wave);
+    updateUI();
+  } else {
+    // Novo jogo - limpar inventário e mostrar seleção
+    state.items = [];
+    addLog("🏰 Bem-vindo ao Reliquary! Escolha seus itens iniciais.", "item");
+    showInitialItemSelection();
+  }
+
   state.lastTime = performance.now();
   requestAnimationFrame(gameLoop);
 
@@ -1850,6 +2175,7 @@ function init() {
 function setupGameControls() {
   const btnPlay = document.getElementById("btn-play");
   const btnPause = document.getElementById("btn-pause");
+  const btnReset = document.getElementById("btn-reset");
 
   if (!btnPlay || !btnPause) return;
 
@@ -1868,6 +2194,10 @@ function setupGameControls() {
     if (state.isPaused) return;
     pauseGame();
   });
+
+  if (btnReset) {
+    btnReset.addEventListener("click", resetGameState);
+  }
 }
 
 function pauseGame() {
@@ -1910,4 +2240,23 @@ function resumeGame() {
   addLog("▶️ Jogo retomado.", "item");
 }
 
-init();
+// ═══════════════════════════════════════════
+//  CARREGAR ITENS DO JSON
+// ═══════════════════════════════════════════
+async function loadItems() {
+  try {
+    const response = await fetch("assets/items.json");
+    if (!response.ok) {
+      throw new Error("Erro ao carregar items.json");
+    }
+    ITEMS = await response.json();
+    console.log(`✅ ${ITEMS.length} itens carregados com sucesso!`);
+    init();
+  } catch (error) {
+    console.error("❌ Erro ao carregar itens:", error);
+    addLog("❌ Erro ao carregar itens do jogo.", "item");
+  }
+}
+
+// Inicializar o jogo após carregar os itens
+loadItems();
