@@ -67,7 +67,85 @@ const state = {
   running: true,
   isPaused: true,
   waveTransition: false,
+  gameSpeed: 1,
+  runStats: { totalDamage: 0, itemUses: {}, startTime: 0 },
 };
+
+// ═══════════════════════════════════════════
+//  SOUND EFFECTS (WebAudio)
+// ═══════════════════════════════════════════
+const sfx = (() => {
+  let actx = null;
+  let muted = false;
+
+  function getCtx() {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      actx = new AC();
+    }
+    if (actx.state === "suspended") actx.resume();
+    return actx;
+  }
+
+  function tone(freq, dur, type = "square", vol = 0.04, slideTo = 0, delay = 0) {
+    if (muted) return;
+    const a = getCtx();
+    if (!a) return;
+    try {
+      const t0 = a.currentTime + delay;
+      const osc = a.createOscillator();
+      const gain = a.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      if (slideTo > 0) {
+        osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+      }
+      gain.gain.setValueAtTime(vol, t0);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(gain);
+      gain.connect(a.destination);
+      osc.start(t0);
+      osc.stop(t0 + dur);
+    } catch (e) {
+      /* áudio é opcional — nunca quebra o jogo */
+    }
+  }
+
+  return {
+    toggleMute() {
+      muted = !muted;
+      return muted;
+    },
+    hit() {
+      tone(220, 0.08, "square", 0.03, 140);
+    },
+    enemyHit() {
+      tone(160, 0.1, "sawtooth", 0.03, 90);
+    },
+    block() {
+      tone(900, 0.07, "triangle", 0.05, 500);
+    },
+    kill() {
+      tone(300, 0.16, "square", 0.04, 620);
+    },
+    heal() {
+      tone(520, 0.12, "sine", 0.04, 780);
+    },
+    waveClear() {
+      tone(392, 0.12, "triangle", 0.05);
+      tone(523, 0.2, "triangle", 0.05, 0, 0.12);
+    },
+    reward() {
+      tone(523, 0.1, "sine", 0.05);
+      tone(659, 0.1, "sine", 0.05, 0, 0.1);
+      tone(784, 0.18, "sine", 0.05, 0, 0.2);
+    },
+    death() {
+      tone(220, 0.6, "sawtooth", 0.05, 55);
+    },
+  };
+})();
 
 // ═══════════════════════════════════════════
 //  SAVE/LOAD SYSTEM
@@ -1119,7 +1197,10 @@ function activateItem(item) {
   const p = state.player;
   const enemies = state.enemies.filter((e) => !e.dead);
   if (enemies.length === 0) return;
-  const target = enemies[0];
+  // Alvo: inimigo mais próximo do jogador
+  const target = enemies.reduce((closest, en) =>
+    Math.abs(en.x - p.x) < Math.abs(closest.x - p.x) ? en : closest,
+  );
 
   let activated = false;
 
@@ -1181,6 +1262,7 @@ function activateItem(item) {
       }
     }
     addLog(`⚔ ${item.name}: ${totalDmg} de dano em ${target.name}!`, "dmg");
+    sfx.hit();
 
     // Anim
     const animMap = {
@@ -1230,6 +1312,7 @@ function activateItem(item) {
       spawnEffect("heal", p.x, p.y - 50, { life: 45 });
       spawnNumber(p.x, p.y - 60, `+${healAmt}`, "#44cc88", 2);
       addLog(`💎 Cristal Vital: restaura ${healAmt} HP.`, "heal");
+      sfx.heal();
       p.anim = "heal";
       activated = true;
     } else if (item.id === "mana_stone") {
@@ -1258,6 +1341,9 @@ function activateItem(item) {
   }
 
   if (activated) {
+    // Estatísticas da run
+    state.runStats.itemUses[item.id] =
+      (state.runStats.itemUses[item.id] || 0) + 1;
     // Flash slot in DOM
     const slot = document.querySelector(`.item-slot[data-id="${item.id}"]`);
     if (slot) {
@@ -1287,6 +1373,7 @@ function enemyAttack(en) {
     } else {
       addLog(`🔰 Ataque bloqueado!`, "item");
     }
+    sfx.block();
     spawnEffect("shield", p.x, p.y - 40, { life: 25 });
     return;
   }
@@ -1322,6 +1409,7 @@ function enemyAttack(en) {
   }
 
   p.hp -= dmg;
+  sfx.enemyHit();
   spawnNumber(p.x - 20, p.y - 60, `-${dmg}`, "#ff6666", 2);
   addLog(`💀 ${en.name} ataca: ${dmg} de dano!`, "dmg");
 
@@ -1343,8 +1431,9 @@ function enemyAttack(en) {
     } else {
       p.hp = 0;
       addLog(`☠️ Você foi derrotado na onda ${state.wave}!`, "kill");
+      sfx.death();
       state.running = false;
-      setTimeout(restartGame, 3000);
+      setTimeout(showGameOverScreen, 1200);
     }
   }
 }
@@ -1358,6 +1447,8 @@ function checkWaveComplete() {
     const goldEarned = state.enemies.reduce((s, e) => s + (e.gold || 5), 0);
     state.gold += goldEarned;
     state.score += state.wave * 50;
+
+    sfx.waveClear();
 
     // Salvar progresso após completar wave
     saveGameState();
@@ -1447,6 +1538,7 @@ function showWaveRewardSelection() {
 }
 
 function selectWaveReward(item, card) {
+  sfx.reward();
   // Adicionar item ao inventário
   state.items.push(item);
 
@@ -1722,6 +1814,7 @@ function applyElementalDamage(target, baseDmg, element, source) {
 
   target.hp -= finalDmg;
   target.hurtTimer = 15;
+  if (source === "player") state.runStats.totalDamage += finalDmg;
 
   // Visual feedback based on resistance
   let color = "#ff4444";
@@ -1779,12 +1872,12 @@ function applyDot(target, type, damage, duration, stackable = true) {
   });
 }
 
-function processDots() {
+function processDots(dt) {
   [...state.enemies, state.player].forEach((entity) => {
     if (!entity.dots || entity.dead || entity.hp <= 0) return;
 
     entity.dots = entity.dots.filter((dot) => {
-      dot.tickTimer += 16.67; // ~60fps
+      dot.tickTimer += dt;
 
       if (dot.tickTimer >= 1000) {
         dot.tickTimer = 0;
@@ -1848,7 +1941,7 @@ function updateUI() {
 let lastItemUpdate = 0;
 
 function gameLoop(timestamp) {
-  const dt = Math.min(timestamp - state.lastTime, 50);
+  const dt = Math.min(timestamp - state.lastTime, 50) * state.gameSpeed;
   state.lastTime = timestamp;
   state.tick++;
 
@@ -1867,7 +1960,6 @@ function gameLoop(timestamp) {
       canvas.width / 2,
       canvas.height / 2 + 20,
     );
-    ctx.fillText("Reiniciando...", canvas.width / 2, canvas.height / 2 + 50);
     requestAnimationFrame(gameLoop);
     return;
   }
@@ -1937,7 +2029,7 @@ function gameLoop(timestamp) {
   }
 
   // ─ Process DoTs ─
-  processDots();
+  processDots(dt);
 
   // ─ Enemy movement & attack ─
   const playerX = state.player.x;
@@ -1964,6 +2056,7 @@ function gameLoop(timestamp) {
       state.score += en.xp;
       state.gold += en.gold || 0;
       state.fragments += en.fragments || 1;
+      sfx.kill();
       spawnEffect("death", en.x, en.y - 30, { life: 50 });
       spawnNumber(en.x, en.y - 50, `+${en.xp} XP`, "#c9a84c", 3);
       if (en.fragments > 0) {
@@ -2087,6 +2180,59 @@ function addLog(msg, type = "") {
 }
 
 // ═══════════════════════════════════════════
+//  GAME OVER SCREEN
+// ═══════════════════════════════════════════
+function showGameOverScreen() {
+  const modal = document.getElementById("game-over-modal");
+  const statsEl = document.getElementById("go-stats");
+  const subtitle = document.getElementById("go-subtitle");
+
+  // Duração da run
+  const elapsed = performance.now() - (state.runStats.startTime || 0);
+  const mins = Math.floor(elapsed / 60000);
+  const secs = Math.floor((elapsed % 60000) / 1000);
+  const duration = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+  // Item mais usado
+  const uses = Object.entries(state.runStats.itemUses);
+  let favoriteItem = "—";
+  if (uses.length > 0) {
+    const [topId, topCount] = uses.reduce((a, b) => (b[1] > a[1] ? b : a));
+    const item = ITEMS.find((i) => i.id === topId);
+    if (item) favoriteItem = `${item.icon} ${item.name} (${topCount}×)`;
+  }
+
+  subtitle.textContent = `Você caiu na onda ${state.wave}.`;
+
+  const stats = [
+    { label: "🌊 Onda alcançada", value: state.wave },
+    { label: "💀 Inimigos mortos", value: state.kills },
+    { label: "🏆 Pontuação", value: state.score },
+    { label: "⚙ Ouro acumulado", value: state.gold },
+    { label: "⚔ Dano total causado", value: state.runStats.totalDamage },
+    { label: "⏱ Duração da run", value: duration },
+    { label: "⭐ Item favorito", value: favoriteItem, wide: true },
+    {
+      label: "⚡ Fragmentos (mantidos)",
+      value: state.fragments,
+      wide: true,
+    },
+  ];
+
+  statsEl.innerHTML = stats
+    .map(
+      (s) => `
+      <div class="go-stat${s.wide ? " wide" : ""}">
+        <div class="go-stat-label">${s.label}</div>
+        <div class="go-stat-value">${s.value}</div>
+      </div>`,
+    )
+    .join("");
+
+  modal.style.display = "flex";
+}
+
+// ═══════════════════════════════════════════
 //  RESTART
 // ═══════════════════════════════════════════
 function restartGame() {
@@ -2118,6 +2264,11 @@ function restartGame() {
   state.running = true;
   state.isPaused = false;
   state.waveTransition = false;
+  state.runStats = {
+    totalDamage: 0,
+    itemUses: {},
+    startTime: performance.now(),
+  };
   document.getElementById("log-panel").innerHTML = "";
   addLog(
     `⚡ Mantidos ${state.fragments} fragmentos de runs anteriores.`,
@@ -2145,6 +2296,7 @@ function restartGame() {
 function init() {
   state.player.x = canvas.width * 0.22;
   state.player.y = canvas.height * 0.55;
+  state.runStats.startTime = performance.now();
 
   // Tentar carregar jogo salvo
   const hasSavedGame = loadGameState();
@@ -2176,6 +2328,9 @@ function setupGameControls() {
   const btnPlay = document.getElementById("btn-play");
   const btnPause = document.getElementById("btn-pause");
   const btnReset = document.getElementById("btn-reset");
+  const btnSpeed = document.getElementById("btn-speed");
+  const btnMute = document.getElementById("btn-mute");
+  const btnRestart = document.getElementById("btn-restart");
 
   if (!btnPlay || !btnPause) return;
 
@@ -2197,6 +2352,30 @@ function setupGameControls() {
 
   if (btnReset) {
     btnReset.addEventListener("click", resetGameState);
+  }
+
+  if (btnSpeed) {
+    const speeds = [1, 2, 3];
+    btnSpeed.addEventListener("click", () => {
+      const idx = speeds.indexOf(state.gameSpeed);
+      state.gameSpeed = speeds[(idx + 1) % speeds.length];
+      btnSpeed.textContent = `⏩ ${state.gameSpeed}×`;
+      btnSpeed.classList.toggle("active", state.gameSpeed > 1);
+    });
+  }
+
+  if (btnMute) {
+    btnMute.addEventListener("click", () => {
+      const muted = sfx.toggleMute();
+      btnMute.textContent = muted ? "🔇" : "🔊";
+    });
+  }
+
+  if (btnRestart) {
+    btnRestart.addEventListener("click", () => {
+      document.getElementById("game-over-modal").style.display = "none";
+      restartGame();
+    });
   }
 }
 
