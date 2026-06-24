@@ -1,0 +1,17 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="64" height="64" fill="#08080a"/>
+
+  <!-- Shield outline -->
+  <path d="M32 8 L48 16 L48 32 Q32 48 32 48 Q16 32 16 32 L16 16 Z" fill="none" stroke="#5b8cff" stroke-width="2"/>
+
+  <!-- Central gem/relic -->
+  <circle cx="32" cy="28" r="6" fill="#c9a84c" stroke="#5b8cff" stroke-width="1.5"/>
+
+  <!-- Gem shine -->
+  <circle cx="30" cy="26" r="2" fill="#ffeb99" opacity="0.8"/>
+
+  <!-- Decorative lines -->
+  <line x1="32" y1="16" x2="32" y2="22" stroke="#5b8cff" stroke-width="1"/>
+  <line x1="32" y1="34" x2="32" y2="40" stroke="#5b8cff" stroke-width="1"/>
+</svg>
