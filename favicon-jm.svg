@@ -1,0 +1,13 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="64" height="64" fill="#08080a"/>
+
+  <!-- Border -->
+  <rect width="64" height="64" fill="none" stroke="#5b8cff" stroke-width="2"/>
+
+  <!-- JM text -->
+  <text x="32" y="44" font-family="Arial, sans-serif" font-size="32" font-weight="800" text-anchor="middle" fill="#f2f2f2" letter-spacing="-2">JM</text>
+
+  <!-- Blue accent line -->
+  <rect x="24" y="50" width="16" height="2" fill="#5b8cff"/>
+</svg>
