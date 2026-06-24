@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reliquary – Auto Battler</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="header">
+        <div>
+          <h1>⚔ RELIQUARY</h1>
+          <div class="subtitle">Auto-Battle Relic Collector</div>
+        </div>
+        <div id="stats-header">
+          <div class="stat-pill">
+            🌊 Wave <span class="val" id="hdr-wave">1</span>
+          </div>
+          <div class="stat-pill">
+            💀 Kills <span class="val" id="hdr-kills">0</span>
+          </div>
+          <div class="stat-pill">
+            🏆 Score <span class="val" id="hdr-score">0</span>
+          </div>
+          <div
+            class="stat-pill"
+            style="background: var(--bg4); border-color: var(--purple)"
+          >
+            <span>⚡ Fragmentos</span>
+            <span class="val" id="hdr-fragments" style="color: var(--purple2)"
+              >0</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="arena">
+        <canvas id="combat-canvas"></canvas>
+        <div id="game-controls">
+          <button id="btn-play" class="control-btn" title="Iniciar/Retomar">
+            ▶️ Play
+          </button>
+          <button id="btn-pause" class="control-btn" title="Pausar">
+            ⏸️ Pause
+          </button>
+          <button id="btn-speed" class="control-btn" title="Velocidade do jogo">
+            ⏩ 1×
+          </button>
+          <button
+            id="btn-mute"
+            class="control-btn"
+            title="Som ligado/desligado"
+          >
+            🔊
+          </button>
+          <button
+            id="btn-reset"
+            class="control-btn reset-btn"
+            title="Resetar Progresso"
+          >
+            🔄 Reset
+          </button>
+        </div>
+      </div>
+
+      <div id="log-panel" aria-label="Combat log"></div>
+
+      <div id="inventory" aria-label="Player inventory">
+        <div class="bars-container">
+          <div class="bar-row">
+            <div class="bar-label">HP</div>
+            <div class="bar-track">
+              <div class="bar-fill hp" id="hp-bar" style="width: 100%"></div>
+            </div>
+            <div class="bar-val" id="hp-val">100/100</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">MP</div>
+            <div class="bar-track">
+              <div class="bar-fill mana" id="mana-bar" style="width: 0%"></div>
+            </div>
+            <div class="bar-val" id="mana-val">0/100</div>
+          </div>
+        </div>
+        <div class="wave-info">
+          <div class="wave-num" id="inv-wave">Onda 1</div>
+          <div class="enemy-count" id="inv-enemies">3 inimigos</div>
+          <div class="gold-display" id="inv-gold">⚙ 0 ouro</div>
+        </div>
+
+        <div class="inv-section">
+          <div class="inv-section-title">Armas</div>
+          <div class="slots-grid" id="slots-weapon"></div>
+        </div>
+        <div class="inv-section">
+          <div class="inv-section-title">Armaduras</div>
+          <div class="slots-grid" id="slots-armor"></div>
+        </div>
+        <div class="inv-section">
+          <div class="inv-section-title">Relíquias</div>
+          <div class="slots-grid" id="slots-relic"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <!-- MODAL DE ESCOLHA DE ITEM -->
+    <div id="item-choice-modal" class="modal-overlay" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>🎁 Recompensa da Onda</h2>
+          <p class="modal-subtitle">Escolha 1 item para equipar</p>
+        </div>
+        <div class="item-choices" id="item-choices-container">
+          <!-- Cards de itens serão inseridos aqui -->
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DE GAME OVER -->
+    <div id="game-over-modal" class="modal-overlay" style="display: none">
+      <div class="modal-content game-over-content">
+        <div class="modal-header">
+          <h2>☠️ Derrotado</h2>
+          <p class="modal-subtitle" id="go-subtitle">
+            Sua jornada termina aqui... por enquanto.
+          </p>
+        </div>
+        <div class="go-stats" id="go-stats">
+          <!-- Estatísticas da run serão inseridas aqui -->
+        </div>
+        <button id="btn-restart" class="go-restart-btn">
+          ⚔️ Jogar Novamente
+        </button>
+      </div>
+    </div>
+
+    <script src="../game.js"></script>
+  </body>
+</html>
