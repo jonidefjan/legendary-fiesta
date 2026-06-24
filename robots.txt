@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Allow: /game/
+Disallow: /node_modules/
+Disallow: *.bak
+
+Sitemap: https://jonatas.dev/sitemap.xml
+
+# Crawl delay (segundos)
+Crawl-delay: 1
