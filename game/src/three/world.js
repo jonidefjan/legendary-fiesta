@@ -6,7 +6,7 @@
 // Y = para cima (chão em 0), Z = profundidade (positivo = mais perto da câmera).
 // A lógica do jogo continua em pixels da arena; o renderer converte x → X.
 export const WORLD = {
-  battleWidth: 32, // largura da arena lógica inteira em X, de -16 a 16
+  battleWidth: 20, // largura da arena lógica inteira em X, de -10 a 10 (herói em X ≈ -5,6)
   groundY: 0,
   heroHeight: 1.8,
   // Faixa de combate: herói e inimigos andam em Z entre -laneHalfDepth e +laneHalfDepth.
@@ -25,6 +25,6 @@ export const LOW_RES_HEIGHT = 240;
 // Câmera ortográfica em diorama 3/4: inclinação para baixo e altura da vista em unidades
 export const CAMERA = {
   pitchDeg: 35,
-  viewHeight: 16, // quanto do mundo cabe na altura da tela
-  target: { x: 0, y: 0.8, z: -1.5 }, // ponto que fica no centro da tela
+  viewHeight: 10, // quanto do mundo cabe na altura da tela (herói com ~45 px de arte)
+  target: { x: 0, y: 0.8, z: -1 }, // ponto que fica no centro da tela
 };

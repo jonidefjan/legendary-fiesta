@@ -7,7 +7,7 @@
 //   state.js   estado compartilhado          items.js   catálogo, sorteio, passivos
 //   combat.js  dano, efeitos, inimigos       waves.js   criação das ondas
 //   save.js    run salva e fragmentos        events.js  avisos da lógica para a UI
-//   render.js  desenho no canvas             ui.js      DOM: inventário, HUD, modais
+//   three/renderer.js  desenho 3D em pixel art  ui.js  DOM: inventário, HUD, modais
 //   audio.js   sons (Web Audio)              fx.js      efeitos visuais (dados)
 //
 // Filosofia: "Quebrar o jogo é divertido" - sinergias absurdas são features
@@ -30,7 +30,7 @@ import {
   updateEnemies,
 } from "./combat.js";
 import * as save from "./save.js";
-import * as render from "./render.js";
+import * as render from "./three/renderer.js";
 import * as particles from "./particles.js";
 import * as feel from "./feel.js";
 import * as ui from "./ui.js";
