@@ -1,25 +1,73 @@
 // ═══════════════════════════════════════════
 //  CANVAS & DRAWING
 // ═══════════════════════════════════════════
+// Duas camadas:
+//   mundo  -> desenhado em 2D num canvas de origem e passado pelo shader de pixel art
+//             (postfx.js). Sem WebGL, o mundo é desenhado direto no canvas visível.
+//   texto  -> canvas por cima, sem shader: números de dano, nomes e avisos de tela
+//             ficariam ilegíveis pixelados.
 import { state } from "./state.js";
+import { createPostFX } from "./postfx.js";
+import * as particles from "./particles.js";
 
-let canvas = null;
-let ctx = null;
+let canvas = null; // onde o mundo é desenhado (origem do shader ou o canvas visível)
+let ctx = null; // contexto atual; onOverlay() troca para a camada de texto
+let worldCtx = null;
+let overlay = null;
+let overlayCtx = null;
+let postfx = null;
+// Deslocamento da "câmera" (tremida de tela), aplicado ao mundo e aos textos presos a ele
+const camera = { x: 0, y: 0 };
 
-export function setupCanvas(el) {
-  canvas = el;
-  ctx = el.getContext("2d");
+export function setupCanvas(display, overlayEl) {
+  postfx = createPostFX(display);
+  canvas = postfx ? postfx.source : display;
+  worldCtx = canvas.getContext("2d");
+  ctx = worldCtx;
+  overlay = overlayEl;
+  overlayCtx = overlay.getContext("2d");
 }
 
 export function getCanvas() {
   return canvas;
 }
 
+export function getPostFX() {
+  return postfx;
+}
+
+export function setCamera(x, y) {
+  camera.x = x;
+  camera.y = y;
+}
+
 export function resizeCanvas() {
   const arena = document.getElementById("arena");
-  canvas.width = arena.clientWidth;
-  canvas.height = arena.clientHeight;
+  const width = arena.clientWidth;
+  const height = arena.clientHeight;
+  if (postfx) {
+    postfx.resize(width, height);
+  } else {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  overlay.width = width;
+  overlay.height = height;
   state.player.y = canvas.height * 0.6;
+  // Inimigos guardam o chão da hora em que nasceram; acompanham o novo tamanho
+  state.enemies.forEach((en) => {
+    en.y = canvas.height * 0.55;
+  });
+}
+
+// Desenha na camada de texto, acompanhando a câmera
+function onOverlay(draw) {
+  ctx = overlayCtx;
+  ctx.save();
+  ctx.translate(camera.x, camera.y);
+  draw();
+  ctx.restore();
+  ctx = worldCtx;
 }
 
 // ─── Draw helpers ───
@@ -331,10 +379,12 @@ export function drawPlayer(p) {
   // HP bar
   const hpPct = state.player.hp / state.player.maxHp;
   drawBar(bodyX - 25, headY - headR - 18, 50, 5, hpPct, "#cc3333");
-  ctx.fillStyle = "#c9a84c";
-  ctx.font = "8px Cinzel";
-  ctx.textAlign = "center";
-  ctx.fillText("YOU", bodyX, headY - headR - 22);
+  onOverlay(() => {
+    ctx.fillStyle = "#c9a84c";
+    ctx.font = "8px Cinzel";
+    ctx.textAlign = "center";
+    ctx.fillText("YOU", bodyX, headY - headR - 22);
+  });
 }
 
 // ─── Draw Enemy ───
@@ -547,28 +597,30 @@ export function drawEnemy(en) {
         : sz * 1.9) -
     8;
   drawBar(ex - barW / 2, barY, barW, 5, hpPct, "#cc3333");
-  ctx.fillStyle = "#c9a84c";
-  ctx.font = "bold 9px Cinzel";
-  ctx.textAlign = "center";
-  ctx.fillText(en.name, ex, barY - 3);
+  onOverlay(() => {
+    ctx.fillStyle = "#c9a84c";
+    ctx.font = "bold 9px Cinzel";
+    ctx.textAlign = "center";
+    ctx.fillText(en.name, ex, barY - 3);
 
-  // DoT indicators
-  if (en.dots && en.dots.length > 0) {
-    const dotIcons = { burning: "🔥", poison: "☠️", bleeding: "💉" };
-    let offsetX = (-12 * en.dots.length) / 2;
-    en.dots.forEach((dot) => {
-      ctx.font = "12px Arial";
-      ctx.fillText(dotIcons[dot.type] || "✨", ex + offsetX, barY - 14);
-      // Stack count
-      if (dot.stacks > 1) {
-        ctx.font = "bold 8px Cinzel";
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(`×${dot.stacks}`, ex + offsetX + 8, barY - 10);
-        ctx.fillStyle = "#c9a84c";
-      }
-      offsetX += 14;
-    });
-  }
+    // DoT indicators
+    if (en.dots && en.dots.length > 0) {
+      const dotIcons = { burning: "🔥", poison: "☠️", bleeding: "💉" };
+      let offsetX = (-12 * en.dots.length) / 2;
+      en.dots.forEach((dot) => {
+        ctx.font = "12px Arial";
+        ctx.fillText(dotIcons[dot.type] || "✨", ex + offsetX, barY - 14);
+        // Stack count
+        if (dot.stacks > 1) {
+          ctx.font = "bold 8px Cinzel";
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(`×${dot.stacks}`, ex + offsetX + 8, barY - 10);
+          ctx.fillStyle = "#c9a84c";
+        }
+        offsetX += 14;
+      });
+    }
+  });
 
   if (en.hurtTimer > 0) en.hurtTimer -= 1;
 }
@@ -584,6 +636,13 @@ export function drawEffects() {
     }
     const a = ef.life / ef.maxLife;
 
+    // Números e textos vão para a camada sem shader
+    const onTop = ef.type === "number" || ef.type === "text";
+    if (onTop) {
+      ctx = overlayCtx;
+      ctx.save();
+      ctx.translate(camera.x, camera.y);
+    }
     ctx.save();
     ctx.globalAlpha = a;
 
@@ -728,6 +787,10 @@ export function drawEffects() {
     }
 
     ctx.restore();
+    if (onTop) {
+      ctx.restore();
+      ctx = worldCtx;
+    }
   });
 
   for (let i = toRemove.length - 1; i >= 0; i--) {
@@ -736,32 +799,53 @@ export function drawEffects() {
 }
 
 // ─── Frames ───
+function beginFrame() {
+  overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+  ctx = worldCtx;
+  ctx.fillStyle = "#0a0810";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
 function drawWorld() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(camera.x, camera.y);
   drawBackground();
-  drawEffects();
   drawPlayer(state.player);
   state.enemies.forEach((en) => drawEnemy(en));
+  particles.draw(ctx);
+  drawEffects();
+  ctx.restore();
 }
 
-function drawCenteredText(title, subtitle, titleFont, subtitleFont, gap) {
-  const W = canvas.width,
-    H = canvas.height;
-  ctx.fillStyle = "#c9a84c";
-  ctx.font = titleFont;
-  ctx.textAlign = "center";
-  ctx.fillText(title, W / 2, H / 2 - gap.title);
-  ctx.fillStyle = "#a08860";
-  ctx.font = subtitleFont;
-  ctx.fillText(subtitle, W / 2, H / 2 + gap.subtitle);
+// Passa o mundo pelo shader (sem WebGL, ele já está no canvas visível)
+function present() {
+  postfx?.render();
 }
 
-export function drawRunningFrame() {
+// Escurece a tela e escreve um aviso centralizado na camada de texto
+function drawScreenMessage(dim, title, subtitle, titleFont, subtitleFont, gap) {
+  const W = overlay.width,
+    H = overlay.height;
+  const c = overlayCtx;
+  c.fillStyle = `rgba(0,0,0,${dim})`;
+  c.fillRect(0, 0, W, H);
+  c.fillStyle = "#c9a84c";
+  c.font = titleFont;
+  c.textAlign = "center";
+  c.fillText(title, W / 2, H / 2 - gap.title);
+  c.fillStyle = "#a08860";
+  c.font = subtitleFont;
+  c.fillText(subtitle, W / 2, H / 2 + gap.subtitle);
+}
+
+export function drawRunningFrame(dt = 16) {
+  beginFrame();
+  particles.update(dt);
   drawWorld();
+  present();
   if (state.waveTransition) {
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    drawCenteredText(
+    drawScreenMessage(
+      0.3,
       `ONDA ${state.wave} CONCLUÍDA`,
       "Preparando próxima onda...",
       "bold 22px Cinzel",
@@ -772,10 +856,11 @@ export function drawRunningFrame() {
 }
 
 export function drawPausedFrame() {
+  beginFrame();
   drawWorld();
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  drawCenteredText(
+  present();
+  drawScreenMessage(
+    0.5,
     "⏸️ PAUSADO",
     "Pressione Play para continuar",
     "bold 36px Cinzel",
@@ -785,10 +870,11 @@ export function drawPausedFrame() {
 }
 
 export function drawDefeatFrame() {
+  beginFrame();
   drawBackground();
-  ctx.fillStyle = "rgba(0,0,0,0.6)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  drawCenteredText(
+  present();
+  drawScreenMessage(
+    0.6,
     "DERROTADO",
     `Onda ${state.wave} · Score: ${state.score}`,
     "bold 32px Cinzel",

@@ -31,6 +31,7 @@ import {
 } from "./combat.js";
 import * as save from "./save.js";
 import * as render from "./render.js";
+import * as particles from "./particles.js";
 import * as ui from "./ui.js";
 
 const ITEMS_URL = new URL("../assets/items.json", import.meta.url);
@@ -39,8 +40,40 @@ const GAME_SPEEDS = [1, 2, 3];
 
 // ─── Ligações: a lógica emite, a interface e o áudio reagem ───
 on("log", ({ msg, type }) => ui.addLog(msg, type));
-on("sfx", (name) => sfx[name]?.());
+on("sfx", ({ name, detail }) => sfx[name]?.(detail));
 on("itemUsed", (id) => ui.flashItem(id));
+// Partículas: os eventos chegam com a posição no chão; o corpo fica ~25 px acima
+const USE_PARTICLES = {
+  blockNext: "shield",
+  barrier: "barrier",
+  heal: "heal",
+  mana: "mana",
+  frenzy: "frenzy",
+};
+// direction 1: inimigos ficam à direita, as partículas voam para longe do herói
+on("hit", ({ x, y, element, damage }) => {
+  const intensity = Math.min(1, damage / 25);
+  particles.emit("hit", x, y - 25, { element, intensity, direction: 1 });
+  if (element === "physical") {
+    particles.emit("blood", x, y - 25, { intensity, direction: 1 });
+  }
+});
+on("dotTick", ({ x, y, type }) =>
+  particles.emit("dot", x, y - 25, { element: type }),
+);
+on("itemUse", ({ x, y, effect }) => {
+  if (USE_PARTICLES[effect]) particles.emit(USE_PARTICLES[effect], x, y - 30);
+});
+on("blocked", ({ x, y }) => particles.emit("shield", x, y - 30));
+on("playerHurt", ({ x, y, damage }) =>
+  particles.emit("blood", x, y - 30, {
+    intensity: Math.min(1, damage / 30),
+    direction: -1,
+  }),
+);
+on("revive", ({ x, y }) => particles.emit("revive", x, y - 30));
+on("enemyDied", ({ x, y }) => particles.emit("death", x, y - 20));
+
 on("playerDied", () => {
   // A run acaba aqui: recarregar a página não pode trazê-la de volta
   save.clearRun();
@@ -189,6 +222,7 @@ function restartGame() {
   resetRun({ x: canvas.width * 0.22, y: canvas.height * 0.55 });
   state.runStats.startTime = performance.now();
   save.clearRun();
+  particles.clear();
   ui.clearLog();
   ui.addLog(
     `⚡ Mantidos ${state.fragments} fragmentos de runs anteriores.`,
@@ -235,7 +269,7 @@ function gameLoop(timestamp) {
     updateEnemies(dt);
     updatePlayerAnim(dt);
 
-    render.drawRunningFrame();
+    render.drawRunningFrame(dt);
 
     if (timestamp - lastHudUpdate > 50) {
       lastHudUpdate = timestamp;
@@ -251,7 +285,10 @@ function gameLoop(timestamp) {
 //  INIT
 // ═══════════════════════════════════════════
 function init() {
-  render.setupCanvas(document.getElementById("combat-canvas"));
+  render.setupCanvas(
+    document.getElementById("combat-canvas"),
+    document.getElementById("overlay-canvas"),
+  );
   render.resizeCanvas();
   window.addEventListener("resize", render.resizeCanvas);
 

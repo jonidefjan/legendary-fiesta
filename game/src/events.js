@@ -22,4 +22,5 @@ export function clearListeners() {
 }
 
 export const log = (msg, type = "") => emit("log", { msg, type });
-export const sound = (name) => emit("sfx", name);
+// detail: complemento do som, como o elemento do golpe ou o tipo do efeito usado
+export const sound = (name, detail) => emit("sfx", { name, detail });

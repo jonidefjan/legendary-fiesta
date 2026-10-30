@@ -2,11 +2,29 @@
 //  COMBATE: dano, efeitos de itens, inimigos
 // ═══════════════════════════════════════════
 // Sem DOM: mensagens, sons e o destaque do item usado saem por events.js.
+//
+// Eventos visuais (para partículas, tremida de tela e animações), com { x, y }:
+//   "hit"         golpe em inimigo: element, damage, source, resisted, weak
+//   "attack"      ataque de arma: itemId, element, hits, targetX, targetY
+//   "dotTick"     dano contínuo: type, damage, onPlayer
+//   "itemUse"     item de uso ativado: effect (tipo do efeito)
+//   "blocked"     ataque bloqueado pelo escudo
+//   "playerHurt"  jogador tomou dano: damage
+//   "revive"      jogador reviveu
+//   "enemyDied"   inimigo morreu: size
+// Sons: sound(nome, detalhe) -> "hit" + elemento, "use" + tipo do efeito, "dot" + tipo.
 import { state } from "./state.js";
 import { random } from "./random.js";
 import { emit, log, sound } from "./events.js";
 import { spawnEffect, spawnNumber } from "./fx.js";
 import { effectsOf, ownedEffects, isActivatable } from "./items.js";
+
+// Duração (ms) das poses de animação; o render.js usa o tempo restante para interpolar
+export const ANIM_MS = {
+  playerAction: 320, // golpe ou uso de item (player.animTimer)
+  enemyAttack: 320, // investida do inimigo (enemy.attackAnim)
+  enemyDeath: 600, // queda do inimigo morto (enemy.deathAnim)
+};
 
 // Animações de ataque que o render.js sabe desenhar; as outras viram "slash"
 const PLAYER_ATTACK_ANIMS = new Set([
@@ -67,6 +85,15 @@ export function applyElementalDamage(target, baseDmg, element, source) {
     });
   }
 
+  emit("hit", {
+    x: target.x,
+    y: target.y,
+    element,
+    damage: finalDmg,
+    source,
+    resisted: resist > 0.3,
+    weak: resist < -0.1,
+  });
   return finalDmg;
 }
 
@@ -112,6 +139,14 @@ export function processDots(dt) {
           DOTS[dot.type]?.color || "#ff8800",
           0,
         );
+        emit("dotTick", {
+          x: entity.x,
+          y: entity.y,
+          type: dot.type,
+          damage: dmg,
+          onPlayer: entity === state.player,
+        });
+        sound("dot", dot.type);
 
         dot.duration--;
       }
@@ -195,7 +230,6 @@ const USE_EFFECTS = {
     spawnEffect("heal", p.x, p.y - 50, { life: 45 });
     spawnNumber(p.x, p.y - 60, `+${healAmt}`, "#44cc88", 2);
     log(`${item.icon} ${item.name}: restaura ${healAmt} HP.`, "heal");
-    sound("heal");
     p.anim = "heal";
   },
   mana(effect, item, p) {
@@ -288,7 +322,17 @@ function weaponAttack(item, target) {
   }
 
   log(`⚔ ${item.name}: ${totalDmg} de dano em ${target.name}!`, "dmg");
-  sound("hit");
+  const element = item.dmgType || "physical";
+  sound("hit", element);
+  emit("attack", {
+    x: p.x,
+    y: p.y,
+    itemId: item.id,
+    element,
+    hits,
+    targetX: target.x,
+    targetY: target.y,
+  });
   p.anim = PLAYER_ATTACK_ANIMS.has(item.anim) ? item.anim : "slash";
   spawnEffect(item.fx || "slash", target.x, target.y - 20, {
     life: 35,
@@ -318,11 +362,14 @@ export function activateItem(item) {
       const handler = USE_EFFECTS[effect.type];
       if (!handler) continue;
       handler(effect, item, p);
+      sound("use", effect.type);
+      emit("itemUse", { x: p.x, y: p.y, effect: effect.type });
       activated = true;
     }
   }
 
   if (activated) {
+    p.animTimer = ANIM_MS.playerAction;
     state.runStats.itemUses[item.id] =
       (state.runStats.itemUses[item.id] || 0) + 1;
     emit("itemUsed", item.id);
@@ -391,6 +438,7 @@ export function updatePlayerAnim(dt) {
 export function enemyAttack(en) {
   const p = state.player;
   let dmg = en.dmg;
+  en.attackAnim = ANIM_MS.enemyAttack;
 
   // Block
   if (p.nextBlockActive) {
@@ -411,6 +459,7 @@ export function enemyAttack(en) {
     }
     sound("block");
     spawnEffect("shield", p.x, p.y - 40, { life: 25 });
+    emit("blocked", { x: p.x, y: p.y });
     return;
   }
 
@@ -446,6 +495,7 @@ export function enemyAttack(en) {
 
   p.hp -= dmg;
   sound("enemyHit");
+  emit("playerHurt", { x: p.x, y: p.y, damage: dmg });
   spawnNumber(p.x - 20, p.y - 60, `-${dmg}`, "#ff6666", 2);
   log(`💀 ${en.name} ataca: ${dmg} de dano!`, "dmg");
 
@@ -463,6 +513,8 @@ export function enemyAttack(en) {
         });
       }
       spawnEffect("phoenix", p.x, p.y - 40, { life: 80 });
+      sound("revive");
+      emit("revive", { x: p.x, y: p.y });
       log(
         `${revive.item.icon} ${revive.item.name}: você renasceu com ${p.hp} HP! Todas as recargas prontas!`,
         "kill",
@@ -483,7 +535,11 @@ export function enemyAttack(en) {
 export function updateEnemies(dt) {
   const playerX = state.player.x;
   state.enemies.forEach((en) => {
-    if (en.dead) return;
+    if (en.attackAnim > 0) en.attackAnim = Math.max(0, en.attackAnim - dt);
+    if (en.dead) {
+      if (en.deathAnim > 0) en.deathAnim = Math.max(0, en.deathAnim - dt);
+      return;
+    }
     const dist = en.x - playerX;
     const combatDist = 80;
 
@@ -501,12 +557,14 @@ export function updateEnemies(dt) {
     // Kill check
     if (en.hp <= 0 && !en.dead) {
       en.dead = true;
+      en.deathAnim = ANIM_MS.enemyDeath;
       state.kills++;
       state.score += en.xp;
       state.gold += en.gold || 0;
       state.fragments += en.fragments || 1;
       sound("kill");
       spawnEffect("death", en.x, en.y - 30, { life: 50 });
+      emit("enemyDied", { x: en.x, y: en.y, size: en.size });
       spawnNumber(en.x, en.y - 50, `+${en.xp} XP`, "#c9a84c", 3);
       if (en.fragments > 0) {
         spawnNumber(en.x - 20, en.y - 65, `⚡${en.fragments}`, "#aa66ee", 2);

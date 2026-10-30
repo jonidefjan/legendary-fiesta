@@ -17,6 +17,7 @@ import {
   updateFrenzy,
   enemyAttack,
   updateEnemies,
+  ANIM_MS,
 } from "../game/src/combat.js";
 
 // ─── Dano e resistências ───
@@ -222,6 +223,24 @@ test("inimigo morto conta abate, pontos e fragmentos uma vez só", () => {
   assert.equal(state.kills, 1);
   assert.equal(state.score, 10);
   assert.equal(state.fragments, 2);
+});
+
+test("timers de animação: golpe do herói, investida e queda do inimigo", () => {
+  const target = enemy({ x: 150 });
+  setupRun(["rusted_sword"], [target]);
+  activateItem(item("rusted_sword"));
+  assert.equal(state.player.animTimer, ANIM_MS.playerAction);
+
+  enemyAttack(target);
+  assert.equal(target.attackAnim, ANIM_MS.enemyAttack);
+  updateEnemies(100);
+  assert.equal(target.attackAnim, ANIM_MS.enemyAttack - 100);
+
+  target.hp = 0;
+  updateEnemies(16);
+  assert.equal(target.deathAnim, ANIM_MS.enemyDeath);
+  updateEnemies(250);
+  assert.equal(target.deathAnim, ANIM_MS.enemyDeath - 250);
 });
 
 test("inimigo anda até o jogador e ataca no intervalo", () => {
