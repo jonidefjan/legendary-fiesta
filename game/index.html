@@ -15,6 +15,15 @@
     />
     <link rel="stylesheet" href="./style.css" />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <!-- Three.js por CDN, sem build: os módulos importam "three" e "three/addons/..." -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="app">
