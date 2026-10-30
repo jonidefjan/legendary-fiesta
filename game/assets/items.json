@@ -11,7 +11,8 @@
     "cooldown": 2200,
     "baseDmg": 8,
     "dmgType": "physical",
-    "anim": "slash"
+    "anim": "slash",
+    "fx": "slash"
   },
   {
     "id": "ember_blade",
@@ -26,7 +27,18 @@
     "baseDmg": 14,
     "bonusDmg": 6,
     "dmgType": "fire",
-    "anim": "fire_slash"
+    "anim": "fire_slash",
+    "fx": "fire",
+    "effects": [
+      {
+        "trigger": "hit",
+        "type": "dot",
+        "dot": "burning",
+        "damage": 3,
+        "duration": 4,
+        "chance": 0.25
+      }
+    ]
   },
   {
     "id": "shadow_dagger",
@@ -41,7 +53,17 @@
     "baseDmg": 9,
     "dmgType": "shadow",
     "hits": 2,
-    "anim": "double_slash"
+    "anim": "double_slash",
+    "fx": "slash",
+    "fxColor": "#aa66ee",
+    "effects": [
+      {
+        "trigger": "hit",
+        "type": "cooldownRefund",
+        "ms": 500,
+        "chance": 0.3
+      }
+    ]
   },
   {
     "id": "thunder_staff",
@@ -55,7 +77,17 @@
     "cooldown": 4500,
     "baseDmg": 22,
     "dmgType": "lightning",
-    "anim": "lightning"
+    "anim": "lightning",
+    "fx": "lightning",
+    "effects": [
+      {
+        "trigger": "attack",
+        "type": "chain",
+        "targets": 2,
+        "ratio": 0.5,
+        "element": "lightning"
+      }
+    ]
   },
   {
     "id": "leather_vest",
@@ -67,9 +99,15 @@
     "effect": "Passivo: +12 de armadura. Reduz dano físico em 12%.",
     "enchant": null,
     "cooldown": 0,
-    "armor": 12,
     "passive": true,
-    "anim": "block"
+    "anim": "block",
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "armor": 12
+      }
+    ]
   },
   {
     "id": "iron_shield",
@@ -81,9 +119,18 @@
     "effect": "A cada 8s: bloqueia o próximo ataque completamente.",
     "enchant": "✦ Parry: Bloquear perfeitamente retorna 5 de dano ao atacante.",
     "cooldown": 8000,
-    "armor": 8,
-    "blockNext": true,
-    "anim": "shield_block"
+    "anim": "shield_block",
+    "effects": [
+      {
+        "trigger": "use",
+        "type": "blockNext"
+      },
+      {
+        "trigger": "block",
+        "type": "reflect",
+        "damage": 5
+      }
+    ]
   },
   {
     "id": "mage_robe",
@@ -95,10 +142,21 @@
     "effect": "Passivo: +20 de Mana Máxima. +15% de dano mágico.",
     "enchant": "✦ Absorção: Ao receber dano mágico, converte 30% em Mana.",
     "cooldown": 0,
-    "manaBonus": 20,
-    "magicBoost": 0.15,
     "passive": true,
-    "anim": "block"
+    "anim": "block",
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "maxMana": 20,
+        "magicBoost": 0.15
+      },
+      {
+        "trigger": "hurt",
+        "type": "manaFromDamage",
+        "ratio": 0.3
+      }
+    ]
   },
   {
     "id": "dragonscale",
@@ -110,9 +168,25 @@
     "effect": "A cada 12s: Barreira de 30 HP que reflete 20% do dano absorvido.",
     "enchant": "✦ Fúria Dracônica: Abaixo de 40% de HP, +30% de dano.",
     "cooldown": 12000,
-    "barrier": 30,
-    "reflectPct": 0.2,
-    "anim": "dragon_roar"
+    "anim": "dragon_roar",
+    "effects": [
+      {
+        "trigger": "use",
+        "type": "barrier",
+        "amount": 30
+      },
+      {
+        "trigger": "barrierAbsorb",
+        "type": "reflect",
+        "ratio": 0.2
+      },
+      {
+        "trigger": "damage",
+        "type": "lowHpBonus",
+        "threshold": 0.4,
+        "bonus": 0.3
+      }
+    ]
   },
   {
     "id": "health_crystal",
@@ -124,8 +198,16 @@
     "effect": "A cada 5s: Restaura 8 HP.",
     "enchant": "✦ Ressonância: Cura extra de +3 HP a cada 10 cargas.",
     "cooldown": 5000,
-    "healAmt": 8,
-    "anim": "heal"
+    "anim": "heal",
+    "effects": [
+      {
+        "trigger": "use",
+        "type": "heal",
+        "amount": 8,
+        "bonusEvery": 10,
+        "bonusAmount": 3
+      }
+    ]
   },
   {
     "id": "mana_stone",
@@ -137,8 +219,15 @@
     "effect": "A cada 4s: Regenera 12 de Mana.",
     "enchant": "✦ Transbordamento: Com Mana cheia, próximo ataque +25% de dano.",
     "cooldown": 4000,
-    "manaRegen": 12,
-    "anim": "mana_orb"
+    "anim": "mana_orb",
+    "effects": [
+      {
+        "trigger": "use",
+        "type": "mana",
+        "amount": 12,
+        "overflowBonus": 0.25
+      }
+    ]
   },
   {
     "id": "berserker_totem",
@@ -150,9 +239,20 @@
     "effect": "A cada 7s: +40% de velocidade de ataque por 3s.",
     "enchant": "✦ Frenesi: Abaixo de 25% de HP, o Totem ativa automaticamente.",
     "cooldown": 7000,
-    "atkSpeedBoost": 0.4,
-    "duration": 3000,
-    "anim": "berserk"
+    "anim": "berserk",
+    "effects": [
+      {
+        "trigger": "use",
+        "type": "frenzy",
+        "speedBonus": 0.4,
+        "duration": 3000
+      },
+      {
+        "trigger": "lowHp",
+        "type": "useNow",
+        "threshold": 0.25
+      }
+    ]
   },
   {
     "id": "phoenix_feather",
@@ -164,10 +264,16 @@
     "effect": "Passivo: Ao ser morto, ressuscita com 40% de HP. (Uma vez por onda)",
     "enchant": "✦ Renascimento: Ao ressuscitar, todos os itens têm recarga zerada.",
     "cooldown": 0,
-    "revive": true,
-    "reviveAmt": 0.4,
     "passive": true,
-    "anim": "phoenix"
+    "anim": "phoenix",
+    "effects": [
+      {
+        "trigger": "death",
+        "type": "revive",
+        "hpRatio": 0.4,
+        "resetCooldowns": true
+      }
+    ]
   },
   {
     "id": "frost_bow",
@@ -252,9 +358,15 @@
     "effect": "Passivo: +18 de armadura. -10% de dano de projéteis.",
     "enchant": "✦ Deflexão: 15% de chance de refletir projéteis.",
     "cooldown": 0,
-    "armor": 18,
     "passive": true,
-    "anim": "block"
+    "anim": "block",
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "armor": 18
+      }
+    ]
   },
   {
     "id": "shadow_cloak",
