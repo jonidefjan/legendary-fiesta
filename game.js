@@ -2424,7 +2424,7 @@ function resumeGame() {
 // ═══════════════════════════════════════════
 async function loadItems() {
   try {
-    const response = await fetch("assets/items.json");
+    const response = await fetch("../assets/items.json");
     if (!response.ok) {
       throw new Error("Erro ao carregar items.json");
     }
