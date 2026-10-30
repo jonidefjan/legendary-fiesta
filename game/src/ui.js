@@ -343,7 +343,15 @@ export function hideGameOver() {
 // ═══════════════════════════════════════════
 //  GAME CONTROLS (PLAY/PAUSE)
 // ═══════════════════════════════════════════
-export function setupControls({ onPlay, onPause, onReset, onSpeed, onMute, onRestart }) {
+export function setupControls({
+  onPlay,
+  onPause,
+  onReset,
+  onSpeed,
+  onMute,
+  onShake,
+  onRestart,
+}) {
   $("btn-play").addEventListener("click", onPlay);
   $("btn-pause").addEventListener("click", onPause);
   $("btn-reset").addEventListener("click", onReset);
@@ -356,6 +364,15 @@ export function setupControls({ onPlay, onPause, onReset, onSpeed, onMute, onRes
   $("btn-mute").addEventListener("click", () => {
     $("btn-mute").textContent = onMute() ? "🔇" : "🔊";
   });
+  $("btn-shake").addEventListener("click", () => setShakeButton(onShake()));
+}
+
+// Ativo e 📳 com a tremida ligada; apagado e 📴 quando desligada
+export function setShakeButton(on) {
+  const btn = $("btn-shake");
+  btn.textContent = on ? "📳" : "📴";
+  btn.classList.toggle("active", on);
+  btn.setAttribute("aria-pressed", String(on));
 }
 
 // Play ativo quando pausado; Pause ativo quando rodando

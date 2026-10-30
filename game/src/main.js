@@ -32,6 +32,7 @@ import {
 import * as save from "./save.js";
 import * as render from "./render.js";
 import * as particles from "./particles.js";
+import * as feel from "./feel.js";
 import * as ui from "./ui.js";
 
 const ITEMS_URL = new URL("../assets/items.json", import.meta.url);
@@ -73,6 +74,30 @@ on("playerHurt", ({ x, y, damage }) =>
 );
 on("revive", ({ x, y }) => particles.emit("revive", x, y - 30));
 on("enemyDied", ({ x, y }) => particles.emit("death", x, y - 20));
+
+// Tremida e hit-stop: sutis, pois no 3× acontecem muitos golpes por segundo
+on("hit", ({ damage, weak }) => {
+  if (damage >= 15 || weak) {
+    feel.addShake(0.15);
+    feel.hitStop(35);
+  } else {
+    feel.addShake(0.06);
+  }
+});
+on("enemyDied", () => {
+  feel.addShake(0.3);
+  feel.hitStop(60);
+});
+on("playerHurt", ({ damage }) => {
+  feel.addShake(Math.min(0.5, Math.max(0.15, damage / 40)));
+  feel.hitStop(45);
+});
+on("blocked", () => feel.addShake(0.15));
+on("revive", () => {
+  feel.addShake(0.6);
+  feel.hitStop(90);
+});
+on("playerDied", () => feel.addShake(0.8));
 
 on("playerDied", () => {
   // A run acaba aqui: recarregar a página não pode trazê-la de volta
@@ -223,6 +248,7 @@ function restartGame() {
   state.runStats.startTime = performance.now();
   save.clearRun();
   particles.clear();
+  feel.reset();
   ui.clearLog();
   ui.addLog(
     `⚡ Mantidos ${state.fragments} fragmentos de runs anteriores.`,
@@ -253,16 +279,27 @@ function resetProgress() {
 let lastHudUpdate = 0;
 
 function gameLoop(timestamp) {
-  const dt = Math.min(timestamp - state.lastTime, 50) * state.gameSpeed;
+  const realDt = Math.min(timestamp - state.lastTime, 50);
+  const dt = realDt * state.gameSpeed;
   state.lastTime = timestamp;
   state.tick++;
 
   if (!state.running) {
+    render.setCamera(0, 0);
     render.drawDefeatFrame();
   } else if (state.isPaused) {
     // Redesenha a tela mas não atualiza o estado do jogo
+    render.setCamera(0, 0);
     render.drawPausedFrame();
   } else {
+    const f = feel.update(realDt);
+    render.setCamera(f.x, f.y);
+    if (f.frozen) {
+      // Hit-stop: nada avança (nem as partículas), só redesenha
+      render.drawRunningFrame(0);
+      requestAnimationFrame(gameLoop);
+      return;
+    }
     updateItemTimers(dt);
     updateFrenzy(dt);
     processDots(dt);
@@ -284,6 +321,21 @@ function gameLoop(timestamp) {
 // ═══════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════
+// localStorage/matchMedia podem lançar erro (modo privado, bloqueios)
+function safeStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function safeMatchMedia() {
+  return typeof window.matchMedia === "function"
+    ? (q) => window.matchMedia(q)
+    : null;
+}
+
 function init() {
   render.setupCanvas(
     document.getElementById("combat-canvas"),
@@ -308,7 +360,14 @@ function init() {
       return state.gameSpeed;
     },
     onMute: () => sfx.toggleMute(),
+    onShake: () => {
+      feel.setShakeEnabled(!feel.isShakeEnabled());
+      feel.savePrefs(safeStorage());
+      return feel.isShakeEnabled();
+    },
   });
+  feel.loadPrefs(safeStorage(), safeMatchMedia());
+  ui.setShakeButton(feel.isShakeEnabled());
   // O jogo começa pausado
   ui.setPausedControls(true);
 
