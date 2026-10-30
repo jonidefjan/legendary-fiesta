@@ -36,7 +36,7 @@
     "rarity": "epic",
     "desc": "Destila o vazio entre os mundos em cada golpe.",
     "effect": "Duplo golpe: 2× 9 de dano + ignora 40% de armadura.",
-    "enchant": "✦ Sombra: Cada acerto crítico reduz o recarga em 0.5s.",
+    "enchant": "✦ Sombra: Cada acerto tem 30% de chance de reduzir a recarga em 0,5s.",
     "cooldown": 2400,
     "baseDmg": 9,
     "dmgType": "shadow",

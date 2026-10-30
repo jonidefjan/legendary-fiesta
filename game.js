@@ -31,6 +31,20 @@ let ITEMS = [];
 // ═══════════════════════════════════════════
 const PLAYER_BASE = { maxHp: 100, maxMana: 100, armor: 0, magicBoost: 0 };
 const SAVE_KEY = "reliquary_save_v1";
+// Progresso permanente (fragmentos) fica separado da run, que é apagada ao morrer
+const META_KEY = "reliquary_meta_v1";
+
+// Itens que ainda não têm efeito no código: ficam fora do sorteio até a fase de itens
+const UNIMPLEMENTED_ITEMS = new Set([
+  "crystal_armor",
+  "ancient_tome",
+  "time_glass",
+  "shadow_cloak",
+  "vampiric_amulet",
+  "speed_boots",
+  "lucky_coin",
+  "cursed_ring",
+]);
 
 const state = {
   wave: 1,
@@ -50,7 +64,9 @@ const state = {
     anim: "idle",
     animTimer: 0,
     berserking: false,
-    berserkEnd: 0,
+    berserkRemaining: 0,
+    berserkSpeed: 0,
+    totemEmergencyUsed: false,
     reviveUsed: false,
     charges: {},
     dots: [],
@@ -150,14 +166,16 @@ const sfx = (() => {
 // ═══════════════════════════════════════════
 //  SAVE/LOAD SYSTEM
 // ═══════════════════════════════════════════
+// A run é salva no começo de cada onda (ver startNextWave): recarregar a página
+// repete a onda atual do início, sem receber de novo ouro, pontos ou recompensa.
 function saveGameState() {
+  saveMeta();
   try {
     const saveData = {
       wave: state.wave,
       kills: state.kills,
       score: state.score,
       gold: state.gold,
-      fragments: state.fragments,
       items: state.items,
       itemTimers: state.itemTimers,
       playerHp: state.player.hp,
@@ -185,8 +203,9 @@ function loadGameState() {
     state.kills = saveData.kills || 0;
     state.score = saveData.score || 0;
     state.gold = saveData.gold || 0;
-    state.fragments = saveData.fragments || 0;
-    state.items = saveData.items || [];
+    state.items = (saveData.items || []).filter(
+      (i) => !UNIMPLEMENTED_ITEMS.has(i.id),
+    );
     state.itemTimers = saveData.itemTimers || {};
     state.player.hp = saveData.playerHp || 100;
     state.player.maxHp = saveData.playerMaxHp || 100;
@@ -201,6 +220,40 @@ function loadGameState() {
   }
 }
 
+function clearRunSave() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch (error) {
+    console.error("❌ Erro ao apagar a run salva:", error);
+  }
+}
+
+function saveMeta() {
+  try {
+    localStorage.setItem(
+      META_KEY,
+      JSON.stringify({ fragments: state.fragments }),
+    );
+  } catch (error) {
+    console.error("❌ Erro ao salvar progresso permanente:", error);
+  }
+}
+
+function loadMeta() {
+  try {
+    const saved = localStorage.getItem(META_KEY);
+    if (saved) {
+      state.fragments = JSON.parse(saved).fragments || 0;
+      return;
+    }
+    // Saves antigos guardavam os fragmentos junto com a run
+    const oldRun = localStorage.getItem(SAVE_KEY);
+    if (oldRun) state.fragments = JSON.parse(oldRun).fragments || 0;
+  } catch (error) {
+    console.error("❌ Erro ao carregar progresso permanente:", error);
+  }
+}
+
 function resetGameState() {
   if (
     !confirm(
@@ -212,6 +265,7 @@ function resetGameState() {
 
   try {
     localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(META_KEY);
     addLog("🔄 Progresso resetado! Recarregando...", "item");
 
     setTimeout(() => {
@@ -1203,13 +1257,14 @@ function activateItem(item) {
   );
 
   let activated = false;
+  // Recarga devolvida por encantamentos; aplicada depois de zerar o timer
+  let cooldownRefund = 0;
 
   if (item.type === "weapon") {
     const hits = item.hits || 1;
     let totalDmg = 0;
     for (let h = 0; h < hits; h++) {
       let dmg = item.baseDmg + (item.bonusDmg || 0);
-      if (p.berserking) dmg = Math.round(dmg * 1.4);
       // Mana overflow boost
       if (p.manaOverflow) {
         dmg = Math.round(dmg * 1.25);
@@ -1235,8 +1290,7 @@ function activateItem(item) {
 
       // Enchant: shadow (shadow dagger)
       if (item.id === "shadow_dagger" && Math.random() < 0.3) {
-        const timerRef = state.itemTimers[item.id];
-        timerRef.elapsed = Math.min(timerRef.cooldown, timerRef.elapsed + 500);
+        cooldownRefund += 500;
         addLog(`🌑 Sombra: recarga reduzida!`, "item");
       }
 
@@ -1332,7 +1386,8 @@ function activateItem(item) {
       activated = true;
     } else if (item.id === "berserker_totem") {
       p.berserking = true;
-      p.berserkEnd = performance.now() + item.duration;
+      p.berserkRemaining = item.duration;
+      p.berserkSpeed = item.atkSpeedBoost || 0;
       spawnEffect("berserk", p.x, p.y - 40, { life: 60 });
       addLog(`🪬 Totem Berserker: Frenesi ativado por 3 segundos!`, "item");
       p.anim = "berserk";
@@ -1350,8 +1405,10 @@ function activateItem(item) {
       slot.classList.add("active");
       setTimeout(() => slot.classList.remove("active"), 600);
     }
-    state.itemTimers[item.id].elapsed = 0;
+    const timer = state.itemTimers[item.id];
+    timer.elapsed = Math.min(timer.cooldown, cooldownRefund);
   }
+  return activated;
 }
 
 // ═══════════════════════════════════════════
@@ -1433,6 +1490,9 @@ function enemyAttack(en) {
       addLog(`☠️ Você foi derrotado na onda ${state.wave}!`, "kill");
       sfx.death();
       state.running = false;
+      // A run acaba aqui: recarregar a página não pode trazê-la de volta
+      clearRunSave();
+      saveMeta();
       setTimeout(showGameOverScreen, 1200);
     }
   }
@@ -1449,9 +1509,6 @@ function checkWaveComplete() {
     state.score += state.wave * 50;
 
     sfx.waveClear();
-
-    // Salvar progresso após completar wave
-    saveGameState();
 
     // Verificar se deve oferecer recompensa (a cada 2 waves)
     const shouldOfferReward = state.wave % 2 === 0;
@@ -1480,11 +1537,14 @@ function startNextWave() {
   state.wave++;
   state.player.reviveUsed = false;
   state.player.berserking = false;
+  state.player.berserkRemaining = 0;
+  state.player.totemEmergencyUsed = false;
   state.player.hp = Math.min(state.player.maxHp, state.player.hp + 20);
   spawnWave(state.wave);
   state.waveTransition = false;
   state.player.anim = "idle";
   updateUI();
+  saveGameState();
 }
 
 // ═══════════════════════════════════════════
@@ -1495,22 +1555,25 @@ function showWaveRewardSelection() {
 
   const modal = document.getElementById("item-choice-modal");
   const container = document.getElementById("item-choices-container");
-  const header = modal.querySelector("h2");
-  const instruction = modal.querySelector("p");
 
-  // Atualizar textos do modal
-  header.textContent = "🎁 Recompensa da Onda!";
-  instruction.innerHTML = `
-    <div style="text-align: center; line-height: 1.6;">
-      <strong>Escolha 1 item de 3 opções</strong><br>
-      <span style="font-size: 0.9em; opacity: 0.8;">Wave ${state.wave} concluída</span>
-    </div>
+  // Gerar 3 itens aleatórios que o jogador ainda não tem
+  const owned = new Set(state.items.map((i) => i.id));
+  const rewardItems = generateRandomItems(3, owned);
+
+  if (rewardItems.length === 0) {
+    addLog("✨ Você já tem todos os itens disponíveis!", "item");
+    startNextWave();
+    resumeGame();
+    return;
+  }
+
+  // Reescreve o cabeçalho inteiro: a escolha inicial deixa um contador de seleção nele
+  modal.querySelector(".modal-header").innerHTML = `
+    <h2>🎁 Recompensa da Onda!</h2>
+    <p class="modal-subtitle">Escolha 1 item de ${rewardItems.length} opções · Onda ${state.wave} concluída</p>
   `;
 
   container.innerHTML = "";
-
-  // Gerar 3 itens aleatórios
-  const rewardItems = generateRandomItems(3);
 
   rewardItems.forEach((item) => {
     const card = document.createElement("div");
@@ -1560,14 +1623,9 @@ function selectWaveReward(item, card) {
   // Log
   addLog(`✨ ${item.icon} ${item.name} adicionado ao inventário!`, "item");
 
-  // Salvar
-  saveGameState();
-
-  // Iniciar próxima wave após breve delay
-  setTimeout(() => {
-    startNextWave();
-    resumeGame();
-  }, 800);
+  // A próxima onda começa (e é salva) já com o item; o combate volta após um instante
+  startNextWave();
+  setTimeout(resumeGame, 800);
 }
 
 // ═══════════════════════════════════════════
@@ -1725,7 +1783,11 @@ function confirmItemSelection() {
   }, 500);
 }
 
-function generateRandomItems(count) {
+// excludeIds: itens que não podem aparecer (ex.: os que o jogador já tem)
+function generateRandomItems(count, excludeIds = new Set()) {
+  const pool = ITEMS.filter(
+    (i) => !UNIMPLEMENTED_ITEMS.has(i.id) && !excludeIds.has(i.id),
+  );
   // Pesos de raridade (maior = mais comum)
   const rarityWeights = {
     common: 40,
@@ -1748,7 +1810,7 @@ function generateRandomItems(count) {
       const rarity = getWeightedRarity(rarityWeights);
 
       // Pegar itens dessa raridade
-      const itemsOfRarity = ITEMS.filter((i) => i.rarity === rarity);
+      const itemsOfRarity = pool.filter((i) => i.rarity === rarity);
 
       if (itemsOfRarity.length > 0) {
         const randomItem =
@@ -1765,7 +1827,7 @@ function generateRandomItems(count) {
 
     // Se não encontrou, pegar qualquer item aleatório
     if (!item) {
-      const remainingItems = ITEMS.filter((i) => !usedIds.has(i.id));
+      const remainingItems = pool.filter((i) => !usedIds.has(i.id));
       if (remainingItems.length > 0) {
         item =
           remainingItems[Math.floor(Math.random() * remainingItems.length)];
@@ -1996,36 +2058,51 @@ function gameLoop(timestamp) {
   const groundY = H * 0.55;
 
   // ─ Update item timers ─
+  const player = state.player;
+  const hasEnemies = state.enemies.some((e) => !e.dead);
   for (const item of state.items) {
     if (item.cooldown <= 0) continue;
     const timer = state.itemTimers[item.id];
+    // Frenesi do Totem: armas recarregam mais rápido enquanto dura
+    const speed =
+      item.type === "weapon" && player.berserking ? 1 + player.berserkSpeed : 1;
     if (timer.elapsed < timer.cooldown) {
-      timer.elapsed += dt;
+      timer.elapsed += dt * speed;
     }
+    if (!hasEnemies) continue;
+
+    // Encantamento do Totem: abaixo de 25% de HP ativa sem esperar a recarga (uma vez por onda)
+    if (
+      item.id === "berserker_totem" &&
+      player.hp / player.maxHp < 0.25 &&
+      !player.berserking &&
+      !player.totemEmergencyUsed
+    ) {
+      player.totemEmergencyUsed = true;
+      activateItem(item);
+      continue;
+    }
+
     // Auto-trigger when ready
-    if (timer.elapsed >= timer.cooldown && state.enemies.some((e) => !e.dead)) {
-      // Berserker totem: auto-trigger below 25% HP
-      if (
-        item.id === "berserker_totem" &&
-        state.player.hp / state.player.maxHp < 0.25 &&
-        !state.player.berserking
-      ) {
-        activateItem(item);
-      } else if (
-        item.type === "weapon" ||
+    if (
+      timer.elapsed >= timer.cooldown &&
+      (item.type === "weapon" ||
         item.type === "relic" ||
-        (item.type === "armor" && !item.passive)
-      ) {
-        activateItem(item);
-      }
+        (item.type === "armor" && !item.passive))
+    ) {
+      activateItem(item);
     }
   }
 
-  // ─ Berserk end ─
-  if (state.player.berserking && timestamp > state.player.berserkEnd) {
-    state.player.berserking = false;
-    state.player.anim = "idle";
-    addLog(`🪬 Frenesi terminou.`, "item");
+  // ─ Berserk end ─ (conta em tempo de jogo: para na pausa e acelera com 2×/3×)
+  if (player.berserking) {
+    player.berserkRemaining -= dt;
+    if (player.berserkRemaining <= 0) {
+      player.berserking = false;
+      player.berserkRemaining = 0;
+      player.anim = "idle";
+      addLog(`🪬 Frenesi terminou.`, "item");
+    }
   }
 
   // ─ Process DoTs ─
@@ -2240,9 +2317,13 @@ function restartGame() {
   state.kills = 0;
   state.score = 0;
   state.gold = 0;
-  // Fragments persist (meta-progression)
+  // Fragmentos persistem (meta-progressão); itens e recargas são da run
+  state.items = [];
+  state.itemTimers = {};
+  state.enemies = [];
   state.effects = [];
   state.projectiles = [];
+  clearRunSave();
   state.player = {
     hp: 100,
     maxHp: 100,
@@ -2255,14 +2336,16 @@ function restartGame() {
     anim: "idle",
     animTimer: 0,
     berserking: false,
-    berserkEnd: 0,
+    berserkRemaining: 0,
+    berserkSpeed: 0,
+    totemEmergencyUsed: false,
     reviveUsed: false,
     charges: {},
     dots: [],
     elementalStatus: {},
   };
   state.running = true;
-  state.isPaused = false;
+  state.isPaused = true; // até escolher os itens iniciais
   state.waveTransition = false;
   state.runStats = {
     totalDamage: 0,
@@ -2274,20 +2357,23 @@ function restartGame() {
     `⚡ Mantidos ${state.fragments} fragmentos de runs anteriores.`,
     "item",
   );
-  buildInventory();
-  spawnWave(1);
+  renderInventory();
+  updateUI();
 
-  // Resetar botões de controle
+  // Botões como no início do jogo: pausado até confirmar a escolha
   const btnPlay = document.getElementById("btn-play");
   const btnPause = document.getElementById("btn-pause");
   if (btnPlay) {
-    btnPlay.disabled = true;
-    btnPlay.classList.remove("active");
+    btnPlay.disabled = false;
+    btnPlay.classList.add("active");
   }
   if (btnPause) {
-    btnPause.disabled = false;
-    btnPause.classList.add("active");
+    btnPause.disabled = true;
+    btnPause.classList.remove("active");
   }
+
+  // Nova run: escolhe os itens iniciais de novo (confirmItemSelection inicia a onda 1)
+  showInitialItemSelection();
 }
 
 // ═══════════════════════════════════════════
@@ -2298,7 +2384,8 @@ function init() {
   state.player.y = canvas.height * 0.55;
   state.runStats.startTime = performance.now();
 
-  // Tentar carregar jogo salvo
+  // Progresso permanente primeiro, depois a run salva (se houver)
+  loadMeta();
   const hasSavedGame = loadGameState();
 
   if (hasSavedGame) {
