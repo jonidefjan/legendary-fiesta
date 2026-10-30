@@ -381,7 +381,7 @@ export function drawPlayer(p) {
   drawBar(bodyX - 25, headY - headR - 18, 50, 5, hpPct, "#cc3333");
   onOverlay(() => {
     ctx.fillStyle = "#c9a84c";
-    ctx.font = "8px Cinzel";
+    ctx.font = "8px 'Pixelify Sans'";
     ctx.textAlign = "center";
     ctx.fillText("YOU", bodyX, headY - headR - 22);
   });
@@ -599,7 +599,7 @@ export function drawEnemy(en) {
   drawBar(ex - barW / 2, barY, barW, 5, hpPct, "#cc3333");
   onOverlay(() => {
     ctx.fillStyle = "#c9a84c";
-    ctx.font = "bold 9px Cinzel";
+    ctx.font = "bold 9px 'Pixelify Sans'";
     ctx.textAlign = "center";
     ctx.fillText(en.name, ex, barY - 3);
 
@@ -612,7 +612,7 @@ export function drawEnemy(en) {
         ctx.fillText(dotIcons[dot.type] || "✨", ex + offsetX, barY - 14);
         // Stack count
         if (dot.stacks > 1) {
-          ctx.font = "bold 8px Cinzel";
+          ctx.font = "bold 8px 'Pixelify Sans'";
           ctx.fillStyle = "#ffffff";
           ctx.fillText(`×${dot.stacks}`, ex + offsetX + 8, barY - 10);
           ctx.fillStyle = "#c9a84c";
@@ -741,14 +741,14 @@ export function drawEffects() {
         ctx.fill();
       }
     } else if (ef.type === "number") {
-      ctx.font = `bold ${12 + ef.size}px Cinzel`;
+      ctx.font = `bold ${12 + ef.size}px 'Pixelify Sans'`;
       ctx.textAlign = "center";
       ctx.fillStyle = ef.color || "#e8c96a";
       ctx.shadowColor = ef.color || "#c9a84c";
       ctx.shadowBlur = 6;
       ctx.fillText(ef.text, ef.x, ef.y - (1 - a) * 40);
     } else if (ef.type === "text") {
-      ctx.font = `bold 11px Cinzel`;
+      ctx.font = `bold 11px 'Pixelify Sans'`;
       ctx.textAlign = "center";
       ctx.fillStyle = ef.color || "#e8c96a";
       ctx.shadowColor = ef.color || "#c9a84c";
@@ -848,8 +848,8 @@ export function drawRunningFrame(dt = 16) {
       0.3,
       `ONDA ${state.wave} CONCLUÍDA`,
       "Preparando próxima onda...",
-      "bold 22px Cinzel",
-      "14px Cinzel",
+      "bold 22px 'Pixelify Sans'",
+      "14px 'Pixelify Sans'",
       { title: 15, subtitle: 15 },
     );
   }
@@ -863,8 +863,8 @@ export function drawPausedFrame() {
     0.5,
     "⏸️ PAUSADO",
     "Pressione Play para continuar",
-    "bold 36px Cinzel",
-    "16px Cinzel",
+    "bold 36px 'Pixelify Sans'",
+    "16px 'Pixelify Sans'",
     { title: 0, subtitle: 40 },
   );
 }
@@ -877,8 +877,8 @@ export function drawDefeatFrame() {
     0.6,
     "DERROTADO",
     `Onda ${state.wave} · Score: ${state.score}`,
-    "bold 32px Cinzel",
-    "16px Cinzel",
+    "bold 32px 'Pixelify Sans'",
+    "16px 'Pixelify Sans'",
     { title: 20, subtitle: 20 },
   );
 }

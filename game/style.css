@@ -50,7 +50,7 @@ html {
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: "Crimson Pro", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 16px;
   min-height: 100vh;
   overflow-x: hidden;
@@ -71,7 +71,7 @@ h1,
 h2,
 h3,
 .label {
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   letter-spacing: 0.05em;
 }
 
@@ -107,7 +107,7 @@ h3,
 #header .subtitle {
   font-size: 13px;
   color: var(--text3);
-  font-style: italic;
+  font-style: normal;
 }
 #stats-header {
   display: flex;
@@ -126,7 +126,7 @@ h3,
 }
 .stat-pill .val {
   color: var(--gold2);
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 14px;
 }
 
@@ -170,7 +170,7 @@ h3,
   border: 2px solid var(--border2);
   border-radius: 8px;
   padding: 10px 18px;
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--gold);
@@ -276,7 +276,7 @@ h3,
 }
 .log-entry.kill {
   color: var(--purple2);
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 12px;
 }
 @keyframes fadeIn {
@@ -310,7 +310,7 @@ h3,
   border-bottom: 1px solid var(--border);
 }
 .inv-section-title {
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 11px;
   letter-spacing: 0.15em;
   color: var(--text3);
@@ -403,7 +403,7 @@ h3,
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   color: var(--text2);
   border-radius: 0 0 5px 5px;
   z-index: 2;
@@ -489,7 +489,7 @@ h3,
   transform: translateY(0);
 }
 .tt-name {
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 14px;
   margin-bottom: 4px;
 }
@@ -498,14 +498,14 @@ h3,
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin-bottom: 8px;
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
 }
 .tt-desc {
   font-size: 13px;
   color: var(--text2);
   line-height: 1.5;
   margin-bottom: 8px;
-  font-style: italic;
+  font-style: normal;
 }
 .tt-effect {
   font-size: 13px;
@@ -525,7 +525,7 @@ h3,
   font-size: 11px;
   color: var(--text3);
   margin-top: 4px;
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
 }
 
 /* Player bars */
@@ -541,7 +541,7 @@ h3,
   margin-bottom: 6px;
 }
 .bar-label {
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 10px;
   color: var(--text3);
   width: 28px;
@@ -571,7 +571,7 @@ h3,
   font-size: 11px;
   color: var(--text2);
   min-width: 60px;
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
 }
 
 /* Wave info */
@@ -584,7 +584,7 @@ h3,
   align-items: center;
 }
 .wave-num {
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 13px;
   color: var(--gold2);
 }
@@ -593,7 +593,7 @@ h3,
   color: var(--text3);
 }
 .gold-display {
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 13px;
   color: var(--gold);
 }
@@ -1092,7 +1092,7 @@ canvas {
 .modal-subtitle {
   font-size: 1rem;
   color: var(--text2);
-  font-style: italic;
+  font-style: normal;
 }
 
 .item-choices {
@@ -1168,7 +1168,7 @@ canvas {
 }
 
 .item-choice-name {
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 1.1rem;
   font-weight: 600;
   text-align: center;
@@ -1193,7 +1193,7 @@ canvas {
   color: var(--text2);
   text-align: center;
   line-height: 1.4;
-  font-style: italic;
+  font-style: normal;
   min-height: 40px;
 }
 
@@ -1295,7 +1295,7 @@ canvas {
 }
 
 .go-stat-label {
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1304,7 +1304,7 @@ canvas {
 }
 
 .go-stat-value {
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--gold2);
@@ -1318,7 +1318,7 @@ canvas {
   border: 2px solid var(--gold2);
   border-radius: 12px;
   padding: 14px 28px;
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--bg);
@@ -1364,7 +1364,7 @@ canvas {
   border: 1px solid var(--border);
   border-radius: 8px;
   display: inline-block;
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 1rem;
   color: var(--text);
 }
@@ -1416,7 +1416,7 @@ canvas {
   border-radius: 12px;
   padding: 16px 32px;
   margin-top: 8px;
-  font-family: "Cinzel", serif;
+  font-family: "Pixelify Sans", sans-serif;
   font-size: 1.2rem;
   font-weight: 600;
   color: var(--text2);
