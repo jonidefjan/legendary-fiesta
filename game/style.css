@@ -1874,3 +1874,83 @@ canvas {
   color: var(--red2);
   text-align: center;
 }
+
+/* ═══════════════════════════════════════════
+   FASE 8: ARTE DOS ITENS (sprites 16×16 e selo de elemento 7×7)
+   ------------------------------------------- */
+/* Pixel art nítida: sem suavização e em escala inteira (3× / 2×) */
+.item-sprite,
+.element-badge {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+.item-sprite {
+  width: 48px;
+  height: 48px;
+}
+/* Selo do elemento no canto superior esquerdo: a gema de raridade fica no
+   direito e o nível/recarga embaixo, então nada se sobrepõe */
+.element-badge {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  z-index: 3;
+}
+.inline-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  position: relative;
+}
+.inline-icon .item-sprite {
+  width: 32px;
+  height: 32px;
+}
+.tt-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tt-icon .item-sprite {
+  width: 32px;
+  height: 32px;
+}
+/* O ícone do cartão vira uma caixa do tamanho do sprite, para o selo ancorar no canto dele */
+.item-choice-icon {
+  position: relative;
+  align-self: center;
+}
+.item-choice-icon .item-sprite {
+  width: 64px;
+  height: 64px;
+}
+.item-choice-icon .element-badge {
+  top: -3px;
+  left: -5px;
+  width: 21px;
+  height: 21px;
+}
+@media (max-width: 768px) {
+  .item-sprite {
+    width: 32px;
+    height: 32px;
+  }
+}
+@media (max-width: 480px) {
+  .item-choice-icon .item-sprite {
+    width: 48px;
+    height: 48px;
+  }
+  .item-choice-icon .element-badge {
+    width: 14px;
+    height: 14px;
+    top: -2px;
+    left: -4px;
+  }
+}
