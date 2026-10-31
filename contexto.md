@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #11 (commit `117f7cf`).
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #12 (commit `4bf8d9e`).
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -8,10 +8,15 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Tem i18n EN (padrão) e pt-BR, com a chave `lang` no localStorage, e tema claro/escuro.
 - **Reliquary** (`game/`): auto-battler em JS puro, sem build.
   - 3D pixel art com Three.js 0.170, vendorizado em `game/vendor/three`.
-  - Testes: `npm test` na raiz (**206** passando).
+  - Testes: `npm test` na raiz (**214** passando).
 
 ## Estado
-- **Fases concluídas:** 0 a 7 (PRs #2 a #11).
+- **Fases concluídas:** 0 a 8 (PRs #2 a #12).
+- **Fase 8 (arte dos itens):**
+  - Ícones 16×16 em `game/src/item-art.js` (paleta, `ITEM_ART`, `ITEM_ELEMENTS`, `ELEMENT_ART` 7×7).
+  - Renderizados por `sprites.js` (data URLs com cache; o emoji é o fallback).
+  - Aparecem só nos itens (inventário, cartas, tooltip, fim de run).
+  - Folha de revisão em `game/dev/item-art.html`. Os scripts que geram a arte ficam em `scratchpad/art/`.
 - **Fase 7 (Itens II):**
   - **Queimadura:** dano fixo por stack; o máximo é 3 + 1 por nível.
   - **Veneno:** base `1 + 3·(nível−1)` + 1 por stack, sem limite e sem contágio.
@@ -27,14 +32,7 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Depois disso, remover a mana do jogo inteiro: a barra MP, `p.mana`/`maxMana`, o save e as traduções.
 
 ## Próximas fases
-- **8 – Arte dos itens:** trocar os emojis por imagens em pixel art fiéis ao nome de cada item.
-  - Exemplos do usuário:
-    - Arco Gélido: arco e flecha com gelo.
-    - Colete de Couro: um colete.
-    - Espada Enferrujada: desgastada e alaranjada.
-  - Item elemental mostra o efeito ou o símbolo do elemento.
-  - As decisões devem ser perguntadas em múltipla escolha.
-- **9 – Docs (por último):** reescrever `auto-battler-doc.md` e arquivar `trello-setup.md` em `docs/`.
+- **9 – Docs (próxima):** reescrever `auto-battler-doc.md` e arquivar `trello-setup.md` em `docs/`.
 - **Opcionais:**
   - god rays fracos;
   - contraste do herói;

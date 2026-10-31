@@ -1,3 +1,5 @@
+> Note: this is the original planning board for the project. It is outdated and kept only for history.
+
 # Trello — Auto Battler Setup Completo
 
 ---

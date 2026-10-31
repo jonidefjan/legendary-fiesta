@@ -4,6 +4,7 @@
   "description": "Portfólio de Jonatas Mattos e o jogo Reliquary (JavaScript puro, sem build)",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "docs:items": "node scripts/items-doc.mjs"
   }
 }
