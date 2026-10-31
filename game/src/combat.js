@@ -15,7 +15,8 @@
 //   "crit"        golpe crítico do herói: damage
 //   "dodge"       herói esquivou de um ataque
 //   "freeze"      inimigo congelado (enemy.frozen = ms restantes)
-//   "explode"     explosão da Armadura Cristalina
+//   "explode"     explosão (Armadura Cristalina, Núcleo Explosivo): kind "ice" | "fire"
+//   "spread"      queimadura passou de um inimigo morto a outros: from {x,y}, to [{x,y}]
 // Sons: sound(nome, detalhe) -> "hit" + elemento, "use" + tipo do efeito, "dot" + tipo,
 // além de "crit", "dodge", "freeze" e "explode".
 import { state } from "./state.js";
@@ -29,6 +30,7 @@ import {
   ownedEffects,
   isActivatable,
   levelMultiplier,
+  itemLevel,
 } from "./items.js";
 
 // Redução máxima de dano pela armadura (%): com Guarda sem teto, nada fica imune
@@ -123,19 +125,43 @@ export function applyElementalDamage(target, baseDmg, element, source, crit = fa
   return finalDmg;
 }
 
-export function applyDot(target, type, damage, duration, stackable = true) {
+// damage: dano por stack. Cada tick causa base + damage × stacks.
+// maxStacks: teto de stacks (a queimadura depende do nível do item; o veneno não tem teto).
+export const DEFAULT_MAX_STACKS = 5;
+
+export function applyDot(
+  target,
+  type,
+  damage,
+  duration,
+  stackable = true,
+  { maxStacks = DEFAULT_MAX_STACKS, base = 0 } = {},
+) {
   if (!target.dots) target.dots = [];
 
   // Stack or refresh
   const existing = target.dots.find((d) => d.type === type);
   if (existing && stackable) {
-    existing.stacks = Math.min(5, existing.stacks + 1);
+    existing.stacks = Math.min(maxStacks, existing.stacks + 1);
     existing.duration = duration;
+    existing.fullDuration = duration; // o contágio renova a duração com este valor
     existing.damage = damage;
+    existing.base = base;
+    existing.maxStacks = maxStacks;
   } else if (existing) {
     existing.duration = duration;
+    existing.fullDuration = duration;
   } else {
-    target.dots.push({ type, damage, duration, stacks: 1, tickTimer: 0 });
+    target.dots.push({
+      type,
+      damage,
+      base,
+      duration,
+      fullDuration: duration,
+      maxStacks,
+      stacks: 1,
+      tickTimer: 0,
+    });
   }
 
   // Visual feedback
@@ -155,7 +181,7 @@ export function processDots(dt) {
 
       if (dot.tickTimer >= 1000) {
         dot.tickTimer = 0;
-        const dmg = Math.round(dot.damage * dot.stacks);
+        const dmg = Math.round((dot.base || 0) + dot.damage * dot.stacks);
         entity.hp -= dmg;
         entity.hurtTimer = 8;
         entity.lastHitCrit = false; // abate por dano contínuo não conta como crítico
@@ -178,7 +204,8 @@ export function processDots(dt) {
         dot.duration--;
       }
 
-      return dot.duration > 0;
+      // Quem morreu neste tick mantém o dot: o Coração de Brasa lê a queimadura no abate
+      return dot.duration > 0 || entity.hp <= 0;
     });
   });
   // Queimadura do chefe também mata (ou aciona a Pena de Fênix)
@@ -189,13 +216,32 @@ export function processDots(dt) {
 //  EFEITOS DOS ITENS (um handler por "type" do items.json)
 // ═══════════════════════════════════════════
 
+// Inimigos vivos (vida 0 ainda não foi marcado como morto, isso é no updateEnemies)
+function livingEnemies() {
+  return state.enemies.filter((e) => !e.dead && e.hp > 0);
+}
+
+// Vivos a até `radius` do ponto em x, sem o `except`. Todos andam na mesma linha do chão;
+// o y não conta (arena redimensionada pode deixar um invocado em outro y).
+function enemiesWithin(x, radius, except = null) {
+  return livingEnemies().filter((e) => e !== except && Math.abs(e.x - x) <= radius);
+}
+
 // trigger "hit": a cada golpe de arma. ctx = { target, damage, refund }
 const HIT_EFFECTS = {
   dot(effect, item, ctx) {
     if (!rolls(effect)) return;
-    // Dano contínuo cresce com o nível; a chance não muda
-    const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
-    applyDot(ctx.target, effect.dot, damage, effect.duration, true);
+    // O nível não aumenta o dano por stack (fixo por item): ele aumenta o teto de stacks
+    // da queimadura e o dano base do veneno. O bônus permanente vale para tudo.
+    const level = itemLevel(item.id);
+    const perm = permanentDamage();
+    const damage = effect.damage * perm;
+    const base = ((effect.base || 0) + (effect.basePerLevel || 0) * (level - 1)) * perm;
+    const maxStacks =
+      effect.maxStacks == null
+        ? Infinity
+        : effect.maxStacks + (effect.maxStacksPerLevel || 0) * (level - 1);
+    applyDot(ctx.target, effect.dot, damage, effect.duration, true, { maxStacks, base });
     const dot = DOTS[effect.dot];
     log(
       t("log.dot", {
@@ -223,6 +269,15 @@ const HIT_EFFECTS = {
   },
   lifesteal(effect, item, ctx) {
     healPlayer(Math.round(ctx.dealt * effect.ratio * levelMultiplier(item.id)), item);
+  },
+  // Respingo: cada golpe também fere os vizinhos do alvo. Sem crítico e sem efeitos de
+  // golpe da arma nos vizinhos (é dano de área); abates contam para os gatilhos de abate.
+  splash(effect, item, ctx) {
+    const near = enemiesWithin(ctx.target.x, effect.radius, ctx.target);
+    if (near.length === 0) return;
+    const damage = Math.round(ctx.damage * effect.ratio);
+    for (const en of near) applyElementalDamage(en, damage, item.dmgType || "physical", "player");
+    log(t("log.splash", { icon: item.icon, item: item.name, count: near.length, damage }), "dmg");
   },
 };
 
@@ -268,6 +323,12 @@ const KILL_EFFECTS = {
     p.harvestReady = true;
     log(t("log.harvestReady", { icon: item.icon, item: item.name }), "item");
   },
+  // Contágio: a queimadura de quem morreu passa aos N vivos mais próximos (N = nível).
+  // Todo abate (golpe, dano contínuo, explosão, reflexo, espinhos) passa pelo teste de
+  // morte do updateEnemies, que chama este gatilho; por isso o contágio pega todos.
+  spread(effect, item, en) {
+    spreadBurn(en, itemLevel(item.id), item);
+  },
   critFragment(effect, item, en) {
     if (!en.lastHitCrit) return;
     state.fragments += effect.amount;
@@ -304,6 +365,17 @@ const ATTACK_EFFECTS = {
       log(t("log.chain", { count: others.length }), "item");
     }
   },
+  // Atinge todos os outros inimigos vivos com o dano base do golpe (sem crítico)
+  hitAll(effect, item, ctx) {
+    const others = livingEnemies().filter((e) => e !== ctx.target);
+    if (others.length === 0) return;
+    const damage = Math.round(ctx.damage * effect.ratio);
+    for (const en of others) {
+      applyElementalDamage(en, damage, item.dmgType || "physical", "player");
+      spawnEffect("lightning", en.x, en.y - 20, { life: 25, color: "#ffe27a" });
+    }
+    log(t("log.hitAll", { icon: item.icon, item: item.name, count: others.length, damage }), "item");
+  },
   // Adianta a recarga dos outros itens (não do próprio)
   cooldownOthers(effect, item, ctx) {
     if (ctx.extra) return;
@@ -335,8 +407,69 @@ const ATTACK_MODS = {
   },
 };
 
+// Passa a queimadura de `dead` aos `count` inimigos vivos mais próximos dele. Cada alvo
+// fica com o maior número de stacks entre o dele e o do morto, e a duração é renovada.
+// Os alvos que também morrerem queimando espalham de novo (cadeia).
+function spreadBurn(dead, count, item) {
+  const burn = (dead.dots || []).find((d) => d.type === "burning");
+  if (!burn) return;
+  const targets = livingEnemies()
+    .filter((e) => e !== dead)
+    .map((e) => ({ e, dist: Math.hypot(e.x - dead.x, e.y - dead.y) }))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, count)
+    .map((o) => o.e);
+  if (targets.length === 0) return;
+  for (const en of targets) {
+    if (!en.dots) en.dots = [];
+    const own = en.dots.find((d) => d.type === "burning");
+    const fullDuration = burn.fullDuration ?? burn.duration;
+    if (own) {
+      own.stacks = Math.max(own.stacks, burn.stacks);
+      own.damage = Math.max(own.damage, burn.damage);
+      own.maxStacks = Math.max(own.maxStacks ?? 0, burn.maxStacks ?? 0);
+      own.duration = fullDuration;
+      own.fullDuration = fullDuration;
+    } else {
+      en.dots.push({
+        type: "burning",
+        damage: burn.damage,
+        base: 0,
+        duration: fullDuration,
+        fullDuration,
+        maxStacks: burn.maxStacks,
+        stacks: burn.stacks,
+        tickTimer: 0,
+      });
+    }
+    spawnEffect("text", en.x, en.y - 50, { life: 40, text: DOTS.burning.icon, color: "#ff6600" });
+  }
+  sound("spread");
+  emit("spread", {
+    from: { x: dead.x, y: dead.y },
+    to: targets.map((e) => ({ x: e.x, y: e.y })),
+  });
+  log(
+    t("log.spread", { icon: item.icon, item: item.name, count: targets.length, stacks: burn.stacks }),
+    "item",
+  );
+}
+
 // trigger "use": itens que não são armas, quando a recarga fica pronta
 const USE_EFFECTS = {
+  // Explosão em volta do herói: dano fixo (cresce com o nível) em todos no raio
+  blast(effect, item, p) {
+    const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
+    const near = enemiesWithin(p.x, effect.radius);
+    // Sem ninguém no alcance não explode: a recarga fica pronta para quando houver alvo
+    if (near.length === 0) return false;
+    for (const en of near) applyElementalDamage(en, damage, effect.element, "player");
+    spawnEffect("dragon_roar", p.x, p.y - 30, { life: 40 });
+    sound("explode");
+    emit("explode", { x: p.x, y: p.y, kind: "fire", radius: effect.radius });
+    log(t("log.blast", { icon: item.icon, item: item.name, damage, count: near.length }), "item");
+    p.anim = "berserk";
+  },
   blockNext(effect, item, p) {
     p.nextBlockActive = true;
     spawnEffect("shield", p.x, p.y - 40, { life: 40 });
@@ -440,6 +573,19 @@ const HURT_EFFECTS = {
     p.mana = Math.min(p.maxMana, p.mana + manaAbsorb);
     if (manaAbsorb > 0)
       log(t("log.manaAbsorb", { icon: item.icon, item: item.name, amount: manaAbsorb }), "item");
+  },
+  // Espinhos: só chega aqui quando o golpe tirou HP (esquiva, bloqueio e barreira
+  // que absorve tudo retornam antes). Fere todos os vivos ao alcance do herói.
+  thorns(effect, item) {
+    const p = state.player;
+    const near = enemiesWithin(p.x, effect.radius);
+    if (near.length === 0) return;
+    const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
+    for (const en of near) {
+      applyElementalDamage(en, damage, "physical", "thorns");
+      spawnEffect("text", en.x, en.y - 60, { life: 30, text: "🌵", color: "#66aa44" });
+    }
+    log(t("log.thorns", { icon: item.icon, item: item.name, count: near.length, damage }), "item");
   },
   // Devolve parte do dano recebido ao atacante
   reflect(effect, item, ctx) {
@@ -661,7 +807,7 @@ export function activateItem(item) {
     for (const effect of effectsOf(item, "use")) {
       const handler = USE_EFFECTS[effect.type];
       if (!handler) continue;
-      handler(effect, item, p);
+      if (handler(effect, item, p) === false) continue; // nada a fazer: não gasta a recarga
       sound("use", effect.type);
       emit("itemUse", { x: p.x, y: p.y, effect: effect.type });
       activated = true;

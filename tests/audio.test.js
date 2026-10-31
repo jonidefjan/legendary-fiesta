@@ -11,6 +11,7 @@ function callAll() {
   for (const u of [...USES, "desconhecido", undefined]) sfx.use(u);
   for (const d of [...DOTS, "desconhecido", undefined]) sfx.dot(d);
   sfx.revive();
+  sfx.spread();
   sfx.enemyHit();
   sfx.block();
   sfx.kill();

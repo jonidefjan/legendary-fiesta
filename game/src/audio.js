@@ -265,6 +265,13 @@ export const sfx = (() => {
         noise(a, 0.35, 0.05, "lowpass", 1400, 100, 1);
       });
     },
+    // Contágio: o fogo salta para outro inimigo (chiado curto subindo)
+    spread() {
+      play("spread", 1, (a) => {
+        noise(a, 0.2, 0.05, "bandpass", 1200, 3200, 1.4);
+        tone(a, 330, 0.16, "triangle", 0.03, 660);
+      });
+    },
     enemyHit() {
       play("enemyHit", 1, (a) => {
         tone(a, 160, 0.1, "sawtooth", 0.035, 90);

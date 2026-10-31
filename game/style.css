@@ -1121,6 +1121,7 @@ canvas {
   max-width: 800px;
   width: 100%;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   box-shadow:
     0 0 40px rgba(201, 168, 76, 0.3),
@@ -1139,17 +1140,30 @@ canvas {
   }
 }
 
+/* Escolha de item: coluna flex. O cabeçalho fica fixo, só a área dos cards rola
+   e o botão (sticky) fica sempre visível. Escopo no id: game over e vitória
+   seguem com o .modal-content genérico. */
+#item-choice-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#item-choice-modal .modal-header {
+  flex: none;
+}
+
 .modal-header {
   text-align: center;
-  padding: 24px 20px 16px;
+  padding: 16px 20px 12px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, var(--bg3) 0%, var(--bg2) 100%);
 }
 
 .modal-header h2 {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   color: var(--gold2);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   text-shadow: 0 2px 8px rgba(201, 168, 76, 0.4);
 }
 
@@ -1162,14 +1176,16 @@ canvas {
 .item-choices {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  padding: 20px;
-  max-height: 70vh;
+  gap: 10px;
+  padding: 14px 20px 12px;
+  /* Ocupa o que sobra do modal e rola por dentro; min-height: 0 deixa encolher */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
 }
 
 /* Otimizar para 3 itens (recompensa de wave) */
-.item-choices:has(.item-choice-card:nth-child(3):last-child) {
+.item-choices:has(.item-choice-card:nth-child(3):nth-last-child(-n + 2)) {
   grid-template-columns: repeat(3, 1fr);
   max-width: 900px;
   margin: 0 auto;
@@ -1179,14 +1195,14 @@ canvas {
   background: var(--bg3);
   border: 2px solid var(--border);
   border-radius: 10px;
-  padding: 20px;
+  padding: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   touch-action: manipulation;
 }
 
@@ -1225,15 +1241,15 @@ canvas {
 }
 
 .item-choice-icon {
-  font-size: 3rem;
+  font-size: 2.2rem;
   text-align: center;
-  margin: 8px 0;
+  margin: 2px 0;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
 }
 
 .item-choice-name {
   font-family: "Reliquary Digits", "Pixelify Sans", sans-serif;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   text-align: center;
   color: var(--gold2);
@@ -1242,40 +1258,40 @@ canvas {
 
 .item-choice-rarity {
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 4px 10px;
+  padding: 2px 8px;
   border-radius: 12px;
   margin: 0 auto;
   display: inline-block;
 }
 
 .item-choice-desc {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text2);
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.35;
   font-style: normal;
-  min-height: 40px;
+  min-height: 0;
 }
 
 .item-choice-effect {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   color: var(--text);
   background: var(--bg4);
-  padding: 10px;
+  padding: 8px;
   border-radius: 6px;
   border-left: 3px solid var(--gold);
   line-height: 1.4;
 }
 
 .item-choice-enchant {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--purple2);
   background: rgba(136, 68, 204, 0.15);
-  padding: 8px;
+  padding: 6px;
   border-radius: 6px;
   border: 1px solid rgba(136, 68, 204, 0.3);
   line-height: 1.4;
@@ -1478,8 +1494,13 @@ canvas {
   background: linear-gradient(135deg, var(--bg3) 0%, var(--bg4) 100%);
   border: 2px solid var(--border);
   border-radius: 12px;
-  padding: 16px 32px;
-  margin-top: 8px;
+  padding: 12px 32px;
+  margin: 0;
+  /* Sticky: fica colado no fim da área rolável, sempre à vista */
+  position: sticky;
+  bottom: 12px;
+  z-index: 20;
+  box-shadow: 0 -10px 12px -2px var(--bg2);
   font-family: "Reliquary Digits", "Pixelify Sans", sans-serif;
   font-size: 1.2rem;
   font-weight: 600;
@@ -1498,7 +1519,9 @@ canvas {
   color: var(--bg);
   cursor: pointer;
   opacity: 1;
+  /* Mantém a sombra que mascara o conteúdo rolando atrás do botão sticky */
   box-shadow:
+    0 -10px 12px -2px var(--bg2),
     0 4px 16px rgba(201, 168, 76, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
@@ -1506,6 +1529,7 @@ canvas {
 .confirm-selection-btn.active:hover {
   transform: translateY(-2px);
   box-shadow:
+    0 -10px 12px -2px var(--bg2),
     0 6px 20px rgba(201, 168, 76, 0.6),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
@@ -1522,7 +1546,7 @@ canvas {
   }
 
   /* Para 3 itens (recompensa), mostrar em coluna única em mobile */
-  .item-choices:has(.item-choice-card:nth-child(3):last-child) {
+  .item-choices:has(.item-choice-card:nth-child(3):nth-last-child(-n + 2)) {
     grid-template-columns: 1fr;
     max-width: 400px;
   }
@@ -1580,6 +1604,7 @@ canvas {
   .modal-content {
     border-radius: 8px;
     max-height: 98vh;
+    max-height: 98dvh;
   }
   .modal-header {
     padding: 12px 10px 10px;

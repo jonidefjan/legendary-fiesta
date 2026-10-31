@@ -27,6 +27,8 @@
         "type": "dot",
         "dot": "burning",
         "damage": 3,
+        "maxStacks": 3,
+        "maxStacksPerLevel": 1,
         "duration": 4,
         "chance": 0.25
       }
@@ -267,7 +269,9 @@
         "trigger": "hit",
         "type": "dot",
         "dot": "poison",
-        "damage": 3,
+        "damage": 1,
+        "base": 1,
+        "basePerLevel": 3,
         "duration": 4,
         "chance": 1
       }
@@ -492,6 +496,97 @@
         "hpCost": 2,
         "bonus": 0.01,
         "max": 0.25
+      }
+    ]
+  },
+  {
+    "id": "ember_heart",
+    "type": "relic",
+    "icon": "🌋",
+    "rarity": "legendary",
+    "cooldown": 0,
+    "passive": true,
+    "anim": "dark_pulse",
+    "effects": [
+      {
+        "trigger": "kill",
+        "type": "spread"
+      }
+    ]
+  },
+  {
+    "id": "seismic_hammer",
+    "type": "weapon",
+    "icon": "⚒️",
+    "rarity": "rare",
+    "cooldown": 3400,
+    "baseDmg": 14,
+    "dmgType": "physical",
+    "anim": "smash",
+    "fx": "slash",
+    "effects": [
+      {
+        "trigger": "hit",
+        "type": "splash",
+        "radius": 90,
+        "ratio": 0.4
+      }
+    ]
+  },
+  {
+    "id": "blast_core",
+    "type": "relic",
+    "icon": "💥",
+    "rarity": "epic",
+    "cooldown": 6000,
+    "anim": "berserk",
+    "effects": [
+      {
+        "trigger": "use",
+        "type": "blast",
+        "damage": 10,
+        "radius": 220,
+        "element": "fire"
+      }
+    ]
+  },
+  {
+    "id": "judgment_tome",
+    "type": "weapon",
+    "icon": "📖",
+    "rarity": "epic",
+    "cooldown": 5000,
+    "baseDmg": 9,
+    "dmgType": "holy",
+    "anim": "lightning",
+    "fx": "lightning",
+    "effects": [
+      {
+        "trigger": "attack",
+        "type": "hitAll",
+        "ratio": 1
+      }
+    ]
+  },
+  {
+    "id": "thorn_mail",
+    "type": "armor",
+    "icon": "🌵",
+    "rarity": "uncommon",
+    "cooldown": 0,
+    "passive": true,
+    "anim": "block",
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "armor": 8
+      },
+      {
+        "trigger": "hurt",
+        "type": "thorns",
+        "damage": 6,
+        "radius": 120
       }
     ]
   }

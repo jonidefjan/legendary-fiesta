@@ -422,8 +422,7 @@ export function refreshLanguage() {
   if (gameOver) renderGameOver();
 }
 
-// Barra de itens recolhível. A escolha do jogador fica salva; sem escolha,
-// começa recolhida em telas estreitas para sobrar arena
+// Barra de itens recolhível. A escolha do jogador fica salva; sem escolha, aberta
 const INV_COLLAPSED_KEY = "reliquary_inv_collapsed";
 
 function readSaved(key) {
@@ -447,12 +446,7 @@ function setupInventoryToggle() {
     inv.classList.toggle("collapsed", collapsed);
     btn.setAttribute("aria-expanded", String(!collapsed));
   };
-  // Abre primeiro para medir quanto o cabeçalho + barra de itens ocupam; só então
-  // decide se a arena ainda cabe (a escolha salva vence dentro de defaultCollapsed)
-  const saved = readSaved(INV_COLLAPSED_KEY);
-  apply(false);
-  const chromeOpenH = $("arena").getBoundingClientRect().top + window.scrollY;
-  apply(defaultCollapsed(saved, window.innerWidth, window.innerHeight, chromeOpenH));
+  apply(defaultCollapsed(readSaved(INV_COLLAPSED_KEY)));
   btn.addEventListener("click", () => {
     const collapsed = !inv.classList.contains("collapsed");
     apply(collapsed);
