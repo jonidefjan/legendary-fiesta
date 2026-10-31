@@ -1,0 +1,184 @@
+/* Tela inicial e loja de melhorias (ui-title.js) */
+#title-screen {
+  background: radial-gradient(ellipse at 50% 20%, rgba(124, 77, 255, 0.25), rgba(0, 0, 0, 0.95) 70%);
+}
+
+.title-content {
+  max-width: 720px;
+}
+
+.title-logo {
+  font-size: 2.75rem;
+  letter-spacing: 0.12em;
+  color: var(--gold2);
+  text-shadow: 0 3px 0 #5a4410, 0 0 24px rgba(201, 168, 76, 0.6);
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+
+.title-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 20px;
+  margin-top: 12px;
+  color: var(--text2);
+}
+
+.title-fragments b {
+  color: var(--gold2);
+}
+
+.title-body {
+  padding: 20px;
+}
+
+.title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.title-confirm {
+  text-align: center;
+  padding: 12px;
+  border: 1px solid var(--purple2);
+  border-radius: 8px;
+}
+
+.title-confirm p {
+  margin-bottom: 10px;
+}
+
+.title-btn {
+  font-family: inherit;
+  font-size: 1.1rem;
+  padding: 10px 22px;
+  min-height: 44px;
+  background: var(--bg3);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.title-btn:hover:not(:disabled),
+.title-btn:focus-visible {
+  border-color: var(--gold);
+  outline: none;
+}
+
+.title-btn.primary {
+  background: var(--gold);
+  color: #1a1408;
+  border-color: var(--gold2);
+}
+
+.title-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.shop-title {
+  margin: 24px 0 12px;
+  font-size: 1.25rem;
+  color: var(--gold2);
+  text-align: center;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.shop-card.bought {
+  animation: shopBought 0.5s ease-out;
+}
+
+@keyframes shopBought {
+  0% {
+    box-shadow: 0 0 0 rgba(201, 168, 76, 0);
+    transform: scale(1);
+  }
+  40% {
+    box-shadow: 0 0 22px rgba(201, 168, 76, 0.9);
+    transform: scale(1.04);
+    border-color: var(--gold2);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(201, 168, 76, 0);
+    transform: scale(1);
+  }
+}
+
+.shop-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shop-icon {
+  font-size: 1.5rem;
+}
+
+.shop-name {
+  flex: 1;
+  color: var(--gold2);
+  font-size: 1.1rem;
+}
+
+.shop-level {
+  color: var(--text2);
+}
+
+.shop-desc,
+.shop-effect {
+  font-size: 0.9rem;
+  color: var(--text2);
+}
+
+.shop-effect b {
+  color: var(--text);
+  font-weight: normal;
+}
+
+.shop-buy {
+  margin-top: auto;
+  font-size: 1rem;
+  padding: 8px 10px;
+}
+
+@media (max-width: 600px) {
+  .title-logo {
+    font-size: 1.9rem;
+    letter-spacing: 0.06em;
+  }
+  .title-body {
+    padding: 14px;
+  }
+  .shop-grid {
+    grid-template-columns: 1fr;
+  }
+  .title-actions .title-btn {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-card.bought {
+    animation: none;
+  }
+}

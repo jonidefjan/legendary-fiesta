@@ -64,6 +64,49 @@ function outlinedText(text, x, y, color, size, bold = true) {
   ctx.fillText(text, x, y);
 }
 
+// Em telas estreitas os botões (#game-controls) cobrem o alto da arena:
+// se a barra colidir com eles, ela desce para o pé da arena
+function bossBarY(W, h, b, x, w) {
+  const top = 80;
+  const controls = document.getElementById("game-controls");
+  if (!controls || !canvas || W > 768) return top;
+  const c = controls.getBoundingClientRect();
+  const a = canvas.getBoundingClientRect();
+  const hitsX = c.left - a.left < x + w + b && c.right - a.left > x - b;
+  const hitsY = c.top - a.top < top + h + b + 6 && c.bottom - a.top > top - 30;
+  if (!hitsX || !hitsY) return top;
+  return Math.max(top, Math.round(arena.height - h - 16));
+}
+
+// Barra grossa do chefe, no alto da arena: nome em cima, 10 marcas de 10%
+function drawBossBar(boss) {
+  const W = arena.width;
+  const w = Math.round(Math.min(W - 32, 420));
+  const h = W < 520 ? 14 : 18;
+  const b = 3;
+  const x = Math.round((W - w) / 2);
+  const y = bossBarY(W, h, b, x, w);
+  const pct = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
+  const enraged = !!boss.enraged;
+  outlinedText(boss.name, W / 2, y - 8, enraged ? PALETTE.pink : PALETTE.bone, W < 520 ? 14 : 18);
+  ctx.fillStyle = PALETTE.night;
+  ctx.fillRect(x - b, y - b, w + b * 2, h + b * 2);
+  ctx.fillStyle = PALETTE.darkBrown;
+  ctx.fillRect(x, y, w, h);
+  const fw = Math.round(w * pct);
+  if (fw > 0) {
+    ctx.fillStyle = enraged ? PALETTE.hotPink : PALETTE.red;
+    ctx.fillRect(x, y, fw, h);
+    ctx.fillStyle = enraged ? PALETTE.pink : PALETTE.orange;
+    ctx.fillRect(x, y, fw, 4);
+    ctx.fillStyle = PALETTE.crimson;
+    ctx.fillRect(x, y + h - 3, fw, 3);
+  }
+  ctx.fillStyle = PALETTE.night;
+  for (let i = 1; i < 10; i++) ctx.fillRect(x + Math.round((w * i) / 10) - 1, y, 2, h);
+  outlinedText(`${Math.max(0, Math.ceil(boss.hp))} / ${boss.maxHp}`, W / 2, y + h - 3, PALETTE.white, 11, false);
+}
+
 const v = new THREE.Vector3();
 const s = { x: 0, y: 0 };
 const pt = { x: 0, y: 0 };
@@ -75,8 +118,10 @@ export function drawBars(characters) {
   // De trás para a frente; nome que cairia em cima de outro é omitido
   items.length = 0;
   labels.length = 0;
+  const boss = state.enemies.find((e) => e.isBoss && !e.dead);
+  if (boss) drawBossBar(boss);
   for (const en of state.enemies) {
-    if (en.dead || !characters.enemyAnchor(en, v)) continue;
+    if (en.dead || en.isBoss || !characters.enemyAnchor(en, v)) continue;
     const p = worldToScreen(v.x, v.y, v.z, pt);
     if (p.x < -60 || p.x > arena.width + 60) continue;
     items.push({ en, x: p.x, y: p.y });

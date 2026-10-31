@@ -2,12 +2,21 @@
 //  INTERFACE (DOM): inventário, HUD, log, modais e botões
 // ═══════════════════════════════════════════
 import { state } from "./state.js";
-import { RARITIES, getTypeLabel, findItem } from "./items.js";
+import {
+  RARITIES,
+  maxLevelOf,
+  getTypeLabel,
+  findItem,
+  itemLevel,
+  effectiveCooldown,
+} from "./items.js";
 
 export const isMobile =
   "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
 const $ = (id) => document.getElementById(id);
+
+const ROMAN = ["", "I", "II", "III", "IV", "V"];
 
 // ═══════════════════════════════════════════
 //  INVENTORY
@@ -21,9 +30,12 @@ export function renderInventory() {
       const slot = document.createElement("div");
       slot.className = "item-slot";
       slot.dataset.id = item.id;
+      const level = itemLevel(item.id);
+      if (level >= maxLevelOf(item) && maxLevelOf(item) > 1) slot.classList.add("max-level");
       slot.innerHTML = `
         <div class="item-icon">${item.icon}</div>
         <div class="rarity-gem rarity-${item.rarity}"></div>
+        ${level > 1 ? `<div class="level-badge">${ROMAN[level]}</div>` : ""}
         <div class="cooldown-overlay" id="cd-text-${item.id}"></div>
         <div class="cd-bar" id="cd-bar-${item.id}" style="width:100%"></div>
       `;
@@ -56,13 +68,16 @@ const tooltip = $("tooltip");
 
 function showTooltip(item, e) {
   const r = RARITIES[item.rarity];
+  const level = itemLevel(item.id);
+  const cooldown = item.cooldown > 0 ? effectiveCooldown(item) : 0;
   tooltip.innerHTML = `
     <div class="tt-name" style="color:${r.color}">${item.icon} ${item.name}</div>
     <div class="tt-rarity" style="color:${r.color}">${r.label}</div>
+    <div class="tt-level">Nível ${level}/${maxLevelOf(item)}</div>
     <div class="tt-desc">${item.desc}</div>
     <div class="tt-effect">${item.effect}</div>
     ${item.enchant ? `<div class="tt-enchant">${item.enchant}</div>` : ""}
-    ${item.cooldown > 0 ? `<div class="tt-cd">⏱ Recarga: ${(item.cooldown / 1000).toFixed(1)}s</div>` : ""}
+    ${cooldown > 0 ? `<div class="tt-cd">⏱ Recarga: ${(cooldown / 1000).toFixed(1)}s</div>` : ""}
   `;
 
   if (isMobile) {
@@ -129,7 +144,7 @@ export function updateHUD() {
   $("inv-wave").textContent = `Onda ${state.wave}`;
   const alive = state.enemies.filter((e) => !e.dead).length;
   $("inv-enemies").textContent = `${alive} inimigo${alive !== 1 ? "s" : ""}`;
-  $("inv-gold").textContent = `⚙ ${state.gold} ouro`;
+  $("inv-best").textContent = `🏆 Recorde: onda ${state.meta.best.wave}`;
 
   // Item cooldown bars
   state.items.forEach((item) => {
@@ -191,7 +206,15 @@ function itemCard(item, onClick) {
   card.onclick = () => onClick(card);
 
   const rarityInfo = RARITIES[item.rarity];
+  // Quem já tem o item vê a oferta como melhoria de nível
+  const owned = state.items.some((i) => i.id === item.id);
+  const level = itemLevel(item.id);
+  const tag = owned
+    ? `<div class="item-choice-tag upgrade">⬆️ Nível ${level} → ${level + 1}</div>`
+    : `<div class="item-choice-tag new">Novo</div>`;
+  if (owned) card.classList.add("upgrade");
   card.innerHTML = `
+    ${tag}
     <div class="item-choice-type">${getTypeLabel(item.type)}</div>
     <div class="item-choice-icon">${item.icon}</div>
     <div class="item-choice-name">${item.name}</div>
@@ -208,13 +231,20 @@ export function hideItemModal() {
   $("item-choice-modal").style.display = "none";
 }
 
-// Escolha inicial: até maxSelections itens; onConfirm recebe os itens escolhidos
+// Escolha inicial: com max === 1 é seleção única (clicar em outro move a escolha);
+// onConfirm recebe os itens escolhidos
 export function showInitialPick(options, maxSelections, onConfirm) {
   const modal = $("item-choice-modal");
   const container = $("item-choices-container");
+  const single = maxSelections === 1;
   const selected = [];
 
-  modal.querySelector(".modal-header").innerHTML = `
+  modal.querySelector(".modal-header").innerHTML = single
+    ? `
+    <h2>⚔️ Escolha sua arma</h2>
+    <p class="modal-subtitle">Ela define seu estilo de luta nesta run</p>
+  `
+    : `
     <h2>⚔️ Escolha Seus Itens Iniciais</h2>
     <p class="modal-subtitle">Selecione até ${maxSelections} itens para começar sua jornada</p>
     <div class="selection-counter">
@@ -226,13 +256,21 @@ export function showInitialPick(options, maxSelections, onConfirm) {
   const confirmBtn = document.createElement("div");
   confirmBtn.className = "confirm-selection-btn";
   confirmBtn.id = "confirm-selection-btn";
-  confirmBtn.innerHTML = "Iniciar Jogo";
+  confirmBtn.innerHTML = single ? "Começar" : "Iniciar Jogo";
 
   options.forEach((item) => {
     container.appendChild(
       itemCard(item, (card) => {
         const index = selected.findIndex((i) => i.id === item.id);
-        if (index >= 0) {
+        if (single) {
+          // Seleção única: troca a escolha anterior
+          container
+            .querySelectorAll(".item-choice-card.selected")
+            .forEach((c) => c.classList.remove("selected"));
+          selected.length = 0;
+          selected.push(item);
+          card.classList.add("selected");
+        } else if (index >= 0) {
           selected.splice(index, 1);
           card.classList.remove("selected");
         } else if (selected.length < maxSelections) {
@@ -245,7 +283,8 @@ export function showInitialPick(options, maxSelections, onConfirm) {
           );
           return;
         }
-        $("selection-count").textContent = selected.length;
+        const counter = $("selection-count");
+        if (counter) counter.textContent = selected.length;
         confirmBtn.classList.toggle("active", selected.length > 0);
       }),
     );
@@ -253,7 +292,12 @@ export function showInitialPick(options, maxSelections, onConfirm) {
 
   confirmBtn.onclick = () => {
     if (selected.length === 0) {
-      addLog("⚠️ Selecione pelo menos 1 item para continuar!", "item");
+      addLog(
+        single
+          ? "⚠️ Escolha uma arma para continuar!"
+          : "⚠️ Selecione pelo menos 1 item para continuar!",
+        "item",
+      );
       return;
     }
     hideItemModal();
@@ -272,7 +316,7 @@ export function showRewardPick(options, wave, onPick) {
   // Reescreve o cabeçalho inteiro: a escolha inicial deixa um contador de seleção nele
   modal.querySelector(".modal-header").innerHTML = `
     <h2>🎁 Recompensa da Onda!</h2>
-    <p class="modal-subtitle">Escolha 1 item de ${options.length} opções · Onda ${wave} concluída</p>
+    <p class="modal-subtitle">Escolha 1 de ${options.length} opções · Onda ${wave} concluída</p>
   `;
   container.innerHTML = "";
   options.forEach((item) => {
@@ -312,7 +356,6 @@ export function showGameOver() {
     { label: "🌊 Onda alcançada", value: state.wave },
     { label: "💀 Inimigos mortos", value: state.kills },
     { label: "🏆 Pontuação", value: state.score },
-    { label: "⚙ Ouro acumulado", value: state.gold },
     { label: "⚔ Dano total causado", value: state.runStats.totalDamage },
     { label: "⏱ Duração da run", value: duration },
     { label: "⭐ Item favorito", value: favoriteItem, wide: true },

@@ -273,7 +273,8 @@
         "hpRatio": 0.4,
         "resetCooldowns": true
       }
-    ]
+    ],
+    "maxLevel": 1
   },
   {
     "id": "frost_bow",

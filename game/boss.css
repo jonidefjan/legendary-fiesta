@@ -1,0 +1,77 @@
+/* Chefes e tela de vitória (ui-victory.js) */
+
+.victory-content {
+  max-width: 520px;
+  border-color: var(--gold2);
+  box-shadow:
+    0 0 60px rgba(232, 201, 106, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.victory-content .modal-header h2 {
+  font-family: "Pixelify Sans", sans-serif;
+  font-size: 2.2rem;
+  color: var(--gold3);
+  text-shadow:
+    0 2px 0 var(--bg),
+    0 0 18px rgba(245, 224, 154, 0.6);
+}
+
+.victory-content .modal-subtitle {
+  font-family: "Pixelify Sans", sans-serif;
+  font-size: 1.15rem;
+  color: var(--red2);
+}
+
+.victory-stat {
+  text-align: center;
+}
+
+.victory-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 20px 20px;
+}
+
+.victory-actions .go-restart-btn {
+  width: 100%;
+  margin: 0;
+}
+
+.victory-end {
+  width: 100%;
+  background: var(--bg3);
+  border: 2px solid var(--border2);
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-family: "Pixelify Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.victory-end:hover {
+  border-color: var(--gold);
+  color: var(--gold2);
+  transform: translateY(-2px);
+}
+
+.victory-end:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 480px) {
+  .victory-content .modal-header h2 {
+    font-size: 1.7rem;
+  }
+
+  .victory-actions .go-restart-btn {
+    font-size: 0.95rem;
+    padding: 12px 14px;
+  }
+}

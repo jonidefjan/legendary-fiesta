@@ -80,37 +80,87 @@ export function starterItems() {
   return [...weapons, ...armors];
 }
 
+// ─── Níveis ───
+// Pegar um item que já tem sobe o nível dele: +20% no efeito principal e -5% de
+// recarga por nível. No nível máximo ele sai do sorteio.
+export const MAX_ITEM_LEVEL = 5;
+export const LEVEL_POWER = 0.2;
+export const LEVEL_COOLDOWN = 0.05;
+
+// Itens cujo efeito não cresce (ex.: Pena de Fênix revive uma vez) declaram maxLevel no JSON
+export function maxLevelOf(item) {
+  return item.maxLevel ?? MAX_ITEM_LEVEL;
+}
+
+export function itemLevel(id) {
+  return state.itemLevels[id] || 1;
+}
+
+// Multiplicador do efeito principal (dano, cura, barreira, mana, duração...)
+export function levelMultiplier(id) {
+  return 1 + LEVEL_POWER * (itemLevel(id) - 1);
+}
+
+// Recarga com nível do item e bônus permanente de velocidade
+export function effectiveCooldown(item) {
+  const levelFactor = 1 - LEVEL_COOLDOWN * (itemLevel(item.id) - 1);
+  const metaFactor = 1 - (state.player.cooldownBonus || 0);
+  return Math.round(item.cooldown * levelFactor * metaFactor);
+}
+
+// Adiciona o item ou, se já existe, sobe o nível. Devolve { leveled, level }.
+export function addItemOrLevel(item) {
+  if (state.items.some((i) => i.id === item.id)) {
+    const level = Math.min(maxLevelOf(item), itemLevel(item.id) + 1);
+    state.itemLevels[item.id] = level;
+    ensureTimers();
+    return { leveled: true, level };
+  }
+  state.items.push(item);
+  state.itemLevels[item.id] = 1;
+  ensureTimers();
+  return { leveled: false, level: 1 };
+}
+
 // Recalcula os atributos vindos de efeitos passivos ("stats")
 export function applyPassives() {
   const p = state.player;
-  p.armor = PLAYER_BASE.armor;
+  p.armor = p.baseArmor ?? PLAYER_BASE.armor;
   p.maxMana = PLAYER_BASE.maxMana;
   p.magicBoost = PLAYER_BASE.magicBoost;
-  for (const { effect } of ownedEffects("passive")) {
+  for (const { item, effect } of ownedEffects("passive")) {
     if (effect.type !== "stats") continue;
-    p.armor += effect.armor || 0;
-    p.maxMana += effect.maxMana || 0;
-    p.magicBoost += effect.magicBoost || 0;
+    const k = levelMultiplier(item.id);
+    p.armor += Math.round((effect.armor || 0) * k);
+    p.maxMana += Math.round((effect.maxMana || 0) * k);
+    p.magicBoost += (effect.magicBoost || 0) * k;
   }
 }
 
-// Itens novos começam com a recarga pronta
+// Itens novos começam com a recarga pronta; os existentes acompanham nível e melhorias
 export function ensureTimers() {
   for (const item of state.items) {
-    if (item.cooldown > 0) {
-      state.itemTimers[item.id] = state.itemTimers[item.id] || {
-        elapsed: item.cooldown,
-        cooldown: item.cooldown,
-      };
+    if (item.cooldown <= 0) continue;
+    const cooldown = effectiveCooldown(item);
+    const timer = state.itemTimers[item.id];
+    if (timer) {
+      timer.cooldown = cooldown;
+    } else {
+      state.itemTimers[item.id] = { elapsed: cooldown, cooldown };
     }
   }
 }
 
 // ─── Sorteio ───
-// excludeIds: itens que não podem aparecer (ex.: os que o jogador já tem)
-export function generateRandomItems(count, excludeIds = new Set()) {
+// excludeIds: itens que não podem aparecer; type: só um tipo (ex.: "weapon").
+// Itens no nível máximo nunca aparecem.
+export function generateRandomItems(count, excludeIds = new Set(), { type } = {}) {
   const pool = catalog.filter(
-    (i) => !UNIMPLEMENTED_ITEMS.has(i.id) && !excludeIds.has(i.id),
+    (i) =>
+      !UNIMPLEMENTED_ITEMS.has(i.id) &&
+      !excludeIds.has(i.id) &&
+      (!type || i.type === type) &&
+      itemLevel(i.id) < maxLevelOf(i),
   );
   const selectedItems = [];
   const usedIds = new Set();

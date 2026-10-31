@@ -23,6 +23,12 @@ const MODEL_FILES = {
   mage: "Skeleton_Mage.glb",
 };
 
+// Formas sem arquivo próprio reaproveitam o modelo de outra (Senhor Demônio = Warrior + chifres)
+const MODEL_ALIAS = { demonlord: "warrior" };
+// Multiplicador sobre a altura do inimigo (size / 18): chefes ficam ~1,5x e ~1,7x o herói
+const SHAPE_SCALE = { mage: 0.9, demonlord: 1 };
+const KNOWN_SHAPES = new Set([...Object.keys(MODEL_FILES), ...Object.keys(MODEL_ALIAS)]);
+
 const FADE = 0.12; // s, transição entre animações
 const ACTION_SPEED = 1.5; // golpes do herói mais rápidos que o clipe original
 const ENEMY_ATTACK_SPEED = 1.4;
@@ -69,7 +75,21 @@ const ENEMY_ATTACK = {
   rogue: "1H_Melee_Attack_Chop",
   warrior: "1H_Melee_Attack_Chop",
   mage: "Spellcast_Shoot",
+  demonlord: "1H_Melee_Attack_Chop",
 };
+
+// Habilidade de chefe (en.castKind) -> clipe, por forma
+const BOSS_CAST = {
+  mage: { summon: "Spellcast_Summon", nova: "Spellcast_Shoot", enrage: "Taunt" },
+  demonlord: { summon: "Spellcast_Raise", nova: "Spellcast_Raise", enrage: "Taunt" },
+};
+
+// Cores dos chefes: olhos, aura do chão e tinta do corpo (normal e enfurecido)
+const BOSS_LOOK = {
+  mage: { eyes: 0xb060ff, aura: 0x8a4cff, tint: 0x6a3a9a, tintAmount: 0.3 },
+  demonlord: { eyes: 0xff2a20, aura: 0xe43b44, tint: 0x8a1c24, tintAmount: 0.3 },
+};
+const ENRAGE_TINT = { color: 0x7a0a10, amount: 0.55, eyes: 0xff0000, aura: 0xff3a10 };
 
 // ─── Carregamento ───
 const loader = new GLTFLoader();
@@ -419,15 +439,114 @@ function laneZ(en) {
   return (t * 2 - 1) * LANE_Z;
 }
 
+// ─── Chefes: olhos, tinta, chifres e aura (tudo descartável por registro) ───
+function setBossLook(rec, enraged) {
+  const look = BOSS_LOOK[rec.shape];
+  const color = new THREE.Color(enraged ? ENRAGE_TINT.color : look.tint);
+  const amount = enraged ? ENRAGE_TINT.amount : look.tintAmount;
+  for (const m of rec.rig.flashMaterials) {
+    m.userData.base ||= m.color.clone();
+    m.color.copy(m.userData.base).lerp(color, amount);
+  }
+  for (const m of rec.eyeMaterials) m.emissive.setHex(enraged ? ENRAGE_TINT.eyes : look.eyes);
+  rec.auraMaterial?.color.setHex(enraged ? ENRAGE_TINT.aura : look.aura);
+  rec.enraged = enraged;
+}
+
+function hornPart(rec, radius, height, color) {
+  const geo = new THREE.ConeGeometry(radius, height, 6);
+  geo.translate(0, height / 2, 0);
+  const mat = toonMaterial(color, CHAR_MAT);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.layers.set(LAYERS.character);
+  mesh.castShadow = true;
+  rec.extras.push({ geometry: geo, material: mat });
+  return mesh;
+}
+
+// Dois chifres de cones (base carmim + ponta de osso) presos ao osso da cabeça
+function addHorns(rec) {
+  const head = rec.rig.model.getObjectByName("head");
+  if (!head) return;
+  rec.rig.model.updateMatrixWorld(true);
+  const ws = new THREE.Vector3();
+  head.getWorldScale(ws);
+  const k = 1 / ws.y; // unidades do mundo -> unidades locais do osso
+  for (const side of [-1, 1]) {
+    const horn = new THREE.Group();
+    const h = rec.height * 0.1; // em unidades do mundo (a escala k converte)
+    const r = rec.height * 0.028;
+    const base = hornPart(rec, r, h * 0.55, PALETTE.crimson);
+    const tip = hornPart(rec, r * 0.62, h * 0.7, PALETTE.bone);
+    tip.position.y = h * 0.5;
+    horn.add(base, tip);
+    horn.scale.setScalar(k);
+    horn.position.set(side * rec.height * 0.05 * k, rec.height * 0.11 * k, 0);
+    horn.rotation.z = -side * 0.55;
+    head.add(horn);
+  }
+}
+
+// Disco de luz no chão (aditivo), cor da aura do chefe
+function addAura(rec) {
+  const r = rec.height * 0.5;
+  const geo = new THREE.RingGeometry(r * 0.72, r, 20);
+  const mat = new THREE.MeshBasicMaterial({
+    color: BOSS_LOOK[rec.shape].aura,
+    transparent: true,
+    opacity: 0.4,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    fog: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = 0.07;
+  mesh.layers.set(LAYERS.noOutline);
+  mesh.renderOrder = SHADOW_BLOB.renderOrder + 1;
+  rec.root.add(mesh);
+  rec.aura = mesh;
+  rec.auraMaterial = mat;
+  rec.extras.push({ geometry: geo, material: mat });
+}
+
+function decorateBoss(rec) {
+  const look = BOSS_LOOK[rec.shape];
+  // Olhos (Glow) ganham material próprio, para a cor não vazar para os outros esqueletos
+  const own = new Map();
+  rec.rig.model.traverse((o) => {
+    if (!o.isMesh || !o.material.userData.glow) return;
+    if (!own.has(o.material)) {
+      const m = toonMaterial(0xffffff, { emissive: look.eyes });
+      m.userData.glow = true;
+      own.set(o.material, m);
+      rec.eyeMaterials.push(m);
+      rec.extras.push({ material: m });
+    }
+    o.material = own.get(o.material);
+  });
+  if (rec.shape === "demonlord") addHorns(rec);
+  setBossLook(rec, false);
+}
+
 function createEnemyRecord(en, group, spawnAllowed) {
-  const shape = MODEL_FILES[en.shape] ? en.shape : "minion";
+  const shape = KNOWN_SHAPES.has(en.shape) ? en.shape : "minion";
   const rec = {
     shape,
+    isBoss: !!en.isBoss,
+    extras: [], // geometrias e materiais criados só para este inimigo
+    lastCast: en.castCount || 0,
+    enraged: false,
+    aura: null,
+    auraMaterial: null,
+    eyeMaterials: [],
+    time: 0,
     root: new THREE.Group(),
     rig: null,
-    stub: placeholder(enemyHeight(en), PALETTE.bone),
-    blob: createBlob(enemyHeight(en)),
-    height: enemyHeight(en),
+    stub: placeholder(enemyHeight(en) * (SHAPE_SCALE[shape] ?? 1), PALETTE.bone),
+    blob: createBlob(enemyHeight(en) * (SHAPE_SCALE[shape] ?? 1)),
+    height: enemyHeight(en) * (SHAPE_SCALE[shape] ?? 1),
     baseZ: laneZ(en),
     z: laneZ(en),
     push: 0, // empurrão para trás (+X) para não sobrepor
@@ -443,6 +562,7 @@ function createEnemyRecord(en, group, spawnAllowed) {
   };
   rec.root.add(rec.stub);
   rec.root.add(rec.blob);
+  if (rec.isBoss && BOSS_LOOK[shape]) addAura(rec);
   rec.root.rotation.y = -Math.PI / 2 + YAW_TO_CAMERA; // olha para -X
   group.add(rec.root);
   return rec;
@@ -456,17 +576,22 @@ function disposeEnemyRecord(rec) {
     rec.stub.material.dispose();
   }
   rec.rig?.dispose();
+  for (const e of rec.extras) {
+    e.geometry?.dispose();
+    e.material?.dispose();
+  }
 }
 
 function attachEnemyModel(rec) {
   if (rec.rig) return;
-  const tpl = requestTemplate(rec.shape);
+  const tpl = requestTemplate(MODEL_ALIAS[rec.shape] ?? rec.shape);
   if (!tpl) return;
   rec.rig = new Rig(tpl, rec.height, { perInstanceMaterials: true });
   rec.root.remove(rec.stub);
   rec.stub.geometry.dispose();
   rec.stub.material.dispose();
   rec.root.add(rec.rig.model);
+  if (rec.isBoss && BOSS_LOOK[rec.shape]) decorateBoss(rec);
   if (rec.dead) {
     rec.rig.play("Death_C_Skeletons", { once: true, timeScale: ENEMY_DEATH_SPEED, fade: 0 });
   } else if (rec.wantsSpawn && rec.rig.has("Spawn_Ground_Skeletons")) {
@@ -490,7 +615,13 @@ function updateEnemyAnim(rec, en) {
   const hurtStart = en.hurtTimer > 0 && en.hurtTimer > rec.lastHurt;
   rec.lastAttack = en.attackAnim || 0;
   if (!rig) return;
-  if (attackStart) {
+  const cast = (en.castCount || 0) > rec.lastCast;
+  rec.lastCast = en.castCount || 0;
+  if (cast) {
+    const clip = BOSS_CAST[rec.shape]?.[en.castKind] ?? ENEMY_ATTACK[rec.shape];
+    rig.play(clip, { once: true, restart: true, timeScale: 1 });
+    rec.action = "attack";
+  } else if (attackStart) {
     rig.play(ENEMY_ATTACK[rec.shape], { once: true, restart: true, timeScale: ENEMY_ATTACK_SPEED });
     rec.action = "attack";
   } else if (hurtStart && rec.action !== "attack" && rec.action !== "spawn") {
@@ -590,6 +721,13 @@ export function createCharacters(scene) {
             rec.root.visible = false;
           }
         }
+      }
+      if (rec.isBoss && rec.rig && rec.eyeMaterials.length > 0) {
+        if (!!en.enraged !== rec.enraged) setBossLook(rec, !!en.enraged);
+        rec.time += dtSec;
+        const pulse = 0.5 + 0.5 * Math.sin(rec.time * (rec.enraged ? 7 : 3));
+        rec.auraMaterial.opacity = en.dead ? 0 : 0.25 + 0.25 * pulse;
+        rec.aura.scale.setScalar(1 + 0.08 * pulse);
       }
       if (rec.rig) {
         const flash = !en.dead && en.hurtTimer > 0 ? 0.55 * Math.min(1, en.hurtTimer / 12) : 0;

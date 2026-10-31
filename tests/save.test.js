@@ -77,9 +77,9 @@ test("save da versão 1 é migrado: IDs, fragmentos e itens sem efeito removidos
   save.loadMeta();
   assert.equal(state.fragments, 12);
   assert.equal(save.loadRun(), true);
-  assert.deepEqual(
-    JSON.parse(storage.data[save.META_KEY]),
-    { fragments: 12 },
+  assert.equal(
+    JSON.parse(storage.data[save.META_KEY]).fragments,
+    12,
     "fragmentos gravados na chave nova antes da antiga sumir",
   );
   assert.equal(state.wave, 3);
@@ -99,4 +99,30 @@ test("sem storage disponível o jogo não quebra", () => {
   save.setStorage(null);
   save.saveRun();
   assert.equal(save.loadRun(), false);
+});
+
+test("run e progresso permanente guardam níveis, infinito, melhorias e recordes", () => {
+  state.itemLevels = { rusted_sword: 3 };
+  state.endless = true;
+  state.victoryShown = true;
+  state.meta.upgrades = { vitality: 2 };
+  state.meta.best = { wave: 12, score: 900 };
+  state.meta.bossesBeaten = 1;
+  save.saveRun();
+
+  resetRun();
+  state.meta.upgrades = {};
+  state.meta.best = { wave: 0, score: 0 };
+  state.meta.bossesBeaten = 0;
+  save.loadMeta();
+  assert.equal(save.hasRun(), true);
+  assert.equal(save.loadRun(), true);
+  assert.deepEqual(state.itemLevels, { rusted_sword: 3 });
+  assert.equal(state.endless, true);
+  assert.equal(state.victoryShown, true);
+  assert.deepEqual(state.meta.upgrades, { vitality: 2 });
+  assert.deepEqual(state.meta.best, { wave: 12, score: 900 });
+  assert.equal(state.meta.bossesBeaten, 1);
+  save.clearRun();
+  assert.equal(save.hasRun(), false);
 });
