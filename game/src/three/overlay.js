@@ -66,19 +66,22 @@ function outlinedText(text, x, y, color, size, bold = true) {
 
 const v = new THREE.Vector3();
 const s = { x: 0, y: 0 };
+const pt = { x: 0, y: 0 };
+const items = [];
+const labels = [];
 
 // Nome, barra de vida e DoTs de cada inimigo vivo, e a barra do herói
 export function drawBars(characters) {
   // De trás para a frente; nome que cairia em cima de outro é omitido
-  const items = [];
+  items.length = 0;
+  labels.length = 0;
   for (const en of state.enemies) {
     if (en.dead || !characters.enemyAnchor(en, v)) continue;
-    const p = worldToScreen(v.x, v.y, v.z, { x: 0, y: 0 });
+    const p = worldToScreen(v.x, v.y, v.z, pt);
     if (p.x < -60 || p.x > arena.width + 60) continue;
     items.push({ en, x: p.x, y: p.y });
   }
   items.sort((a, b) => a.y - b.y);
-  const labels = [];
   for (const { en, x, y } of items) {
     s.x = x;
     s.y = y;

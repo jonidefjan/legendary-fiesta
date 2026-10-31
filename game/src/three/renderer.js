@@ -64,6 +64,9 @@ async function loadEnvironment() {
     environment = mod.buildEnvironment(scene) || null;
     applyNoOutline(scene);
     scene.remove(fallbackGround);
+    fallbackGround.geometry.dispose();
+    fallbackGround.material.dispose();
+    fallbackGround = null;
   } catch (err) {
     console.warn("[renderer] Cenário 3D indisponível; usando chão simples.", err);
   }
@@ -111,6 +114,14 @@ export function getRenderContext() {
   return { scene, camera: view.camera, pipeline, environment, lighting, view };
 }
 
+// Depuração: contagem de geometrias/texturas na GPU (deve ficar estável entre ondas)
+// No console: __gpuMemory()
+export function gpuMemory() {
+  const m = pipeline?.renderer.info.memory;
+  return m ? { geometries: m.geometries, textures: m.textures } : null;
+}
+if (typeof window !== "undefined") window.__gpuMemory = gpuMemory;
+
 export function setCamera(x, y) {
   shake.x = x;
   shake.y = y;
@@ -122,8 +133,9 @@ export function resizeCanvas() {
   const height = el?.clientHeight || display.clientHeight || 480;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   resizeView(width, height);
-  pipeline?.setSize(width, height, dpr);
+  // Canvas de efeitos primeiro: o pipeline realoca a textura se o tamanho mudou
   fx.resizeFxCanvas();
+  pipeline?.setSize(width, height, dpr);
   overlay.resizeOverlay(width, height, dpr);
   // Herói e inimigos no mesmo chão lógico
   state.player.y = logicGroundY();
@@ -173,7 +185,9 @@ function renderFrame(gameDt, { tickEffects, showFx, tickHurt, allowSpawn }) {
 
 export function drawRunningFrame(dt = 16) {
   particles.update(dt);
-  renderFrame(dt, { tickEffects: true, showFx: true, tickHurt: true, allowSpawn: true });
+  // dt 0 = hit-stop: nada avança (efeitos, hurtTimer), mas o quadro é desenhado
+  const running = dt > 0;
+  renderFrame(dt, { tickEffects: running, showFx: true, tickHurt: running, allowSpawn: true });
   if (state.waveTransition) {
     overlay.drawScreenMessage(
       0.3,

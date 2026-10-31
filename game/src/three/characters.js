@@ -214,6 +214,16 @@ class Rig {
   update(dtSec) {
     this.mixer.update(dtSec);
   }
+
+  // Libera só o que o clone possui (geometrias e texturas são do template)
+  dispose() {
+    this.mixer.stopAllAction();
+    this.mixer.uncacheRoot(this.model);
+    this.model.traverse((o) => {
+      if (o.isSkinnedMesh) o.skeleton.dispose();
+    });
+    for (const m of this.flashMaterials) m.dispose();
+  }
 }
 
 // Cápsula enquanto o modelo não chega (ou se falhar)
@@ -261,7 +271,10 @@ function blobTex() {
   return blobTexture;
 }
 
+let blobGeometry = null;
+
 function createBlob(height) {
+  blobGeometry ||= new THREE.PlaneGeometry(1, 1); // compartilhada; escala por personagem
   const mat = new THREE.MeshBasicMaterial({
     map: blobTex(),
     transparent: true,
@@ -272,7 +285,8 @@ function createBlob(height) {
     fog: false,
   });
   const size = height * SHADOW_BLOB.width * 2;
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+  const mesh = new THREE.Mesh(blobGeometry, mat);
+  mesh.scale.set(size, size, 1);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = SHADOW_BLOB.y;
   mesh.layers.set(LAYERS.noOutline);
@@ -434,12 +448,24 @@ function createEnemyRecord(en, group, spawnAllowed) {
   return rec;
 }
 
+// Libera o que cada inimigo possui: blob (material), cápsula e clone do rig
+function disposeEnemyRecord(rec) {
+  rec.blob.material.dispose();
+  if (!rec.rig) {
+    rec.stub.geometry.dispose();
+    rec.stub.material.dispose();
+  }
+  rec.rig?.dispose();
+}
+
 function attachEnemyModel(rec) {
   if (rec.rig) return;
   const tpl = requestTemplate(rec.shape);
   if (!tpl) return;
   rec.rig = new Rig(tpl, rec.height, { perInstanceMaterials: true });
   rec.root.remove(rec.stub);
+  rec.stub.geometry.dispose();
+  rec.stub.material.dispose();
   rec.root.add(rec.rig.model);
   if (rec.dead) {
     rec.rig.play("Death_C_Skeletons", { once: true, timeScale: ENEMY_DEATH_SPEED, fade: 0 });
@@ -509,6 +535,7 @@ function separate(list, dtSec) {
 
 // ─── API do módulo ───
 export function createCharacters(scene) {
+  const aliveSet = new Set(); // reaproveitado a cada quadro
   const group = new THREE.Group();
   group.name = "characters";
   scene.add(group);
@@ -524,10 +551,13 @@ export function createCharacters(scene) {
     const dtSec = dtMs / 1000;
     updateHero(hero, dtMs);
 
-    const alive = new Set(state.enemies);
+    aliveSet.clear();
+    for (const en of state.enemies) aliveSet.add(en);
+    const alive = aliveSet;
     for (const [en, rec] of enemies) {
       if (!alive.has(en)) {
         group.remove(rec.root);
+        disposeEnemyRecord(rec);
         enemies.delete(en);
       }
     }

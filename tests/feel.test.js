@@ -65,6 +65,7 @@ test("hit-stop não soma", () => {
   let frozenFrames = 0;
   while (feel.update(10).frozen) frozenFrames++;
   assert.equal(frozenFrames, 5);
+  feel.update(feel.HITSTOP_COOLDOWN); // passa o intervalo entre congelamentos
   feel.hitStop(20);
   feel.hitStop(60);
   feel.hitStop(10);
@@ -108,4 +109,26 @@ test("JSON corrompido cai no padrão", () => {
   assert.equal(feel.loadPrefs(fakeStorage("{quebrado"), mm(false)).shake, true);
   assert.equal(feel.loadPrefs(fakeStorage("{quebrado"), mm(true)).shake, false);
   assert.equal(feel.loadPrefs(fakeStorage('{"shake":"sim"}'), mm(false)).shake, true);
+});
+
+test("hit-stop: intervalo depois de um congelamento evita travar o jogo em sequência", () => {
+  feel.reset();
+  feel.hitStop(40);
+  assert.equal(feel.update(40).frozen, true);
+  assert.equal(feel.update(16).frozen, false);
+  feel.hitStop(40);
+  assert.equal(feel.update(16).frozen, false, "ainda no intervalo");
+  feel.update(feel.HITSTOP_COOLDOWN);
+  feel.hitStop(40);
+  assert.equal(feel.update(16).frozen, true, "intervalo acabou");
+  feel.reset();
+});
+
+test("hit-stop encurta com a velocidade do jogo e ignora dt negativo", () => {
+  feel.reset();
+  feel.hitStop(60, 3);
+  assert.equal(feel.update(19).frozen, true);
+  assert.equal(feel.update(1).frozen, true, "20 ms = 60 / 3");
+  assert.equal(feel.update(-500).frozen, false, "dt negativo não estende");
+  feel.reset();
 });

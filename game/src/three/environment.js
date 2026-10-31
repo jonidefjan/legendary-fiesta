@@ -820,7 +820,7 @@ function buildGrass(ctx) {
   mesh.frustumCulled = false;
   mesh.castShadow = false; // sombra de quad billboard ficaria errada
   mesh.receiveShadow = true;
-  mesh.layers.enable(1); // também na camada 1, sem sair da 0
+  mesh.layers.enable(1); // o renderer move userData.noOutline para a camada 1 (layers.set), fora da 0
   mesh.userData.noOutline = true;
   mesh.name = "grass";
   return { mesh, tex, count: pts.length };

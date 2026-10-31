@@ -41,7 +41,6 @@ uniform sampler2D tColor;
 uniform sampler2D tSceneDepth;
 uniform sampler2D tDepth;
 uniform sampler2D tNormal;
-uniform vec2 uTexel; // 1 / tamanho (mantido para passes que usem uv)
 uniform float uNear;
 uniform float uFar;
 uniform float uDepthThreshold;
@@ -162,6 +161,8 @@ function makeTarget(w, h, { type = THREE.UnsignedByteType, depth = false } = {})
   return target;
 }
 
+const prevClearColor = new THREE.Color();
+
 export function createPipeline(canvas, fxCanvas) {
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -195,6 +196,8 @@ export function createPipeline(canvas, fxCanvas) {
   fxTexture.minFilter = THREE.NearestFilter;
   fxTexture.magFilter = THREE.NearestFilter;
   fxTexture.generateMipmaps = false;
+  let fxW = fxCanvas.width;
+  let fxH = fxCanvas.height;
 
   const outlineMaterial = new THREE.ShaderMaterial({
     vertexShader: FULLSCREEN_VERT,
@@ -204,7 +207,6 @@ export function createPipeline(canvas, fxCanvas) {
       tSceneDepth: { value: sceneTarget.depthTexture },
       tDepth: { value: normalTarget.depthTexture },
       tNormal: { value: normalTarget.texture },
-      uTexel: { value: new THREE.Vector2(1 / w, 1 / h) },
       uNear: { value: view.camera.near },
       uFar: { value: view.camera.far },
       uDepthThreshold: { value: OUTLINE.depthThreshold },
@@ -259,8 +261,13 @@ export function createPipeline(canvas, fxCanvas) {
   function setSize(cssW, cssH, dpr) {
     renderer.setSize(Math.round(cssW * dpr), Math.round(cssH * dpr), false);
     const s = paddedSize();
+    // O canvas de efeitos já foi redimensionado: realoca o storage da textura
+    if (fxCanvas.width !== fxW || fxCanvas.height !== fxH) {
+      fxW = fxCanvas.width;
+      fxH = fxCanvas.height;
+      fxTexture.dispose();
+    }
     for (const t of [sceneTarget, normalTarget, postA, postB]) t.setSize(s.w, s.h);
-    outlineMaterial.uniforms.uTexel.value.set(1 / s.w, 1 / s.h);
     finalMaterial.uniforms.uInner.value.set(view.lowW, view.lowH);
     finalMaterial.uniforms.uPadded.value.set(s.w, s.h);
     outlineMaterial.uniforms.uNear.value = view.camera.near;
@@ -279,7 +286,7 @@ export function createPipeline(canvas, fxCanvas) {
     camera.layers.disable(LAYERS.noOutline);
     camera.layers.disable(LAYERS.character);
     const background = scene.background;
-    const prevClear = renderer.getClearColor(new THREE.Color());
+    const prevClear = renderer.getClearColor(prevClearColor);
     const prevAlpha = renderer.getClearAlpha();
     scene.background = null;
     scene.overrideMaterial = normalMaterial;

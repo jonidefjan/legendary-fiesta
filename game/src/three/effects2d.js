@@ -189,21 +189,19 @@ function particleProxy(zAt) {
   };
 }
 
-// Redesenha o canvas de efeitos. withParticles: falso na tela de derrota
-export function drawFx(zAt, { effects = true, withParticles = true } = {}) {
+// Redesenha o canvas de efeitos
+export function drawFx(zAt) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (effects) {
-    for (const ef of state.effects) {
-      if (SCREEN_EFFECTS.has(ef.type)) continue;
-      const a = Math.max(0, ef.life / ef.maxLife);
-      const s = setLogicTransform(ef.x, ef.y, zAt(ef.x));
-      ctx.save();
-      ctx.globalAlpha = a;
-      drawEffect(ef, a, 1 / s);
-      ctx.restore();
-    }
+  for (const ef of state.effects) {
+    if (SCREEN_EFFECTS.has(ef.type)) continue;
+    const a = Math.max(0, ef.life / ef.maxLife);
+    const s = setLogicTransform(ef.x, ef.y, zAt(ef.x));
+    ctx.save();
+    ctx.globalAlpha = a;
+    drawEffect(ef, a, 1 / s);
+    ctx.restore();
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  if (withParticles) particles.draw(particleProxy(zAt));
+  particles.draw(particleProxy(zAt));
 }

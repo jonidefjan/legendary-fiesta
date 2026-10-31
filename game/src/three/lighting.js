@@ -6,7 +6,6 @@
 // textura de ruído que vira sombra de nuvem nos materiais toon.
 import * as THREE from "three";
 import { sharedUniforms } from "./materials.js";
-import { LAYERS } from "./layers.js";
 import { PALETTE } from "../palette.js";
 
 export const LIGHTING = {
@@ -118,8 +117,9 @@ export function createLighting(scene) {
   sc.bottom = -LIGHTING.shadowExtent * 0.7;
   sc.near = 1;
   sc.far = 110;
-  // Grama/folhagem fora do contorno ainda projeta sombra, se o cenário pedir
-  sc.layers.enable(LAYERS.noOutline);
+  // Quem projeta sombra vem das camadas ativas da câmera principal (three 0.170
+  // ignora shadow.camera.layers): o pipeline habilita noOutline e character ao
+  // desenhar a cor, então esses objetos também projetam sombra
   sun.shadow.mapSize.set(LIGHTING.shadowMapSize, LIGHTING.shadowMapSize);
   // Viés pequeno + normalBias contra acne sem descolar a sombra do pé
   sun.shadow.bias = -0.0006;

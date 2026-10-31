@@ -79,25 +79,24 @@ on("enemyDied", ({ x, y }) => particles.emit("death", x, y - 20));
 on("hit", ({ damage, weak }) => {
   if (damage >= 15 || weak) {
     feel.addShake(0.15);
-    feel.hitStop(35);
+    feel.hitStop(35, state.gameSpeed);
   } else {
     feel.addShake(0.06);
   }
 });
 on("enemyDied", () => {
   feel.addShake(0.3);
-  feel.hitStop(60);
+  feel.hitStop(60, state.gameSpeed);
 });
 on("playerHurt", ({ damage }) => {
   feel.addShake(Math.min(0.5, Math.max(0.15, damage / 40)));
-  feel.hitStop(45);
+  feel.hitStop(45, state.gameSpeed);
 });
 on("blocked", () => feel.addShake(0.15));
 on("revive", () => {
   feel.addShake(0.6);
-  feel.hitStop(90);
+  feel.hitStop(90, state.gameSpeed);
 });
-on("playerDied", () => feel.addShake(0.8));
 
 on("playerDied", () => {
   // A run acaba aqui: recarregar a página não pode trazê-la de volta
@@ -279,7 +278,8 @@ function resetProgress() {
 let lastHudUpdate = 0;
 
 function gameLoop(timestamp) {
-  const realDt = Math.min(timestamp - state.lastTime, 50);
+  // Logo depois de retomar, o timestamp do rAF pode ser anterior a lastTime
+  const realDt = Math.max(0, Math.min(timestamp - state.lastTime, 50));
   const dt = realDt * state.gameSpeed;
   state.lastTime = timestamp;
   state.tick++;

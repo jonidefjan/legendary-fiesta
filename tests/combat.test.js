@@ -8,6 +8,7 @@ import {
   captureEvents,
 } from "./helpers.js";
 import { state } from "../game/src/state.js";
+import { on } from "../game/src/events.js";
 import {
   applyElementalDamage,
   applyDot,
@@ -253,4 +254,63 @@ test("inimigo anda até o jogador e ataca no intervalo", () => {
   assert.equal(state.player.hp, 100);
   updateEnemies(1);
   assert.equal(state.player.hp, 90);
+});
+
+// ─── Eventos visuais (contrato com partículas, tremida e renderer) ───
+function eventsOf(events, type) {
+  return events.filter((e) => e.type === type).map((e) => e.payload);
+}
+
+test("golpe emite attack e hit com posição, elemento e dano", () => {
+  const target = enemy({ x: 150, resist: { fire: -0.2 } });
+  setupRun(["ember_blade"], [target]);
+  const events = [];
+  for (const type of ["hit", "attack", "sfx"]) {
+    on(type, (payload) => events.push({ type, payload }));
+  }
+  fixedRandom(0.99);
+  activateItem(item("ember_blade"));
+  const [hit] = eventsOf(events, "hit");
+  assert.equal(hit.element, "fire");
+  assert.equal(hit.damage, 24);
+  assert.equal(hit.weak, true);
+  assert.equal(hit.x, 150);
+  const [attack] = eventsOf(events, "attack");
+  assert.equal(attack.itemId, "ember_blade");
+  assert.equal(attack.targetX, 150);
+  assert.deepEqual(
+    eventsOf(events, "sfx").find((s) => s.name === "hit"),
+    { name: "hit", detail: "fire" },
+  );
+});
+
+test("defesa, dano recebido, morte e reviver emitem seus eventos", () => {
+  const attacker = enemy({ dmg: 30, x: 180 });
+  setupRun(["iron_shield", "phoenix_feather"], [attacker]);
+  const events = [];
+  for (const type of ["itemUse", "blocked", "playerHurt", "revive", "enemyDied"]) {
+    on(type, (payload) => events.push({ type, payload }));
+  }
+  activateItem(item("iron_shield"));
+  assert.equal(eventsOf(events, "itemUse")[0].effect, "blockNext");
+  enemyAttack(attacker);
+  assert.equal(eventsOf(events, "blocked").length, 1);
+  enemyAttack(attacker);
+  assert.equal(eventsOf(events, "playerHurt")[0].damage, 30);
+  state.player.hp = 1;
+  enemyAttack(attacker);
+  assert.equal(eventsOf(events, "revive").length, 1);
+  attacker.hp = 0;
+  updateEnemies(16);
+  assert.deepEqual(eventsOf(events, "enemyDied")[0], { x: 180, y: 300, size: undefined });
+});
+
+test("dano contínuo emite dotTick com o tipo", () => {
+  const target = enemy({ x: 220 });
+  setupRun([], [target]);
+  const ticks = [];
+  on("dotTick", (payload) => ticks.push(payload));
+  applyDot(target, "poison", 3, 2);
+  processDots(1000);
+  assert.deepEqual(ticks[0], { x: 220, y: 300, type: "poison", damage: 3, onPlayer: false });
 });
