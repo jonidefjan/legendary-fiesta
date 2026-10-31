@@ -1436,6 +1436,73 @@ canvas {
   }
 }
 
+/* Arma favorita e botão de compartilhar das telas de fim (share.js) */
+.go-stat.wide .go-stat-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+}
+
+.go-fav-dmg {
+  color: var(--text);
+}
+
+.go-fav-dmg::before {
+  content: "· ";
+}
+
+.share-controls {
+  padding: 0 20px 14px;
+}
+
+.share-btn {
+  width: 100%;
+  background: var(--bg3);
+  border: 2px solid var(--border2);
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-family: "Reliquary Digits", "Pixelify Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.share-btn:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold2);
+  transform: translateY(-2px);
+}
+
+.share-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.share-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.share-status {
+  min-height: 1.4em;
+  margin-top: 8px;
+  font-family: "Reliquary Digits", "Pixelify Sans", sans-serif;
+  font-size: 0.85rem;
+  color: var(--green2);
+}
+
+@media (max-width: 480px) {
+  .share-btn {
+    font-size: 0.95rem;
+    padding: 12px 14px;
+  }
+}
+
 /* ─── SELEÇÃO MÚLTIPLA ─── */
 .selection-counter {
   margin-top: 12px;

@@ -48,6 +48,7 @@ import * as feel from "./feel.js";
 import * as ui from "./ui.js";
 import * as title from "./ui-title.js";
 import * as victory from "./ui-victory.js";
+import { runResult } from "./share.js";
 
 const ITEMS_URL = new URL("../assets/items.json", import.meta.url);
 // Começa com 1 arma escolhida entre 3; o resto vem das recompensas
@@ -318,12 +319,7 @@ function offerVictory() {
   recordBest();
   victory.showVictory({
     stats: {
-      wave: state.wave,
-      kills: state.kills,
-      score: state.score,
-      totalDamage: state.runStats.totalDamage,
-      durationMs: performance.now() - (state.runStats.startTime || 0),
-      fragments: state.fragments,
+      ...runResult(),
       bossKind: state.enemies.find((e) => e.isBoss)?.kind || "",
     },
     onContinue: () => {

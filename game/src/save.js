@@ -67,6 +67,8 @@ export function serializeRun() {
     endless: state.endless,
     victoryShown: state.victoryShown,
     rewardsSinceLegendary: state.rewardsSinceLegendary,
+    totalDamage: state.runStats.totalDamage,
+    damageByItem: state.runStats.damageByItem,
     player: {
       hp: state.player.hp,
       maxHp: state.player.maxHp,
@@ -132,6 +134,9 @@ export function loadRun() {
   state.endless = !!data.endless;
   state.victoryShown = !!data.victoryShown;
   state.rewardsSinceLegendary = data.rewardsSinceLegendary || 0;
+  // Saves antigos não têm o dano por item: começa vazio
+  state.runStats.totalDamage = data.totalDamage || 0;
+  state.runStats.damageByItem = { ...data.damageByItem };
   state.player.hp = data.player?.hp || 100;
   state.player.maxHp = data.player?.maxHp || 100;
   state.player.mana = data.player?.mana || 0;

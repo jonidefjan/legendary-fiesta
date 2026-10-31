@@ -73,7 +73,16 @@ function rolls(effect) {
 // ═══════════════════════════════════════════
 //  ELEMENTAL & DOT SYSTEM
 // ═══════════════════════════════════════════
-export function applyElementalDamage(target, baseDmg, element, source, crit = false) {
+// Soma o dano ao item que o causou (tela final: arma favorita). Dano de reflexo não passa aqui.
+function creditDamage(itemId, amount) {
+  if (!itemId || amount <= 0) return;
+  const by = (state.runStats.damageByItem ||= {});
+  by[itemId] = (by[itemId] || 0) + amount;
+  state.runStats.totalDamage += amount;
+}
+
+// itemId: item do jogador que causou o dano (crédito); sem ele, só source "player" soma ao total
+export function applyElementalDamage(target, baseDmg, element, source, crit = false, itemId = null) {
   if (!target.resist) target.resist = {};
   const resist = target.resist[element] || 0;
   target.lastHitCrit = !!crit; // quem mata paga Moeda da Fortuna só se este golpe foi crítico
@@ -81,7 +90,8 @@ export function applyElementalDamage(target, baseDmg, element, source, crit = fa
 
   target.hp -= finalDmg;
   target.hurtTimer = 15;
-  if (source === "player") state.runStats.totalDamage += finalDmg;
+  if (itemId) creditDamage(itemId, finalDmg);
+  else if (source === "player") state.runStats.totalDamage += finalDmg;
 
   // Visual feedback based on resistance
   let color = crit ? "#ffdd44" : "#ff4444";
@@ -135,7 +145,7 @@ export function applyDot(
   damage,
   duration,
   stackable = true,
-  { maxStacks = DEFAULT_MAX_STACKS, base = 0 } = {},
+  { maxStacks = DEFAULT_MAX_STACKS, base = 0, sourceId = null } = {},
 ) {
   if (!target.dots) target.dots = [];
 
@@ -148,6 +158,7 @@ export function applyDot(
     existing.damage = damage;
     existing.base = base;
     existing.maxStacks = maxStacks;
+    if (sourceId) existing.sourceId = sourceId; // o último a empilhar leva o crédito
   } else if (existing) {
     existing.duration = duration;
     existing.fullDuration = duration;
@@ -161,6 +172,7 @@ export function applyDot(
       maxStacks,
       stacks: 1,
       tickTimer: 0,
+      sourceId, // item que aplicou: os ticks creditam o dano a ele
     });
   }
 
@@ -185,6 +197,7 @@ export function processDots(dt) {
         entity.hp -= dmg;
         entity.hurtTimer = 8;
         entity.lastHitCrit = false; // abate por dano contínuo não conta como crítico
+        if (entity !== state.player) creditDamage(dot.sourceId, dmg);
         spawnNumber(
           entity.x,
           entity.y - 30,
@@ -241,7 +254,11 @@ const HIT_EFFECTS = {
       effect.maxStacks == null
         ? Infinity
         : effect.maxStacks + (effect.maxStacksPerLevel || 0) * (level - 1);
-    applyDot(ctx.target, effect.dot, damage, effect.duration, true, { maxStacks, base });
+    applyDot(ctx.target, effect.dot, damage, effect.duration, true, {
+      maxStacks,
+      base,
+      sourceId: item.id,
+    });
     const dot = DOTS[effect.dot];
     log(
       t("log.dot", {
@@ -276,7 +293,9 @@ const HIT_EFFECTS = {
     const near = enemiesWithin(ctx.target.x, effect.radius, ctx.target);
     if (near.length === 0) return;
     const damage = Math.round(ctx.damage * effect.ratio);
-    for (const en of near) applyElementalDamage(en, damage, item.dmgType || "physical", "player");
+    for (const en of near) {
+      applyElementalDamage(en, damage, item.dmgType || "physical", "player", false, item.id);
+    }
     log(t("log.splash", { icon: item.icon, item: item.name, count: near.length, damage }), "dmg");
   },
 };
@@ -355,6 +374,8 @@ const ATTACK_EFFECTS = {
         Math.round(ctx.damage * effect.ratio),
         effect.element,
         "player",
+        false,
+        item.id,
       );
       spawnEffect("lightning", en.x, en.y - 20, {
         life: 25,
@@ -371,7 +392,7 @@ const ATTACK_EFFECTS = {
     if (others.length === 0) return;
     const damage = Math.round(ctx.damage * effect.ratio);
     for (const en of others) {
-      applyElementalDamage(en, damage, item.dmgType || "physical", "player");
+      applyElementalDamage(en, damage, item.dmgType || "physical", "player", false, item.id);
       spawnEffect("lightning", en.x, en.y - 20, { life: 25, color: "#ffe27a" });
     }
     log(t("log.hitAll", { icon: item.icon, item: item.name, count: others.length, damage }), "item");
@@ -440,6 +461,7 @@ function spreadBurn(dead, count, item) {
         maxStacks: burn.maxStacks,
         stacks: burn.stacks,
         tickTimer: 0,
+        sourceId: burn.sourceId, // a arma original continua levando o crédito
       });
     }
     spawnEffect("text", en.x, en.y - 50, { life: 40, text: DOTS.burning.icon, color: "#ff6600" });
@@ -463,7 +485,7 @@ const USE_EFFECTS = {
     const near = enemiesWithin(p.x, effect.radius);
     // Sem ninguém no alcance não explode: a recarga fica pronta para quando houver alvo
     if (near.length === 0) return false;
-    for (const en of near) applyElementalDamage(en, damage, effect.element, "player");
+    for (const en of near) applyElementalDamage(en, damage, effect.element, "player", false, item.id);
     spawnEffect("dragon_roar", p.x, p.y - 30, { life: 40 });
     sound("explode");
     emit("explode", { x: p.x, y: p.y, kind: "fire", radius: effect.radius });
@@ -540,7 +562,7 @@ const BARRIER_BREAK_EFFECTS = {
   explode(effect, item, p) {
     const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
     for (const en of state.enemies.filter((e) => !e.dead && e.hp > 0)) {
-      applyElementalDamage(en, damage, effect.element, "player");
+      applyElementalDamage(en, damage, effect.element, "player", false, item.id);
       if (effect.freeze) freezeEnemy(en, effect.freeze, true);
     }
     if (effect.freeze) {
@@ -582,7 +604,7 @@ const HURT_EFFECTS = {
     if (near.length === 0) return;
     const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
     for (const en of near) {
-      applyElementalDamage(en, damage, "physical", "thorns");
+      applyElementalDamage(en, damage, "physical", "thorns", false, item.id);
       spawnEffect("text", en.x, en.y - 60, { life: 30, text: "🌵", color: "#66aa44" });
     }
     log(t("log.thorns", { icon: item.icon, item: item.name, count: near.length, damage }), "item");
@@ -726,7 +748,7 @@ function weaponAttack(item, target, extra = null) {
       : attackDamage(item, ctx, h === 0);
     const dealt = appliesOnly
       ? 0
-      : applyElementalDamage(target, dmg, item.dmgType || "physical", "player", crit);
+      : applyElementalDamage(target, dmg, item.dmgType || "physical", "player", crit, item.id);
     totalDmg += dealt;
     ctx.damage = base;
     ctx.dealt = dealt;

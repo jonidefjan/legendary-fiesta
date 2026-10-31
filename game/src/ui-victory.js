@@ -3,17 +3,11 @@
 // ═══════════════════════════════════════════
 // Desenha dentro de #victory-modal (index.html); estilos em game/boss.css.
 import { t } from "./i18n.js";
+import { formatDuration, favoriteCellHTML, createShareControls } from "./share.js";
 
 let current = null; // { stats, onContinue, onEnd } enquanto a tela está aberta
 
-function formatDuration(ms) {
-  const total = Math.floor((ms || 0) / 1000);
-  const mins = Math.floor(total / 60);
-  const secs = total % 60;
-  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-}
-
-function statCell(label, value, wide = false) {
+function statCell(label, value, wide = false, html = false) {
   const cell = document.createElement("div");
   cell.className = `go-stat victory-stat${wide ? " wide" : ""}`;
   const l = document.createElement("div");
@@ -21,7 +15,8 @@ function statCell(label, value, wide = false) {
   l.textContent = label;
   const v = document.createElement("div");
   v.className = "go-stat-value";
-  v.textContent = String(value);
+  if (html) v.innerHTML = value;
+  else v.textContent = String(value);
   cell.append(l, v);
   return cell;
 }
@@ -35,7 +30,7 @@ function button(className, text, onClick) {
   return btn;
 }
 
-// stats: { wave, kills, score, totalDamage, durationMs, fragments, bossKind }
+// stats: { wave, kills, score, damage, durationMs, fragments, favorite, bossKind }
 // (bossKind é o id do chefe: o nome sai no idioma atual a cada desenho)
 export function showVictory({ stats, onContinue, onEnd }) {
   const modal = document.getElementById("victory-modal");
@@ -79,9 +74,10 @@ function render() {
     statCell(t("victory.wave"), stats.wave),
     statCell(t("gameover.kills"), stats.kills),
     statCell(t("gameover.score"), stats.score),
-    statCell(t("gameover.damage"), stats.totalDamage),
+    statCell(t("gameover.damage"), stats.damage),
     statCell(t("gameover.duration"), formatDuration(stats.durationMs)),
     statCell(t("victory.fragments"), stats.fragments),
+    statCell(t("gameover.favorite"), favoriteCellHTML(stats.favorite), true, true),
   );
 
   const actions = document.createElement("div");
@@ -95,7 +91,7 @@ function render() {
     button("victory-end", t("victory.end"), close(onEnd)),
   );
 
-  content.append(header, grid, actions);
+  content.append(header, grid, createShareControls(() => stats), actions);
   modal.append(content);
 }
 

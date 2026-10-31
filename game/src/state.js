@@ -73,7 +73,7 @@ function freshRun() {
     victoryShown: false,
     // Telas de recompensa seguidas sem lendário (4 seguidas garantem um na próxima)
     rewardsSinceLegendary: 0,
-    runStats: { totalDamage: 0, itemUses: {}, startTime: 0 },
+    runStats: { totalDamage: 0, itemUses: {}, damageByItem: {}, startTime: 0 },
   };
 }
 
