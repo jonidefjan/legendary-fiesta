@@ -636,6 +636,9 @@ function addVegetationAndProps(ctx) {
     [-18, -5.5, 1.2],
     [16, -6.5, 1.1],
     [21, 3.8, 1],
+    // frente alongada (celular em pé): a vista que chega até lá só mostra |x| ≤ 9
+    [-4, 11.5, 1],
+    [4, 16.5, 1],
   ];
   for (const [x, z, s] of bushes) addBush(ctx, x, z, s);
   // pedras: primeiro plano (fora da faixa) e junto às ruínas
@@ -649,6 +652,10 @@ function addVegetationAndProps(ctx) {
     [-14, 5, 1.2],
     [15, -4.4, 1],
     [22, -3.9, 1.2],
+    [-8, 10.5, 1.1],
+    [1, 12, 0.9],
+    [9, 14, 1.2],
+    [-2, 15.5, 0.8],
   ];
   for (const [x, z, s] of rocks) addRock(ctx, x, z, s);
   addPot(ctx, -5.2, -4.4, false);
@@ -739,15 +746,16 @@ function grassDensity(x, z, ctx) {
 
 function buildGrass(ctx) {
   const rng = mulberry32(2024);
-  const MAX = 1500;
+  const MAX = 1700;
   const minDist = 0.75;
   const grid = new Map();
   const pts = [];
   const key = (i, j) => i * 4096 + j;
 
-  for (let attempt = 0; attempt < 24000 && pts.length < MAX; attempt++) {
+  for (let attempt = 0; attempt < 28000 && pts.length < MAX; attempt++) {
     const x = WORLD.minX + 0.5 + rng() * (WORLD.maxX - WORLD.minX - 1);
     const z = WORLD.backZ + 0.5 + rng() * (WORLD.frontZ - WORLD.backZ - 1);
+    if (z > 9.5 && Math.abs(x) > 10.5) continue; // além da frente comum só se vê |x| ≤ 9
     if (rng() > grassDensity(x, z, ctx)) continue;
     if (ctx.blockers.some((b) => (x - b.x) ** 2 + (z - b.z) ** 2 < b.r * b.r)) continue;
     // Poisson-ish: rejeita pontos perto demais de outros (grade espacial)

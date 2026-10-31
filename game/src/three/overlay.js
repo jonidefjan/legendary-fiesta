@@ -69,6 +69,14 @@ function outlinedText(text, x, y, color, size, bold = true, font = FONT) {
   ctx.fillText(text, x, y);
 }
 
+// Maior tamanho (até size, mínimo 9) em que o texto cabe em maxW px
+function fitFontSize(text, size, bold, maxW) {
+  ctx.font = `${bold ? "bold " : ""}${size}px ${FONT}`;
+  const w = ctx.measureText(text).width + 6; // + contorno
+  if (w <= maxW) return size;
+  return Math.max(9, Math.floor((size * maxW) / w));
+}
+
 // Em telas estreitas os botões (#game-controls) cobrem o alto da arena:
 // se a barra colidir com eles, ela desce para o pé da arena
 function bossBarY(W, h, b, x, w) {
@@ -183,6 +191,12 @@ export function drawScreenMessage(dim, title, subtitle, titleSize, subtitleSize,
   const H = arena.height;
   ctx.fillStyle = `rgba(24,20,37,${dim})`;
   ctx.fillRect(0, 0, W, H);
-  outlinedText(title, W / 2, H / 2 - gap.title, PALETTE.amber, titleSize);
-  outlinedText(subtitle, W / 2, H / 2 + gap.subtitle, PALETTE.tan, subtitleSize, false);
+  // Arena de 320 px ou baixa (celular deitado): reduz o texto até caber, e
+  // aproxima as linhas se a altura for pequena
+  const maxW = W - 24;
+  const ts = fitFontSize(title, titleSize, true, maxW);
+  const ss = fitFontSize(subtitle, subtitleSize, false, maxW);
+  const k = Math.min(1, H / 360);
+  outlinedText(title, W / 2, H / 2 - gap.title * k, PALETTE.amber, ts);
+  outlinedText(subtitle, W / 2, H / 2 + gap.subtitle * k, PALETTE.tan, ss, false);
 }

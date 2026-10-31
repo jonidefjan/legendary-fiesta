@@ -67,7 +67,6 @@ function later(ms, fn) {
 let autoResume = false;
 
 // ─── Ligações: a lógica emite, a interface e o áudio reagem ───
-on("log", ({ msg, type }) => ui.addLog(msg, type));
 // Troca de idioma (a página estática já foi traduzida por i18n.js): primeiro o
 // catálogo de itens, que state.items referencia, depois tudo que o JS desenha
 on("langChange", () => {
@@ -207,7 +206,6 @@ function spawnWave(waveNum) {
   state.enemies = boss.isBossWave(waveNum)
     ? boss.createBossWave(waveNum, arena)
     : createWave(waveNum, arena);
-  ui.addLog(t("log.waveStart", { wave: waveNum, count: state.enemies.length }), "kill");
 }
 
 function checkWaveComplete() {
@@ -224,13 +222,10 @@ function checkWaveComplete() {
     // Primeira vitória da run (onda 10): tela de vitória; no infinito segue normal
     if (!state.victoryShown) {
       state.victoryShown = true;
-      ui.addLog(t("log.bossDefeated", { wave: state.wave }), "kill");
       later(1500, offerVictory);
       return;
     }
   }
-
-  ui.addLog(t("log.waveClear", { wave: state.wave }), "kill");
   later(1500, offerReward);
 }
 
@@ -261,7 +256,6 @@ function offerReward() {
   const options = generateRandomItems(REWARD_OPTIONS);
 
   if (options.length === 0) {
-    ui.addLog(t("log.allMaxed"), "item");
     startNextWave();
     resumeGame();
     return;
@@ -273,10 +267,6 @@ function pickReward(item) {
   sfx.reward();
   const { leveled, level } = addItemOrLevel(item);
   rebuildInventory();
-  ui.addLog(
-    t(leveled ? "log.itemLevelUp" : "log.itemAdded", { icon: item.icon, item: item.name, level }),
-    "item",
-  );
 
   // A próxima onda começa (e é salva) já com o item; o combate volta após um instante
   startNextWave();
@@ -301,7 +291,6 @@ function confirmStartingPick(items) {
   state.itemTimers = {};
   items.forEach(addItemOrLevel);
   rebuildInventory();
-  ui.addLog(t("log.runStarted", { items: items.map((i) => i.name).join(", ") }), "item");
   spawnWave(1);
   save.saveRun();
   autoResume = true;
@@ -327,7 +316,6 @@ function offerVictory() {
     onContinue: () => {
       victory.hideVictory();
       state.endless = true;
-      ui.addLog(t("log.endless"), "kill");
       offerReward();
     },
     onEnd: endRun,
@@ -372,13 +360,11 @@ function prepareRun() {
   state.runStats.startTime = performance.now();
   particles.clear();
   feel.reset();
-  ui.clearLog();
 }
 
 function startNewRun() {
   prepareRun();
   save.clearRun();
-  ui.addLog(t("log.fragmentsSaved", { n: state.fragments }), "item");
   ui.renderInventory();
   ui.updateHUD();
   ui.setPausedControls(true);
@@ -394,7 +380,6 @@ function continueRun() {
   // A vida salva vale; os bônus vêm das melhorias atuais
   meta.applyUpgrades(state.player);
   state.player.hp = Math.min(state.player.hp, state.player.maxHp);
-  ui.addLog(t("log.welcomeBack", { wave: state.wave }), "item");
   rebuildInventory();
   spawnWave(state.wave);
   ui.updateHUD();
@@ -409,7 +394,6 @@ function pauseGame() {
   autoResume = false;
   state.isPaused = true;
   ui.setPausedControls(true);
-  ui.addLog(t("log.paused"), "item");
 }
 
 function resumeGame() {
@@ -417,7 +401,6 @@ function resumeGame() {
   state.isPaused = false;
   state.lastTime = performance.now(); // Reset timer para evitar salto no dt
   ui.setPausedControls(false);
-  ui.addLog(t("log.resumed"), "item");
 }
 
 function resetProgress() {
@@ -425,7 +408,6 @@ function resetProgress() {
     return;
   }
   save.resetAll();
-  ui.addLog(t("log.reset"), "item");
   setTimeout(() => location.reload(), 1000);
 }
 
@@ -540,7 +522,6 @@ function init() {
 
   save.loadMeta();
   ui.updateHUD(); // tira o texto estático em inglês da barra de onda (e mostra o recorde salvo)
-  ui.addLog(t("log.welcome"), "item");
   showTitleScreen();
 
   state.lastTime = performance.now();
@@ -560,7 +541,12 @@ async function loadItems() {
     init();
   } catch (error) {
     console.error("❌ Erro ao carregar itens:", error);
-    ui.addLog(t("log.loadError"), "item");
+    // Sem o log na tela, o jogador precisa ver o erro de algum jeito
+    const box = document.createElement("div");
+    box.className = "load-error";
+    box.setAttribute("role", "alert");
+    box.textContent = t("log.loadError");
+    document.body.appendChild(box);
   }
 }
 
