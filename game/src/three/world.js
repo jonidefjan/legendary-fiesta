@@ -15,8 +15,11 @@ export const WORLD = {
   // Limites do cenário montado (além disso a câmera não mostra)
   minX: -26,
   maxX: 26,
-  backZ: -18, // fundo: ruínas grandes, árvores, morro
-  frontZ: 9, // frente: borda do chão, grama, pedras baixas
+  // A vista mostra o chão de z≈-17,8 (fundo) a z≈13,5 (frente) numa arena quadrada
+  // (meia altura 9, o máximo no celular em pé); abaixo de 1:1 só desce até ~17,5.
+  // Por isso o cenário vai além: nenhuma faixa vazia em nenhuma proporção de tela.
+  backZ: -20, // fundo: ruínas grandes, árvores, morro (planalto liso depois de -18)
+  frontZ: 18, // frente: borda do chão, grama, pedras baixas
 };
 
 // Altura do quadro em "pixels de arte"; a largura segue a proporção da arena

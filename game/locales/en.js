@@ -28,7 +28,6 @@ export default {
   "hud.enemies.one": "{count} enemy",
   "hud.enemies.other": "{count} enemies",
   "hud.best": "🏆 Best: wave {wave}",
-  "log.aria": "Combat log",
 
   // Controles
   "controls.play": "Start/Resume",
@@ -67,9 +66,6 @@ export default {
   "pick.multi.counter": "/ {max} selected",
   "pick.start": "Start",
   "pick.startMulti": "Start Game",
-  "pick.warnMax": "⚠️ You already selected the maximum of {max} items!",
-  "pick.warnWeapon": "⚠️ Pick a weapon to continue!",
-  "pick.warnAny": "⚠️ Select at least 1 item to continue!",
   "reward.title": "🎁 Wave Reward!",
   "reward.sub.one": "Choose 1 of {count} option · Wave {wave} cleared",
   "reward.sub.other": "Choose 1 of {count} options · Wave {wave} cleared",

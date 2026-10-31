@@ -28,7 +28,6 @@ export default {
   "hud.enemies.one": "{count} inimigo",
   "hud.enemies.other": "{count} inimigos",
   "hud.best": "🏆 Recorde: onda {wave}",
-  "log.aria": "Registro de combate",
 
   // Controles
   "controls.play": "Iniciar/Retomar",
@@ -67,9 +66,6 @@ export default {
   "pick.multi.counter": "/ {max} selecionados",
   "pick.start": "Começar",
   "pick.startMulti": "Iniciar Jogo",
-  "pick.warnMax": "⚠️ Você já selecionou o máximo de {max} itens!",
-  "pick.warnWeapon": "⚠️ Escolha uma arma para continuar!",
-  "pick.warnAny": "⚠️ Selecione pelo menos 1 item para continuar!",
   "reward.title": "🎁 Recompensa da Onda!",
   "reward.sub.one": "Escolha 1 de {count} opção · Onda {wave} concluída",
   "reward.sub.other": "Escolha 1 de {count} opções · Onda {wave} concluída",

@@ -10,7 +10,8 @@ import {
   itemLevel,
   effectiveCooldown,
 } from "./items.js";
-import { t, getLang, formatNumber } from "./i18n.js";
+import { t, formatNumber } from "./i18n.js";
+import { defaultCollapsed } from "./layout.js";
 
 export const isMobile =
   "ontouchstart" in window || navigator.maxTouchPoints > 0;
@@ -175,30 +176,6 @@ export function updateHUD() {
 }
 
 // ═══════════════════════════════════════════
-//  LOG
-// ═══════════════════════════════════════════
-export function addLog(msg, type = "") {
-  const panel = $("log-panel");
-  const entry = document.createElement("div");
-  entry.className = "log-entry " + type;
-  const ts = new Date().toLocaleTimeString(getLang(), {
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-  entry.textContent = `[${ts}] ${msg}`;
-  panel.appendChild(entry);
-  panel.scrollTop = panel.scrollHeight;
-  // Cap log
-  while (panel.children.length > 80) panel.removeChild(panel.firstChild);
-}
-
-export function clearLog() {
-  $("log-panel").innerHTML = "";
-}
-
-// ═══════════════════════════════════════════
 //  MODAIS DE ESCOLHA DE ITEM
 // ═══════════════════════════════════════════
 function itemCard(item, onClick) {
@@ -285,7 +262,6 @@ export function showInitialPick(options, maxSelections, onConfirm) {
           selected.push(item);
           card.classList.add("selected");
         } else {
-          addLog(t("pick.warnMax", { max: maxSelections }), "item");
           return;
         }
         const counter = $("selection-count");
@@ -298,7 +274,6 @@ export function showInitialPick(options, maxSelections, onConfirm) {
 
     confirmBtn.onclick = () => {
       if (selected.length === 0) {
-        addLog(t(single ? "pick.warnWeapon" : "pick.warnAny"), "item");
         return;
       }
       hideItemModal();
@@ -451,6 +426,20 @@ export function refreshLanguage() {
 // começa recolhida em telas estreitas para sobrar arena
 const INV_COLLAPSED_KEY = "reliquary_inv_collapsed";
 
+function readSaved(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSaved(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+}
+
 function setupInventoryToggle() {
   const inv = $("inventory");
   const btn = $("btn-inv-toggle");
@@ -458,18 +447,17 @@ function setupInventoryToggle() {
     inv.classList.toggle("collapsed", collapsed);
     btn.setAttribute("aria-expanded", String(!collapsed));
   };
-  let saved = null;
-  try {
-    saved = localStorage.getItem(INV_COLLAPSED_KEY);
-  } catch {}
-  apply(saved === null ? window.innerWidth <= 768 : saved === "1");
+  // Abre primeiro para medir quanto o cabeçalho + barra de itens ocupam; só então
+  // decide se a arena ainda cabe (a escolha salva vence dentro de defaultCollapsed)
+  const saved = readSaved(INV_COLLAPSED_KEY);
+  apply(false);
+  const chromeOpenH = $("arena").getBoundingClientRect().top + window.scrollY;
+  apply(defaultCollapsed(saved, window.innerWidth, window.innerHeight, chromeOpenH));
   btn.addEventListener("click", () => {
     const collapsed = !inv.classList.contains("collapsed");
     apply(collapsed);
     if (collapsed) hideTooltip();
-    try {
-      localStorage.setItem(INV_COLLAPSED_KEY, collapsed ? "1" : "0");
-    } catch {}
+    writeSaved(INV_COLLAPSED_KEY, collapsed ? "1" : "0");
   });
 }
 

@@ -1,6 +1,6 @@
 /* Dígitos 0-9 em Tiny5 (OFL): a família só cobre os números, então qualquer
    texto com "Reliquary Digits" na frente mostra letras em Pixelify Sans e
-   números em Tiny5 (cabeçalho, log, tooltips, descrições e canvas) */
+   números em Tiny5 (cabeçalho, tooltips, descrições e canvas) */
 @font-face {
   font-family: "Reliquary Digits";
   font-style: normal;
@@ -92,13 +92,12 @@ h3,
 
 #app {
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto 1fr;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     "header"
     "inventory"
-    "arena"
-    "log";
+    "arena";
   min-height: 100vh;
   max-width: 1280px;
   margin: 0 auto;
@@ -311,44 +310,6 @@ h3,
   );
 }
 
-/* ─── LOG ─── */
-#log-panel {
-  grid-area: log;
-  background: var(--bg2);
-  border-top: 1px solid var(--border);
-  height: 130px;
-  overflow-y: auto;
-  padding: 8px 16px;
-}
-#log-panel::-webkit-scrollbar {
-  width: 4px;
-}
-#log-panel::-webkit-scrollbar-thumb {
-  background: var(--border2);
-  border-radius: 2px;
-}
-.log-entry {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text2);
-  border-bottom: 1px solid rgba(58, 46, 30, 0.4);
-  padding: 2px 0;
-  animation: fadeIn 0.3s ease;
-}
-.log-entry.dmg {
-  color: var(--red2);
-}
-.log-entry.heal {
-  color: var(--green2);
-}
-.log-entry.item {
-  color: var(--gold2);
-}
-.log-entry.kill {
-  color: var(--purple2);
-  font-family: "Reliquary Digits", "Pixelify Sans", sans-serif;
-  font-size: 12px;
-}
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -742,10 +703,6 @@ canvas {
     max-width: 100%;
   }
 
-  #log-panel {
-    height: 150px;
-  }
-
   #header {
     flex-wrap: wrap;
     gap: 12px;
@@ -822,18 +779,6 @@ canvas {
   .control-btn {
     padding: 6px 12px;
     font-size: 0.8rem;
-  }
-
-  #log-panel {
-    height: 120px;
-    padding: 6px 12px;
-    font-size: 11px;
-  }
-
-  .log-entry {
-    padding: 4px 6px;
-    margin-bottom: 3px;
-    font-size: 11px;
   }
 
   .inv-bar {
@@ -991,18 +936,6 @@ canvas {
     margin-left: 0;
   }
 
-  #log-panel {
-    height: 100px;
-    padding: 4px 8px;
-    font-size: 10px;
-  }
-
-  .log-entry {
-    padding: 3px 5px;
-    font-size: 10px;
-    line-height: 1.3;
-  }
-
   .inv-items {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1150,9 +1083,6 @@ canvas {
     min-height: 70vh;
   }
 
-  #log-panel {
-    height: 120px;
-  }
 }
 
 /* ═══════════════════════════════════════════
@@ -1769,4 +1699,153 @@ canvas {
 }
 .item-choice-card.upgrade.selected {
   border-color: var(--green);
+}
+
+/* ═══════════════════════════════════════════
+   FASE 6: CELULAR (retrato e paisagem)
+   ------------------------------------------- */
+
+/* ─── Celular em pé: arena no máximo quadrada, o resto fica de fundo da página ─── */
+@media (orientation: portrait) {
+  /* A arena pega o que sobra da altura depois do cabeçalho e da barra de itens
+     (mínimo 260 px) e nunca passa de quadrada: acima de 1:1 o chão acabaria
+     antes da borda do quadro. align-content: start: as linhas auto não esticam
+     e a arena fica logo abaixo dos itens; o que sobra vira fundo da página. */
+  #app {
+    height: 100vh; /* sem dvh (navegadores antigos) */
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: auto auto minmax(260px, 1fr);
+    align-content: start;
+  }
+  #arena {
+    min-height: 260px;
+    max-height: min(100vw, 1280px);
+  }
+}
+
+/* ─── Celular deitado (pouca altura): modo compacto, a batalha cabe sem rolar ─── */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --hdr-h: 34px;
+    --invbar-h: 38px;
+  }
+  #app {
+    min-height: 0;
+    grid-template-rows: auto auto auto;
+  }
+  #header {
+    box-sizing: border-box;
+    height: var(--hdr-h);
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 0 12px;
+  }
+  #header h1 {
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  #header .subtitle {
+    display: none;
+  }
+  #header > .lang-toggle {
+    order: 3;
+    margin-left: 0;
+  }
+  .lang-btn {
+    padding: 2px 8px;
+    min-width: 30px;
+    font-size: 11px;
+  }
+  /* Os indicadores encolhem (e cortam) antes de empurrar o EN|PT para fora */
+  #header > div:first-child {
+    flex: none;
+  }
+  #stats-header {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    width: auto;
+    margin-left: auto;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .stat-pill {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    gap: 4px;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .stat-pill span {
+    display: inline;
+  }
+  .stat-pill .val {
+    font-size: 11px;
+  }
+  /* Barra do inventário em uma linha: HP e MP lado a lado, sem a faixa de onda
+     (a onda já está nos indicadores do alto) */
+  .inv-bar {
+    box-sizing: border-box;
+    flex-wrap: nowrap;
+    height: var(--invbar-h);
+  }
+  .inv-bar .bars-container {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 14px;
+    max-width: none;
+    padding: 0 12px;
+    border-right: 1px solid var(--border);
+    border-bottom: none;
+  }
+  .inv-bar .bar-row {
+    flex: 1;
+    margin: 0;
+  }
+  .inv-bar .bar-track {
+    height: 10px;
+  }
+  .inv-bar .wave-info {
+    display: none;
+  }
+  .inv-toggle {
+    padding: 0 12px;
+  }
+  /* A arena ocupa o que sobra da altura da tela; nada rola */
+  #arena {
+    height: calc(100vh - var(--hdr-h) - var(--invbar-h) - 2px); /* sem dvh */
+    height: calc(100dvh - var(--hdr-h) - var(--invbar-h) - 2px);
+    max-height: none;
+    min-height: 0;
+  }
+  #game-controls {
+    top: 6px;
+    right: 6px;
+  }
+  .control-btn {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+  }
+}
+
+/* Aviso se o items.json não carregar (não há mais log na tela) */
+.load-error {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  max-width: 90vw;
+  padding: 14px 20px;
+  background: var(--bg2);
+  border: 1px solid var(--red2);
+  border-radius: 8px;
+  color: var(--red2);
+  text-align: center;
 }

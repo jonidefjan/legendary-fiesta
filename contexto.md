@@ -26,16 +26,19 @@ Repositório `jonidefjan/legendary-fiesta`:
   - `enemy.frozen` é medido em ms. `enemyAttack` devolve o resultado do ataque: dodged, blocked, absorbed ou hit.
 
 ## Fases restantes
-- **5 – i18n do jogo:** feita na branch `feat/phase-5-i18n`, com PR aberta.
+- **5 – i18n do jogo:** concluída (PR #9, commit `f512bb6`).
   - Inglês é o padrão; `?lang=` tem prioridade; a escolha fica na chave `lang`, compartilhada com o portfólio.
   - Botão EN/PT na tela inicial e no cabeçalho.
   - API em `game/src/i18n.js` (`t`, `setLang`, `formatNumber`); textos em `game/locales/{en,pt-BR}.js` e `items.{en,pt-BR}.js`.
   - Inimigos têm `kind`; os nomes vêm de `enemyName()`.
   - Fonte dos números: Tiny5 (OFL). A família `"Reliquary Digits"` (só 0-9, via unicode-range) fica na frente de toda pilha Pixelify Sans, no CSS e no canvas.
   - A Pixel Game (1001fonts) foi recusada: a licença é só para uso pessoal e o repositório é público.
-- **6 – Mobile retrato:**
-  - Arena alta e estreita mostra uma faixa de solo abaixo da borda frontal.
-  - O texto de pausa transborda no celular.
+- **6 – Celular:** feita na branch `feat/phase-6-mobile`, com PR aberta.
+  - Retrato (qualquer largura): a arena ocupa o espaço que sobra, limitada a quadrada (`max-height: min(100vw, 1280px)`), com mínimo de 260 px. Há fallback em `vh` para navegadores sem `dvh`.
+  - O cenário vai de `frontZ` 18 até `backZ` -20, então o chão cobre o quadro na proporção mais alta que o layout permite.
+  - Paisagem com altura de até 500 px: modo compacto, com cabeçalho de 34 px e barra de 38 px, sem rolar.
+  - Itens abertos por padrão: decidido em `layout.js` (`defaultCollapsed`) a partir da altura medida do cabeçalho e dos itens. A escolha salva manda.
+  - O log de combate saiu da tela. `log()` continua chamado, mas nada o exibe; o erro de carga aparece num `.load-error`.
 - **7 – Docs:** reescrever `auto-battler-doc.md` e arquivar `trello-setup.md` em `docs/`.
 - **8 – Arte dos itens** (pedida pelo usuário em 2026-10-31, fase própria): trocar os emojis por imagens em pixel art fiéis ao nome de cada item.
   - Exemplos do usuário:
