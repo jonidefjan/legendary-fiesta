@@ -489,7 +489,14 @@ function init() {
     document.getElementById("overlay-canvas"),
   );
   render.resizeCanvas();
-  window.addEventListener("resize", render.resizeCanvas);
+  // A arena muda de altura quando a barra de itens abre ou fecha, não só com a janela
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(() => render.resizeCanvas()).observe(
+      document.getElementById("arena"),
+    );
+  } else {
+    window.addEventListener("resize", render.resizeCanvas);
+  }
 
   const canvas = render.getCanvas();
   state.player.x = canvas.width * 0.22;

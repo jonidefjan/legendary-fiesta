@@ -22,6 +22,7 @@ const ROMAN = ["", "I", "II", "III", "IV", "V"];
 //  INVENTORY
 // ═══════════════════════════════════════════
 export function renderInventory() {
+  $("inv-count").textContent = state.items.length;
   ["weapon", "armor", "relic"].forEach((type) => {
     const el = $("slots-" + type);
     el.innerHTML = "";
@@ -408,6 +409,33 @@ export function setupControls({
     $("btn-mute").textContent = onMute() ? "🔇" : "🔊";
   });
   $("btn-shake").addEventListener("click", () => setShakeButton(onShake()));
+  setupInventoryToggle();
+}
+
+// Barra de itens recolhível. A escolha do jogador fica salva; sem escolha,
+// começa recolhida em telas estreitas para sobrar arena
+const INV_COLLAPSED_KEY = "reliquary_inv_collapsed";
+
+function setupInventoryToggle() {
+  const inv = $("inventory");
+  const btn = $("btn-inv-toggle");
+  const apply = (collapsed) => {
+    inv.classList.toggle("collapsed", collapsed);
+    btn.setAttribute("aria-expanded", String(!collapsed));
+  };
+  let saved = null;
+  try {
+    saved = localStorage.getItem(INV_COLLAPSED_KEY);
+  } catch {}
+  apply(saved === null ? window.innerWidth <= 768 : saved === "1");
+  btn.addEventListener("click", () => {
+    const collapsed = !inv.classList.contains("collapsed");
+    apply(collapsed);
+    if (collapsed) hideTooltip();
+    try {
+      localStorage.setItem(INV_COLLAPSED_KEY, collapsed ? "1" : "0");
+    } catch {}
+  });
 }
 
 // Ativo e 📳 com a tremida ligada; apagado e 📴 quando desligada

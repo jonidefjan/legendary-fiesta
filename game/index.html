@@ -56,6 +56,59 @@
         </div>
       </div>
 
+      <!-- Barra do inventário no alto: a arena fica com a largura toda e os
+           inimigos que entram pela direita não ficam escondidos -->
+      <div id="inventory" aria-label="Player inventory">
+        <div class="inv-bar">
+          <div class="bars-container">
+            <div class="bar-row">
+              <div class="bar-label">HP</div>
+              <div class="bar-track">
+                <div class="bar-fill hp" id="hp-bar" style="width: 100%"></div>
+              </div>
+              <div class="bar-val" id="hp-val">100/100</div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-label">MP</div>
+              <div class="bar-track">
+                <div class="bar-fill mana" id="mana-bar" style="width: 0%"></div>
+              </div>
+              <div class="bar-val" id="mana-val">0/100</div>
+            </div>
+          </div>
+          <div class="wave-info">
+            <div class="wave-num" id="inv-wave">Onda 1</div>
+            <div class="enemy-count" id="inv-enemies">3 inimigos</div>
+            <div class="gold-display" id="inv-best">🏆 Recorde: onda 0</div>
+          </div>
+          <button
+            id="btn-inv-toggle"
+            class="inv-toggle"
+            aria-expanded="true"
+            aria-controls="inv-items"
+            title="Mostrar/ocultar itens"
+          >
+            <span class="inv-toggle-arrow" aria-hidden="true">▾</span>
+            Itens <span class="inv-toggle-count" id="inv-count">0</span>
+          </button>
+        </div>
+
+        <div class="inv-items" id="inv-items">
+          <div class="inv-section">
+            <div class="inv-section-title">Armas</div>
+            <div class="slots-grid" id="slots-weapon"></div>
+          </div>
+          <div class="inv-section">
+            <div class="inv-section-title">Armaduras</div>
+            <div class="slots-grid" id="slots-armor"></div>
+          </div>
+          <div class="inv-section">
+            <div class="inv-section-title">Relíquias</div>
+            <div class="slots-grid" id="slots-relic"></div>
+          </div>
+        </div>
+      </div>
+
       <div id="arena">
         <canvas id="combat-canvas"></canvas>
         <canvas id="overlay-canvas" aria-hidden="true"></canvas>
@@ -90,43 +143,6 @@
       </div>
 
       <div id="log-panel" aria-label="Combat log"></div>
-
-      <div id="inventory" aria-label="Player inventory">
-        <div class="bars-container">
-          <div class="bar-row">
-            <div class="bar-label">HP</div>
-            <div class="bar-track">
-              <div class="bar-fill hp" id="hp-bar" style="width: 100%"></div>
-            </div>
-            <div class="bar-val" id="hp-val">100/100</div>
-          </div>
-          <div class="bar-row">
-            <div class="bar-label">MP</div>
-            <div class="bar-track">
-              <div class="bar-fill mana" id="mana-bar" style="width: 0%"></div>
-            </div>
-            <div class="bar-val" id="mana-val">0/100</div>
-          </div>
-        </div>
-        <div class="wave-info">
-          <div class="wave-num" id="inv-wave">Onda 1</div>
-          <div class="enemy-count" id="inv-enemies">3 inimigos</div>
-          <div class="gold-display" id="inv-best">🏆 Recorde: onda 0</div>
-        </div>
-
-        <div class="inv-section">
-          <div class="inv-section-title">Armas</div>
-          <div class="slots-grid" id="slots-weapon"></div>
-        </div>
-        <div class="inv-section">
-          <div class="inv-section-title">Armaduras</div>
-          <div class="slots-grid" id="slots-armor"></div>
-        </div>
-        <div class="inv-section">
-          <div class="inv-section-title">Relíquias</div>
-          <div class="slots-grid" id="slots-relic"></div>
-        </div>
-      </div>
     </div>
 
     <div class="tooltip" id="tooltip"></div>
