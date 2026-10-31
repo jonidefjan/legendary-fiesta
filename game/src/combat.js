@@ -714,18 +714,19 @@ function weaponAttack(item, target, extra = null) {
   const hits = item.hits || 1;
   const ctx = attackModifiers(item, target, extra);
   let totalDmg = 0;
+  // Arma sem dano próprio (ex.: Lâmina de Brasa só aplica queimadura): o golpe não
+  // causa dano nem crítico e não gasta bônus de uso único, mas os efeitos de golpe rodam
+  const appliesOnly = !((item.baseDmg || 0) + (item.bonusDmg || 0) > 0);
 
   for (let h = 0; h < hits; h++) {
     // Alvo já morto (outra arma, ou o golpe anterior): não gasta mais nada nele
     if (h > 0 && target.hp <= 0) break;
-    const { dmg, crit, base } = attackDamage(item, ctx, h === 0);
-    const dealt = applyElementalDamage(
-      target,
-      dmg,
-      item.dmgType || "physical",
-      "player",
-      crit,
-    );
+    const { dmg, crit, base } = appliesOnly
+      ? { dmg: 0, crit: false, base: 0 }
+      : attackDamage(item, ctx, h === 0);
+    const dealt = appliesOnly
+      ? 0
+      : applyElementalDamage(target, dmg, item.dmgType || "physical", "player", crit);
     totalDmg += dealt;
     ctx.damage = base;
     ctx.dealt = dealt;
@@ -746,8 +747,11 @@ function weaponAttack(item, target, extra = null) {
     for (const effect of effectsOf(item, "hit")) {
       HIT_EFFECTS[effect.type]?.(effect, item, ctx);
     }
-    for (const { item: owner, effect } of ownedEffects("anyHit")) {
-      ANY_HIT_EFFECTS[effect.type]?.(effect, owner, ctx);
+    // Roubo de vida e afins dependem do dano do golpe: sem dano, não há o que roubar
+    if (!appliesOnly) {
+      for (const { item: owner, effect } of ownedEffects("anyHit")) {
+        ANY_HIT_EFFECTS[effect.type]?.(effect, owner, ctx);
+      }
     }
     if (h === 0) {
       for (const effect of effectsOf(item, "attack")) {
@@ -756,7 +760,9 @@ function weaponAttack(item, target, extra = null) {
     }
   }
 
-  log(t("log.attack", { item: item.name, damage: totalDmg, target: enemyName(target) }), "dmg");
+  if (!appliesOnly) {
+    log(t("log.attack", { item: item.name, damage: totalDmg, target: enemyName(target) }), "dmg");
+  }
   const element = item.dmgType || "physical";
   sound("hit", element);
   emit("attack", {

@@ -57,18 +57,19 @@ test("arma ataca o inimigo mais próximo", () => {
   assert.equal(state.itemTimers.rusted_sword.elapsed, 0, "recarga reiniciada");
 });
 
-test("Lâmina de Brasa queima o alvo só quando a chance acerta", () => {
+test("Lâmina de Brasa não causa dano direto e queima em todo golpe", () => {
   const target = enemy();
+  const hp = target.hp;
   setupRun(["ember_blade"], [target]);
-  fixedRandom(0.99);
+  fixedRandom(0.99); // nem a pior rolagem impede a queimadura (chance 100%)
   activateItem(item("ember_blade"));
-  assert.equal(target.dots.length, 0);
-  fixedRandom(0);
-  activateItem(item("ember_blade"));
+  assert.equal(target.hp, hp, "golpe sem dano");
   assert.deepEqual(
     target.dots.map((d) => [d.type, d.damage, d.stacks]),
     [["burning", 3, 1]],
   );
+  activateItem(item("ember_blade"));
+  assert.equal(target.dots[0].stacks, 2);
 });
 
 test("Adaga das Sombras devolve 0,5 s de recarga por golpe que acerta a chance", () => {
@@ -262,25 +263,25 @@ function eventsOf(events, type) {
 }
 
 test("golpe emite attack e hit com posição, elemento e dano", () => {
-  const target = enemy({ x: 150, resist: { fire: -0.2 } });
-  setupRun(["ember_blade"], [target]);
+  const target = enemy({ x: 150, resist: { ice: -0.2 } });
+  setupRun(["frost_bow"], [target]);
   const events = [];
   for (const type of ["hit", "attack", "sfx"]) {
     on(type, (payload) => events.push({ type, payload }));
   }
   fixedRandom(0.99);
-  activateItem(item("ember_blade"));
+  activateItem(item("frost_bow"));
   const [hit] = eventsOf(events, "hit");
-  assert.equal(hit.element, "fire");
-  assert.equal(hit.damage, 24);
+  assert.equal(hit.element, "ice");
+  assert.equal(hit.damage, 20); // (12 + 5) × 1,2 de fraqueza
   assert.equal(hit.weak, true);
   assert.equal(hit.x, 150);
   const [attack] = eventsOf(events, "attack");
-  assert.equal(attack.itemId, "ember_blade");
+  assert.equal(attack.itemId, "frost_bow");
   assert.equal(attack.targetX, 150);
   assert.deepEqual(
     eventsOf(events, "sfx").find((s) => s.name === "hit"),
-    { name: "hit", detail: "fire" },
+    { name: "hit", detail: "ice" },
   );
 });
 

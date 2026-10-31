@@ -16,8 +16,7 @@
     "icon": "🔥",
     "rarity": "rare",
     "cooldown": 3000,
-    "baseDmg": 14,
-    "bonusDmg": 6,
+    "baseDmg": 0,
     "dmgType": "fire",
     "anim": "fire_slash",
     "fx": "fire",
@@ -30,7 +29,7 @@
         "maxStacks": 3,
         "maxStacksPerLevel": 1,
         "duration": 4,
-        "chance": 0.25
+        "chance": 1
       }
     ]
   },
