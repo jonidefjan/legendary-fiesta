@@ -61,9 +61,11 @@ export function serializeRun() {
     wave: state.wave,
     kills: state.kills,
     score: state.score,
-    gold: state.gold,
     items: state.items.map((i) => i.id),
+    itemLevels: state.itemLevels,
     itemTimers: state.itemTimers,
+    endless: state.endless,
+    victoryShown: state.victoryShown,
     player: {
       hp: state.player.hp,
       maxHp: state.player.maxHp,
@@ -81,7 +83,6 @@ export function migrateRun(data) {
     wave: data.wave,
     kills: data.kills,
     score: data.score,
-    gold: data.gold,
     items: (data.items || []).map((i) => (typeof i === "string" ? i : i.id)),
     itemTimers: data.itemTimers || {},
     player: {
@@ -116,11 +117,13 @@ export function loadRun() {
   state.wave = data.wave || 1;
   state.kills = data.kills || 0;
   state.score = data.score || 0;
-  state.gold = data.gold || 0;
   state.items = (data.items || [])
     .map(findItem)
     .filter((item) => item && !UNIMPLEMENTED_ITEMS.has(item.id));
+  state.itemLevels = data.itemLevels || {};
   state.itemTimers = data.itemTimers || {};
+  state.endless = !!data.endless;
+  state.victoryShown = !!data.victoryShown;
   state.player.hp = data.player?.hp || 100;
   state.player.maxHp = data.player?.maxHp || 100;
   state.player.mana = data.player?.mana || 0;
@@ -134,14 +137,23 @@ export function clearRun() {
 }
 
 // ─── Progresso permanente ───
+// Fragmentos, melhorias compradas e recordes (campos novos são opcionais em saves antigos)
 export function saveMeta() {
-  write(META_KEY, { fragments: state.fragments });
+  write(META_KEY, {
+    fragments: state.fragments,
+    upgrades: state.meta.upgrades,
+    best: state.meta.best,
+    bossesBeaten: state.meta.bossesBeaten,
+  });
 }
 
 export function loadMeta() {
   const meta = read(META_KEY);
   if (meta) {
     state.fragments = meta.fragments || 0;
+    state.meta.upgrades = meta.upgrades || {};
+    state.meta.best = { wave: 0, score: 0, ...meta.best };
+    state.meta.bossesBeaten = meta.bossesBeaten || 0;
     return;
   }
   // Save da versão 1: grava os fragmentos já na chave nova, porque loadRun apaga a antiga
@@ -155,4 +167,9 @@ export function loadMeta() {
 export function resetAll() {
   clearRun();
   remove(META_KEY);
+}
+
+// Existe uma run salva para continuar? (sem alterar o estado)
+export function hasRun() {
+  return !!(read(RUN_KEY) || read(LEGACY_RUN_KEY));
 }

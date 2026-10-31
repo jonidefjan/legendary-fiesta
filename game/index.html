@@ -14,6 +14,8 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./title.css" />
+    <link rel="stylesheet" href="./boss.css" />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <!-- Three.js 0.170.0 local (game/vendor/three), sem build e sem depender de CDN -->
     <script type="importmap">
@@ -109,7 +111,7 @@
         <div class="wave-info">
           <div class="wave-num" id="inv-wave">Onda 1</div>
           <div class="enemy-count" id="inv-enemies">3 inimigos</div>
-          <div class="gold-display" id="inv-gold">⚙ 0 ouro</div>
+          <div class="gold-display" id="inv-best">🏆 Recorde: onda 0</div>
         </div>
 
         <div class="inv-section">
@@ -159,6 +161,12 @@
         </button>
       </div>
     </div>
+
+    <!-- TELA INICIAL: Jogar, Continuar, Melhorias e recorde (ui-title.js) -->
+    <div id="title-screen" class="modal-overlay" style="display: none"></div>
+
+    <!-- VITÓRIA depois do chefe da onda 10 (ui-victory.js) -->
+    <div id="victory-modal" class="modal-overlay" style="display: none"></div>
 
     <script type="module" src="./src/main.js"></script>
   </body>

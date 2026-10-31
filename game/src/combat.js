@@ -560,7 +560,6 @@ export function updateEnemies(dt) {
       en.deathAnim = ANIM_MS.enemyDeath;
       state.kills++;
       state.score += en.xp;
-      state.gold += en.gold || 0;
       state.fragments += en.fragments || 1;
       sound("kill");
       spawnEffect("death", en.x, en.y - 30, { life: 50 });

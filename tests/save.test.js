@@ -77,9 +77,9 @@ test("save da versão 1 é migrado: IDs, fragmentos e itens sem efeito removidos
   save.loadMeta();
   assert.equal(state.fragments, 12);
   assert.equal(save.loadRun(), true);
-  assert.deepEqual(
-    JSON.parse(storage.data[save.META_KEY]),
-    { fragments: 12 },
+  assert.equal(
+    JSON.parse(storage.data[save.META_KEY]).fragments,
+    12,
     "fragmentos gravados na chave nova antes da antiga sumir",
   );
   assert.equal(state.wave, 3);

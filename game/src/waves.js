@@ -14,7 +14,6 @@ export const ENEMY_TYPES = [
     size: 18,
     atkInterval: 2000,
     xp: 10,
-    gold: 5,
     fragments: 2,
     resist: { fire: 0, water: 0, ice: 0.2, lightning: 0.3, physical: 0 },
   },
@@ -27,7 +26,6 @@ export const ENEMY_TYPES = [
     size: 16,
     atkInterval: 1600,
     xp: 8,
-    gold: 4,
     fragments: 1,
     resist: { fire: -0.2, water: 0, ice: 0, lightning: 0, physical: 0.1 },
   },
@@ -40,7 +38,6 @@ export const ENEMY_TYPES = [
     size: 22,
     atkInterval: 2500,
     xp: 20,
-    gold: 10,
     fragments: 5,
     resist: {
       fire: 0.5,

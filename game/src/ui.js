@@ -129,7 +129,7 @@ export function updateHUD() {
   $("inv-wave").textContent = `Onda ${state.wave}`;
   const alive = state.enemies.filter((e) => !e.dead).length;
   $("inv-enemies").textContent = `${alive} inimigo${alive !== 1 ? "s" : ""}`;
-  $("inv-gold").textContent = `⚙ ${state.gold} ouro`;
+  $("inv-best").textContent = `🏆 Recorde: onda ${state.meta.best.wave}`;
 
   // Item cooldown bars
   state.items.forEach((item) => {
@@ -312,7 +312,6 @@ export function showGameOver() {
     { label: "🌊 Onda alcançada", value: state.wave },
     { label: "💀 Inimigos mortos", value: state.kills },
     { label: "🏆 Pontuação", value: state.score },
-    { label: "⚙ Ouro acumulado", value: state.gold },
     { label: "⚔ Dano total causado", value: state.runStats.totalDamage },
     { label: "⏱ Duração da run", value: duration },
     { label: "⭐ Item favorito", value: favoriteItem, wide: true },
