@@ -2,11 +2,12 @@
 //  ENEMY WAVES
 // ═══════════════════════════════════════════
 import { random } from "./random.js";
+import { t, hasKey } from "./i18n.js";
 
 // shape = modelo 3D (KayKit Skeletons): minion, rogue, warrior; "mage" fica para o chefe Lich
 export const ENEMY_TYPES = [
   {
-    name: "Esqueleto",
+    kind: "skeleton",
     shape: "minion",
     hp: 35,
     dmg: 6,
@@ -18,7 +19,7 @@ export const ENEMY_TYPES = [
     resist: { fire: 0, water: 0, ice: 0.2, lightning: 0.3, physical: 0 },
   },
   {
-    name: "Esqueleto Ladino",
+    kind: "rogue",
     shape: "rogue",
     hp: 25,
     dmg: 8,
@@ -30,7 +31,7 @@ export const ENEMY_TYPES = [
     resist: { fire: -0.2, water: 0, ice: 0, lightning: 0, physical: 0.1 },
   },
   {
-    name: "Esqueleto Guerreiro",
+    kind: "warrior",
     shape: "warrior",
     hp: 55,
     dmg: 14,
@@ -48,6 +49,14 @@ export const ENEMY_TYPES = [
     },
   },
 ];
+
+// Nome exibido do inimigo no idioma atual (overlay, log, vitória). O dado guarda só
+// o id estável (kind); sem kind (inimigos de teste) cai no name que o objeto tiver.
+export function enemyName(en) {
+  if (en.summoned) return t("enemies.summoned");
+  const key = `enemies.${en.kind}`;
+  return en.kind && hasKey(key) ? t(key) : en.name || "";
+}
 
 // Escalas da onda (vida +20%, dano +15% por onda); mobile bate menos
 export function waveScales(waveNum, mobile = false) {

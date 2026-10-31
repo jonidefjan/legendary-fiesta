@@ -9,7 +9,7 @@
 }
 
 .victory-content .modal-header h2 {
-  font-family: "Pixelify Sans", sans-serif;
+  font-family: "Reliquary Digits", "Pixelify Sans", sans-serif;
   font-size: 2.2rem;
   color: var(--gold3);
   text-shadow:
@@ -18,7 +18,7 @@
 }
 
 .victory-content .modal-subtitle {
-  font-family: "Pixelify Sans", sans-serif;
+  font-family: "Reliquary Digits", "Pixelify Sans", sans-serif;
   font-size: 1.15rem;
   color: var(--red2);
 }
@@ -45,7 +45,7 @@
   border: 2px solid var(--border2);
   border-radius: 12px;
   padding: 12px 24px;
-  font-family: "Pixelify Sans", sans-serif;
+  font-family: "Reliquary Digits", "Pixelify Sans", sans-serif;
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.08em;

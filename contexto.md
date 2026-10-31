@@ -12,7 +12,7 @@ Repositório `jonidefjan/legendary-fiesta`:
 
 ## Estado atual
 - Fases 0 a 4 já foram mergeadas na `main` (PRs #2 a #5 e #7). A última é o commit `32fa459`.
-- A câmera está 25% mais afastada (`viewHeight` 12.5, `MIN_HALF_WIDTH` 9). Os inimigos nascem até `visibleLogicRight()` (`arena.maxX`) e nunca fora da tela (branch `feat/battle-framing`).
+- A câmera está 25% mais afastada (`viewHeight` 12.5, `MIN_HALF_WIDTH` 9). Os inimigos nascem até `visibleLogicRight()` (`arena.maxX`) e nunca fora da tela (PR #8, commit `7913c11`). No celular (até 480 px), os botões ficam numa linha no alto da arena.
 - O inventário virou uma barra no topo que dá para recolher (PR #6, commit `99e2a2a`). A escolha de aberto/fechado fica salva em `localStorage` (`reliquary_inv_collapsed`), e a arena é redimensionada por um ResizeObserver.
 - **Fase 4 (itens):**
   - Decisões:
@@ -26,7 +26,13 @@ Repositório `jonidefjan/legendary-fiesta`:
   - `enemy.frozen` é medido em ms. `enemyAttack` devolve o resultado do ataque: dodged, blocked, absorbed ou hit.
 
 ## Fases restantes
-- **5 – i18n do jogo (próxima):** EN/PT. Hoje o jogo é só em português, e as decisões dela devem ser perguntadas em múltipla escolha.
+- **5 – i18n do jogo:** feita na branch `feat/phase-5-i18n`, com PR aberta.
+  - Inglês é o padrão; `?lang=` tem prioridade; a escolha fica na chave `lang`, compartilhada com o portfólio.
+  - Botão EN/PT na tela inicial e no cabeçalho.
+  - API em `game/src/i18n.js` (`t`, `setLang`, `formatNumber`); textos em `game/locales/{en,pt-BR}.js` e `items.{en,pt-BR}.js`.
+  - Inimigos têm `kind`; os nomes vêm de `enemyName()`.
+  - Fonte dos números: Tiny5 (OFL). A família `"Reliquary Digits"` (só 0-9, via unicode-range) fica na frente de toda pilha Pixelify Sans, no CSS e no canvas.
+  - A Pixel Game (1001fonts) foi recusada: a licença é só para uso pessoal e o repositório é público.
 - **6 – Mobile retrato:**
   - Arena alta e estreita mostra uma faixa de solo abaixo da borda frontal.
   - O texto de pausa transborda no celular.

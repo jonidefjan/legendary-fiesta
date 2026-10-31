@@ -8,6 +8,7 @@ import {
   ensureTimers,
 } from "../game/src/items.js";
 import { setRandom } from "../game/src/random.js";
+import { setLangQuiet } from "../game/src/i18n.js";
 import { on, clearListeners } from "../game/src/events.js";
 
 // Os 5% de crítico base deixariam os testes de dano aleatórios: aqui começa em 0.
@@ -18,6 +19,8 @@ PLAYER_BASE.critChance = 0;
 export const ITEMS = JSON.parse(
   readFileSync(new URL("../game/assets/items.json", import.meta.url), "utf8"),
 );
+// Os textos esperados nos testes são os em português; o idioma padrão do jogo é en
+setLangQuiet("pt-BR");
 setItems(ITEMS);
 
 export function item(id) {

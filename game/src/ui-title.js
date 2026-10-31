@@ -3,7 +3,17 @@
 // ═══════════════════════════════════════════
 // Desenha dentro de #title-screen (index.html); estilos em game/title.css.
 import { state } from "./state.js";
-import { UPGRADES, upgradeLevel, upgradeCost, buyUpgrade, describeLevel, isMaxed } from "./meta.js";
+import {
+  UPGRADES,
+  upgradeLevel,
+  upgradeCost,
+  buyUpgrade,
+  describeLevel,
+  isMaxed,
+  upgradeName,
+  upgradeDesc,
+} from "./meta.js";
+import { t, getLang } from "./i18n.js";
 import * as save from "./save.js";
 import { sfx } from "./audio.js";
 
@@ -22,64 +32,89 @@ function shopCard(u) {
   const lvl = upgradeLevel(u.id);
   const cost = upgradeCost(u.id);
   const can = state.fragments >= cost;
-  const now = lvl > 0 ? describeLevel(u.id, lvl) : "nenhum bônus";
+  const now = lvl > 0 ? describeLevel(u.id, lvl) : t("shop.none");
   const maxed = isMaxed(u.id);
   return `
     <div class="shop-card${u.id === lastBought ? " bought" : ""}" data-id="${u.id}">
       <div class="shop-head">
         <span class="shop-icon">${u.icon}</span>
-        <span class="shop-name">${esc(u.name)}</span>
-        <span class="shop-level">Nv. ${lvl}</span>
+        <span class="shop-name">${esc(upgradeName(u.id))}</span>
+        <span class="shop-level">${esc(t("shop.level", { n: lvl }))}</span>
       </div>
-      <div class="shop-desc">${esc(u.desc)}</div>
-      <div class="shop-effect">Atual: <b>${esc(now)}</b></div>
-      <div class="shop-effect">${maxed ? "<b>Nível máximo</b>" : `Próximo: <b>${esc(describeLevel(u.id, lvl + 1))}</b>`}</div>
+      <div class="shop-desc">${esc(upgradeDesc(u.id))}</div>
+      <div class="shop-effect">${esc(t("shop.current"))} <b>${esc(now)}</b></div>
+      <div class="shop-effect">${maxed ? `<b>${esc(t("shop.maxLevel"))}</b>` : `${esc(t("shop.next"))} <b>${esc(describeLevel(u.id, lvl + 1))}</b>`}</div>
       <button class="title-btn shop-buy" data-buy="${u.id}"${can && !maxed ? "" : " disabled"}>
-        ${maxed ? "Máximo" : `Comprar · ⚡ ${cost}`}
+        ${maxed ? esc(t("shop.maxButton")) : esc(t("shop.buy", { cost }))}
       </button>
     </div>`;
 }
 
-function render() {
+function render(keepLangFocus = false) {
   const el = root();
   if (!el || !current) return;
   const { canContinue } = current;
   const best = state.meta.best || { wave: 0, score: 0 };
   const record =
-    best.wave > 0 ? `Recorde: onda ${best.wave} · ${best.score} pontos` : "Recorde: ainda sem registro";
+    best.wave > 0
+      ? t("title.record", { wave: best.wave, score: best.score })
+      : t("title.recordNone");
 
   const buttons = confirming
-    ? `<div class="title-confirm" role="alertdialog" aria-label="Confirmar nova run">
-         <p>Começar uma nova run descarta a run salva. Continuar?</p>
+    ? `<div class="title-confirm" role="alertdialog" aria-label="${esc(t("title.confirmLabel"))}">
+         <p>${esc(t("title.confirmText"))}</p>
          <div class="title-actions">
-           <button class="title-btn primary" data-act="confirm-new">Sim, nova run</button>
-           <button class="title-btn" data-act="cancel-new">Cancelar</button>
+           <button class="title-btn primary" data-act="confirm-new">${esc(t("title.confirmYes"))}</button>
+           <button class="title-btn" data-act="cancel-new">${esc(t("title.confirmNo"))}</button>
          </div>
        </div>`
     : `<div class="title-actions">
-         ${canContinue ? `<button class="title-btn primary" data-act="continue">Continuar run</button>` : ""}
-         <button class="title-btn${canContinue ? "" : " primary"}" data-act="new">Nova run</button>
+         ${canContinue ? `<button class="title-btn primary" data-act="continue">${esc(t("title.continue"))}</button>` : ""}
+         <button class="title-btn${canContinue ? "" : " primary"}" data-act="new">${esc(t("title.new"))}</button>
        </div>`;
+
+  // Botões EN/PT: o clique é tratado por i18n.js (delegação em document)
+  const langs = [
+    ["en", "EN"],
+    ["pt-BR", "PT"],
+  ]
+    .map(
+      ([code, label]) =>
+        `<button type="button" class="lang-btn" data-lang="${code}" lang="${code}" aria-pressed="${code === getLang()}">${label}</button>`,
+    )
+    .join("");
 
   el.innerHTML = `
     <div class="modal-content title-content">
+      <div class="lang-toggle title-lang" role="group" aria-label="${esc(t("lang.label"))}">${langs}</div>
       <div class="modal-header title-header">
         <h1 class="title-logo">⚔ RELIQUARY</h1>
-        <div class="modal-subtitle">Sobreviva às ondas. Forje relíquias. Vença o chefe.</div>
+        <div class="modal-subtitle">${esc(t("title.tagline"))}</div>
         <div class="title-stats">
           <span>${esc(record)}</span>
-          <span class="title-fragments">⚡ <b>${state.fragments}</b> fragmentos</span>
+          <span class="title-fragments">⚡ <b>${state.fragments}</b> ${esc(t("title.fragments", { count: state.fragments }))}</span>
         </div>
       </div>
       <div class="title-body">
         ${buttons}
-        <h2 class="shop-title">Loja de melhorias</h2>
+        <h2 class="shop-title">${esc(t("shop.title"))}</h2>
         <div class="shop-grid">${UPGRADES.map(shopCard).join("")}</div>
       </div>
     </div>`;
   lastBought = null;
-  const focus = el.querySelector(".title-btn.primary");
+  // Ao trocar de idioma o foco volta para o botão EN/PT que o tinha
+  const focus = keepLangFocus
+    ? el.querySelector(`[data-lang="${keepLangFocus}"]`)
+    : el.querySelector(".title-btn.primary");
   if (focus) focus.focus({ preventScroll: true });
+}
+
+// Troca de idioma com a tela inicial aberta: redesenha (confirmação e compras ficam)
+export function refreshTitle() {
+  const el = root();
+  if (!el || !current || el.style.display === "none") return;
+  const active = document.activeElement;
+  render(active && el.contains(active) ? active.dataset.lang || false : false);
 }
 
 function onClick(e) {
