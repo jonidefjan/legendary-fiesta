@@ -13,6 +13,7 @@ import {
 import { t, formatNumber } from "./i18n.js";
 import { defaultCollapsed } from "./layout.js";
 import { itemIconHTML } from "./sprites.js";
+import { runResult, formatDuration, favoriteCellHTML, createShareControls } from "./share.js";
 
 export const isMobile =
   "ontouchstart" in window || navigator.maxTouchPoints > 0;
@@ -321,29 +322,9 @@ export function showRewardPick(options, wave, onPick) {
 let gameOver = null; // dados da run congelados ao morrer; null = tela fechada
 
 export function showGameOver() {
-  // Duração da run
-  const elapsed = performance.now() - (state.runStats.startTime || 0);
-  const mins = Math.floor(elapsed / 60000);
-  const secs = Math.floor((elapsed % 60000) / 1000);
-  const duration = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-
-  // Item mais usado (guarda o id: o nome é buscado de novo se o idioma mudar)
-  const uses = Object.entries(state.runStats.itemUses);
-  let favorite = null;
-  if (uses.length > 0) {
-    const [topId, topCount] = uses.reduce((a, b) => (b[1] > a[1] ? b : a));
-    if (findItem(topId)) favorite = { id: topId, count: topCount };
-  }
-
-  gameOver = {
-    wave: state.wave,
-    kills: state.kills,
-    score: state.score,
-    damage: state.runStats.totalDamage,
-    fragments: state.fragments,
-    duration,
-    favorite,
-  };
+  // Congela o resultado ao morrer; a arma favorita guarda só o id (o nome é buscado de
+  // novo se o idioma mudar)
+  gameOver = runResult();
   renderGameOver();
   $("game-over-modal").style.display = "flex";
 }
@@ -351,12 +332,6 @@ export function showGameOver() {
 function renderGameOver() {
   const g = gameOver;
   if (!g) return;
-  let favoriteItem = "—";
-  if (g.favorite) {
-    const item = findItem(g.favorite.id);
-    if (item) favoriteItem = `<span class="inline-icon">${itemIconHTML(item, { badge: false })}</span> ${item.name} (${g.favorite.count}×)`;
-  }
-
   $("go-subtitle").textContent = t("gameover.sub", { wave: g.wave });
 
   const stats = [
@@ -364,9 +339,9 @@ function renderGameOver() {
     { label: t("gameover.kills"), value: g.kills },
     { label: t("gameover.score"), value: g.score },
     { label: t("gameover.damage"), value: g.damage },
-    { label: t("gameover.duration"), value: g.duration },
-    { label: t("gameover.favorite"), value: favoriteItem, wide: true },
-    { label: t("gameover.fragments"), value: g.fragments, wide: true },
+    { label: t("gameover.duration"), value: formatDuration(g.durationMs) },
+    { label: t("gameover.fragments"), value: g.fragments },
+    { label: t("gameover.favorite"), value: favoriteCellHTML(g.favorite), wide: true },
   ];
 
   $("go-stats").innerHTML = stats
@@ -378,6 +353,7 @@ function renderGameOver() {
       </div>`,
     )
     .join("");
+  $("go-share").replaceChildren(createShareControls(() => gameOver));
 }
 
 export function hideGameOver() {
