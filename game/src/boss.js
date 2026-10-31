@@ -6,7 +6,8 @@
 import { state } from "./state.js";
 import { random } from "./random.js";
 import { emit, log, sound } from "./events.js";
-import { createEnemy, ENEMY_TYPES, waveScales } from "./waves.js";
+import { createEnemy, ENEMY_TYPES, waveScales, enemyName } from "./waves.js";
+import { t } from "./i18n.js";
 import { applyDot, enemyAttack, ANIM_MS } from "./combat.js";
 
 // Onda de chefe a cada 10 (10, 20, 30... no modo infinito)
@@ -21,7 +22,6 @@ const SUMMON_COUNT = 2;
 export const BOSS_TYPES = {
   lich: {
     kind: "lich",
-    name: "Lich",
     shape: "mage",
     size: 30,
     speed: 0.25,
@@ -33,7 +33,6 @@ export const BOSS_TYPES = {
   },
   demon: {
     kind: "demon",
-    name: "Senhor Demônio",
     shape: "demonlord",
     size: 30,
     speed: 0.22,
@@ -122,8 +121,7 @@ function summon(boss, arena) {
   if (count <= 0) return;
   for (let i = 0; i < count; i++) {
     const minion = createEnemy(0, boss.wave, arena, 0);
-    minion.name = "Esqueleto Invocado";
-    minion.summoned = true;
+    minion.summoned = true; // enemyName() mostra "Esqueleto Invocado" / "Summoned Skeleton"
     // Invocados também nascem dentro da tela (o chefe pode estar na borda)
     minion.x = Math.min(
       boss.x + (i === 0 ? -50 : 50) + (random() - 0.5) * 20,
@@ -133,18 +131,18 @@ function summon(boss, arena) {
     minion.fragments = 1;
     state.enemies.push(minion);
   }
-  emit("bossAbility", { kind: "summon", x: boss.x, y: boss.y, bossName: boss.name });
+  emit("bossAbility", { kind: "summon", x: boss.x, y: boss.y, bossName: enemyName(boss) });
   sound("summon");
-  log(`💀 ${boss.name} invoca ${count} esqueletos!`, "kill");
+  log(t("log.bossSummon", { boss: enemyName(boss), count }), "kill");
 }
 
 // Senhor Demônio: nova de fogo que fere o herói e o deixa queimando
 function fireNova(boss) {
   const p = state.player;
   markCast(boss, "nova");
-  emit("bossAbility", { kind: "nova", x: boss.x, y: boss.y, bossName: boss.name });
+  emit("bossAbility", { kind: "nova", x: boss.x, y: boss.y, bossName: enemyName(boss) });
   sound("nova");
-  log(`🔥 ${boss.name} lança uma Nova de Fogo!`, "dmg");
+  log(t("log.bossNova", { boss: enemyName(boss) }), "dmg");
   // O próprio chefe ataca (com dano temporário), para o Parry e o reflexo da
   // barreira acertarem ele e não uma cópia
   const dmg = boss.dmg;
@@ -163,9 +161,9 @@ function enrage(boss) {
   boss.abilityInterval = Math.round(boss.abilityInterval * 0.75);
   boss.speed *= 1.3;
   markCast(boss, "enrage");
-  emit("bossAbility", { kind: "enrage", x: boss.x, y: boss.y, bossName: boss.name });
+  emit("bossAbility", { kind: "enrage", x: boss.x, y: boss.y, bossName: enemyName(boss) });
   sound("enrage");
-  log(`😡 ${boss.name} entra em fúria!`, "dmg");
+  log(t("log.bossEnrage", { boss: enemyName(boss) }), "dmg");
 }
 
 // Habilidades dos chefes vivos (invocar, área de fogo...); dt em ms de jogo

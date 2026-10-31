@@ -16,7 +16,7 @@ test("cada onda tem 2 + número da onda inimigos", () => {
 test("vida e dano crescem 20% e 15% por onda", () => {
   setRandom(() => 0);
   const [skeleton] = createWave(3, arena);
-  assert.equal(skeleton.name, ENEMY_TYPES[0].name);
+  assert.equal(skeleton.kind, ENEMY_TYPES[0].kind);
   assert.equal(skeleton.maxHp, Math.round(35 * 1.4));
   assert.equal(skeleton.dmg, Math.round(6 * 1.3));
 });
@@ -24,10 +24,10 @@ test("vida e dano crescem 20% e 15% por onda", () => {
 test("tipos mais fortes só aparecem em ondas mais altas", () => {
   setRandom(() => 0.99);
   assert.deepEqual(
-    [...new Set(createWave(1, arena).map((e) => e.name))],
-    [ENEMY_TYPES[0].name],
+    [...new Set(createWave(1, arena).map((e) => e.kind))],
+    [ENEMY_TYPES[0].kind],
   );
-  assert.ok(createWave(5, arena).every((e) => e.name === ENEMY_TYPES[2].name));
+  assert.ok(createWave(5, arena).every((e) => e.kind === ENEMY_TYPES[2].kind));
 });
 
 test("no celular os inimigos começam mais longe, mais lentos e batem menos", () => {

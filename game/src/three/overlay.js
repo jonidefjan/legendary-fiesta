@@ -8,8 +8,13 @@ import { state } from "../state.js";
 import { PALETTE } from "../palette.js";
 import { arena, worldToScreen, logicToWorldX, logicToWorldY } from "./view.js";
 import { SCREEN_EFFECTS } from "./effects2d.js";
+import { t } from "../i18n.js";
+import { enemyName } from "../waves.js";
 
-const FONT = "'Pixelify Sans'";
+// Dígitos em Tiny5 em todo texto do canvas (a família "Reliquary Digits" do style.css)
+const FONT = "'Reliquary Digits', 'Pixelify Sans'";
+// Números (dano flutuante, vida do chefe, acúmulos): mesma fonte dos números do HTML
+const NUM_FONT = "'Tiny5', 'Pixelify Sans'";
 const BAR = { w: 38, h: 6, border: 2 };
 const DOT_ICONS = { burning: "🔥", poison: "☠️", bleeding: "💉" };
 
@@ -53,8 +58,8 @@ function drawBar(cx, y, pct, fill, shine) {
   }
 }
 
-function outlinedText(text, x, y, color, size, bold = true) {
-  ctx.font = `${bold ? "bold " : ""}${size}px ${FONT}`;
+function outlinedText(text, x, y, color, size, bold = true, font = FONT) {
+  ctx.font = `${bold ? "bold " : ""}${size}px ${font}`;
   ctx.textAlign = "center";
   ctx.lineJoin = "round";
   ctx.lineWidth = 3;
@@ -88,7 +93,7 @@ function drawBossBar(boss) {
   const y = bossBarY(W, h, b, x, w);
   const pct = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
   const enraged = !!boss.enraged;
-  outlinedText(boss.name, W / 2, y - 8, enraged ? PALETTE.pink : PALETTE.bone, W < 520 ? 14 : 18);
+  outlinedText(enemyName(boss), W / 2, y - 8, enraged ? PALETTE.pink : PALETTE.bone, W < 520 ? 14 : 18);
   ctx.fillStyle = PALETTE.night;
   ctx.fillRect(x - b, y - b, w + b * 2, h + b * 2);
   ctx.fillStyle = PALETTE.darkBrown;
@@ -104,7 +109,7 @@ function drawBossBar(boss) {
   }
   ctx.fillStyle = PALETTE.night;
   for (let i = 1; i < 10; i++) ctx.fillRect(x + Math.round((w * i) / 10) - 1, y, 2, h);
-  outlinedText(`${Math.max(0, Math.ceil(boss.hp))} / ${boss.maxHp}`, W / 2, y + h - 3, PALETTE.white, 11, false);
+  outlinedText(`${Math.max(0, Math.ceil(boss.hp))} / ${boss.maxHp}`, W / 2, y + h - 3, PALETTE.white, 11, false, NUM_FONT);
 }
 
 const v = new THREE.Vector3();
@@ -134,7 +139,7 @@ export function drawBars(characters) {
     const free = !labels.some((l) => Math.abs(l.x - x) < 70 && Math.abs(l.y - y) < 14);
     if (free) {
       labels.push({ x, y });
-      outlinedText(en.name, s.x, s.y - 6, PALETTE.bone, 10);
+      outlinedText(enemyName(en), s.x, s.y - 6, PALETTE.bone, 10);
     }
     if (en.dots && en.dots.length > 0) {
       let offsetX = (-14 * (en.dots.length - 1)) / 2;
@@ -142,7 +147,7 @@ export function drawBars(characters) {
         ctx.font = "11px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(DOT_ICONS[d.type] || "✨", s.x + offsetX, s.y - 20);
-        if (d.stacks > 1) outlinedText(`×${d.stacks}`, s.x + offsetX + 8, s.y - 15, PALETTE.white, 8);
+        if (d.stacks > 1) outlinedText(`×${d.stacks}`, s.x + offsetX + 8, s.y - 15, PALETTE.white, 8, false, NUM_FONT);
         offsetX += 14;
       }
     }
@@ -152,7 +157,7 @@ export function drawBars(characters) {
     characters.heroAnchor(v);
     worldToScreen(v.x, v.y, v.z, s);
     drawBar(s.x, s.y, p.hp / p.maxHp, PALETTE.green, PALETTE.gold);
-    outlinedText("YOU", s.x, s.y - 6, PALETTE.amber, 9);
+    outlinedText(t("overlay.you"), s.x, s.y - 6, PALETTE.amber, 9);
   }
 }
 
@@ -166,7 +171,8 @@ export function drawScreenEffects(zAt) {
     worldToScreen(logicToWorldX(ef.x), logicToWorldY(ly), zAt(ef.x), s);
     ctx.globalAlpha = a;
     const size = ef.type === "number" ? 12 + (ef.size || 0) : 11;
-    outlinedText(ef.text, s.x, s.y, ef.color || "#e8c96a", size);
+    const font = ef.type === "number" ? NUM_FONT : FONT;
+    outlinedText(ef.text, s.x, s.y, ef.color || "#e8c96a", size, font === FONT, font);
     ctx.globalAlpha = 1;
   }
 }

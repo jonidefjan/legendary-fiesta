@@ -42,12 +42,12 @@ test("onda de chefe tem um chefe e 2 a 4 escoltas", () => {
 });
 
 test("o sorteio usa random() e os dois chefes aparecem", () => {
-  const names = new Set();
+  const kinds = new Set();
   for (const r of [0.1, 0.9]) {
     setRandom(() => r);
-    names.add(createBossWave(10, arena).find((e) => e.isBoss).name);
+    kinds.add(createBossWave(10, arena).find((e) => e.isBoss).kind);
   }
-  assert.deepEqual([...names].sort(), ["Lich", "Senhor Demônio"]);
+  assert.deepEqual([...kinds].sort(), ["demon", "lich"]);
 });
 
 test("chefe é grande, forte e cresce com a onda", () => {
@@ -122,7 +122,7 @@ test("Nova de Fogo: o Parry reflete no próprio chefe e o bloqueio evita a queim
   assert.equal(state.player.hp, state.player.maxHp, "ataque bloqueado");
   assert.ok(demonWave.hp < hpBefore, "reflexo acerta o chefe");
   assert.equal(state.player.dots.length, 0, "sem queimadura no bloqueio");
-  assert.equal(demonWave.name, "Senhor Demônio");
+  assert.equal(demonWave.kind, "demon");
 });
 
 test("chefe congelado não conjura nem avança a recarga das habilidades", () => {
@@ -156,7 +156,7 @@ test("chefe, escolta e invocados nascem dentro da tela (maxX)", () => {
   setRandom(() => 0.999);
   const maxX = 600;
   const enemies = createBossWave(10, { ...arena, maxX });
-  for (const en of enemies) assert.ok(en.x <= maxX, `${en.name}: x ${en.x} > ${maxX}`);
+  for (const en of enemies) assert.ok(en.x <= maxX, `${en.kind}: x ${en.x} > ${maxX}`);
   const boss = enemies.find((e) => e.isBoss);
   assert.equal(boss.arena.maxX, maxX);
 });

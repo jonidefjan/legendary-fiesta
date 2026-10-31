@@ -5,13 +5,23 @@
 // (gatilho + tipo + parâmetros); combat.js tem uma função para cada tipo.
 import { state, PLAYER_BASE } from "./state.js";
 import { random } from "./random.js";
+import { t, hasKey } from "./i18n.js";
+
+// O rótulo vem do idioma atual (getter), então quem lê RARITIES[r].label sempre
+// pega o texto certo, mesmo depois de trocar de idioma no meio da run
+const rarity = (id, color) => ({
+  get label() {
+    return t(`rarity.${id}`);
+  },
+  color,
+});
 
 export const RARITIES = {
-  common: { label: "Comum", color: "#888888" },
-  uncommon: { label: "Incomum", color: "#4caa6a" },
-  rare: { label: "Raro", color: "#4488cc" },
-  epic: { label: "Épico", color: "#8844cc" },
-  legendary: { label: "Lendário", color: "#c9a84c" },
+  common: rarity("common", "#888888"),
+  uncommon: rarity("uncommon", "#4caa6a"),
+  rare: rarity("rare", "#4488cc"),
+  epic: rarity("epic", "#8844cc"),
+  legendary: rarity("legendary", "#c9a84c"),
 };
 
 // Pesos de raridade no sorteio (maior = mais comum)
@@ -27,6 +37,18 @@ let catalog = [];
 
 export function setItems(list) {
   catalog = list;
+  localizeItems();
+}
+
+// Escreve nome, descrição, efeito e encantamento do idioma atual em cada item do
+// catálogo. state.items guarda os mesmos objetos, então o inventário troca junto.
+export function localizeItems() {
+  for (const item of catalog) {
+    item.name = t(`items.${item.id}.name`);
+    item.desc = t(`items.${item.id}.desc`);
+    item.effect = t(`items.${item.id}.effect`);
+    item.enchant = hasKey(`items.${item.id}.enchant`) ? t(`items.${item.id}.enchant`) : null;
+  }
 }
 
 export function getItems() {
@@ -238,10 +260,5 @@ export function getWeightedRarity(weights) {
 }
 
 export function getTypeLabel(type) {
-  const labels = {
-    weapon: "Arma",
-    armor: "Armadura",
-    relic: "Relíquia",
-  };
-  return labels[type] || type;
+  return hasKey(`type.${type}`) ? t(`type.${type}`) : type;
 }

@@ -26,6 +26,7 @@ import { WORLD } from "./world.js";
 import { PALETTE } from "../palette.js";
 import * as fx from "./effects2d.js";
 import * as overlay from "./overlay.js";
+import { t } from "../i18n.js";
 
 let display = null;
 let pipeline = null;
@@ -194,8 +195,8 @@ export function drawRunningFrame(dt = 16) {
   if (state.waveTransition) {
     overlay.drawScreenMessage(
       0.3,
-      `ONDA ${state.wave} CONCLUÍDA`,
-      "Preparando próxima onda...",
+      t("screen.waveClear", { wave: state.wave }),
+      t("screen.nextWave"),
       22,
       14,
       { title: 15, subtitle: 15 },
@@ -205,7 +206,7 @@ export function drawRunningFrame(dt = 16) {
 
 export function drawPausedFrame() {
   renderFrame(0, { tickEffects: true, showFx: true, tickHurt: true, allowSpawn: false });
-  overlay.drawScreenMessage(0.5, "⏸️ PAUSADO", "Pressione Play para continuar", 36, 16, {
+  overlay.drawScreenMessage(0.5, t("screen.paused"), t("screen.resume"), 36, 16, {
     title: 0,
     subtitle: 40,
   });
@@ -218,7 +219,7 @@ export function drawDefeatFrame() {
   const dt = defeatLast && now - defeatLast < 100 ? now - defeatLast : 16;
   defeatLast = now;
   renderFrame(dt, { tickEffects: false, showFx: false, tickHurt: false, allowSpawn: false });
-  overlay.drawScreenMessage(0.6, "DERROTADO", `Onda ${state.wave} · Score: ${state.score}`, 32, 16, {
+  overlay.drawScreenMessage(0.6, t("screen.defeat"), t("screen.defeatSub", { wave: state.wave, score: state.score }), 32, 16, {
     title: 20,
     subtitle: 20,
   });

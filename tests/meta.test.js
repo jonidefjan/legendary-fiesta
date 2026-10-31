@@ -2,6 +2,9 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { state, resetMeta, createPlayer } from "../game/src/state.js";
 import * as meta from "../game/src/meta.js";
+import { setLangQuiet } from "../game/src/i18n.js";
+
+setLangQuiet("pt-BR"); // describeLevel devolve texto: o teste confere o português
 
 beforeEach(() => resetMeta());
 

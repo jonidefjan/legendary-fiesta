@@ -5,18 +5,23 @@
 // A persistência (save.saveMeta) fica por conta de quem chama buyUpgrade.
 import { state, PLAYER_BASE } from "./state.js";
 import { applyMaxHp } from "./items.js";
+import { t, formatNumber } from "./i18n.js";
 
 export const BASE_COST = 20;
 export const COST_GROWTH = 1.25;
 export const MAX_COOLDOWN_BONUS = 0.5;
 
-// [{ id, icon, name, desc, perLevel: { maxHp?, damageBonus?, armor?, cooldownBonus? } }]
+// [{ id, icon, perLevel: { maxHp?, damageBonus?, armor?, cooldownBonus? } }]
+// Nome e descrição ficam nos locales (upgrades.<id>.name|desc); use upgradeName/upgradeDesc
 export const UPGRADES = [
-  { id: "vitality", icon: "❤️", name: "Vitalidade", desc: "+10 de vida máxima por nível", perLevel: { maxHp: 10 } },
-  { id: "might", icon: "⚔️", name: "Força", desc: "+5% de dano por nível", perLevel: { damageBonus: 0.05 } },
-  { id: "guard", icon: "🛡️", name: "Guarda", desc: "+2 de armadura por nível", perLevel: { armor: 2 } },
-  { id: "haste", icon: "⏱️", name: "Celeridade", desc: "Recargas 3% mais rápidas por nível", perLevel: { cooldownBonus: 0.03 }, maxLevel: 16 },
+  { id: "vitality", icon: "❤️", perLevel: { maxHp: 10 } },
+  { id: "might", icon: "⚔️", perLevel: { damageBonus: 0.05 } },
+  { id: "guard", icon: "🛡️", perLevel: { armor: 2 } },
+  { id: "haste", icon: "⏱️", perLevel: { cooldownBonus: 0.03 }, maxLevel: 16 },
 ];
+
+export const upgradeName = (id) => t(`upgrades.${id}.name`);
+export const upgradeDesc = (id) => t(`upgrades.${id}.desc`);
 
 function find(id) {
   return UPGRADES.find((u) => u.id === id);
@@ -60,18 +65,18 @@ export function applyUpgrades(player = state.player) {
   player.cooldownBonus = Math.min(MAX_COOLDOWN_BONUS, total("cooldownBonus"));
 }
 
-// Texto do efeito de `level` níveis do upgrade, ex.: "+30 vida"
+// Texto do efeito de `level` níveis do upgrade, ex.: "+30 vida" (no idioma atual)
 export function describeLevel(id, level = upgradeLevel(id)) {
   const u = find(id);
   if (!u) return "";
   const p = u.perLevel;
-  const pct = (v) => `${Math.round(v * 100)}%`;
-  if (p.maxHp) return `+${p.maxHp * level} vida`;
-  if (p.damageBonus) return `+${pct(p.damageBonus * level)} dano`;
-  if (p.armor) return `+${p.armor * level} armadura`;
+  const pct = (v) => formatNumber(Math.round(v * 100));
+  if (p.maxHp) return t("upgrades.effect.maxHp", { n: p.maxHp * level });
+  if (p.damageBonus) return t("upgrades.effect.damage", { n: pct(p.damageBonus * level) });
+  if (p.armor) return t("upgrades.effect.armor", { n: p.armor * level });
   if (p.cooldownBonus) {
     const v = Math.min(MAX_COOLDOWN_BONUS, p.cooldownBonus * level);
-    return `-${pct(v)} recarga`;
+    return t("upgrades.effect.cooldown", { n: pct(v) });
   }
   return "";
 }

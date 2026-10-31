@@ -11,6 +11,7 @@
 //   three/renderer.js  desenho 3D em pixel art  ui.js  DOM: inventário, HUD, modais
 //   ui-title.js tela inicial e loja          ui-victory.js tela de vitória
 //   audio.js   sons (Web Audio)              fx.js      efeitos visuais (dados)
+//   i18n.js    idioma (en/pt-BR) e t()       ../locales textos de cada idioma
 //
 // Fluxo da run: tela inicial → escolha de 1 arma entre 3 → ondas (recompensa a
 // cada onda) → chefe na onda 10 → vitória (continuar no infinito ou encerrar).
@@ -19,8 +20,10 @@
 import { state, resetRun } from "./state.js";
 import { on } from "./events.js";
 import { sfx } from "./audio.js";
+import { t, initLang } from "./i18n.js";
 import {
   setItems,
+  localizeItems,
   applyPassives,
   ensureTimers,
   starterItems,
@@ -65,6 +68,14 @@ let autoResume = false;
 
 // ─── Ligações: a lógica emite, a interface e o áudio reagem ───
 on("log", ({ msg, type }) => ui.addLog(msg, type));
+// Troca de idioma (a página estática já foi traduzida por i18n.js): primeiro o
+// catálogo de itens, que state.items referencia, depois tudo que o JS desenha
+on("langChange", () => {
+  localizeItems();
+  ui.refreshLanguage();
+  title.refreshTitle();
+  victory.refreshVictory();
+});
 on("sfx", ({ name, detail }) => sfx[name]?.(detail));
 on("itemUsed", (id) => ui.flashItem(id));
 // Partículas: os eventos chegam com a posição no chão; o corpo fica ~25 px acima
@@ -196,10 +207,7 @@ function spawnWave(waveNum) {
   state.enemies = boss.isBossWave(waveNum)
     ? boss.createBossWave(waveNum, arena)
     : createWave(waveNum, arena);
-  ui.addLog(
-    `🌊 Onda ${waveNum} iniciada! ${state.enemies.length} inimigos aparecem.`,
-    "kill",
-  );
+  ui.addLog(t("log.waveStart", { wave: waveNum, count: state.enemies.length }), "kill");
 }
 
 function checkWaveComplete() {
@@ -216,16 +224,13 @@ function checkWaveComplete() {
     // Primeira vitória da run (onda 10): tela de vitória; no infinito segue normal
     if (!state.victoryShown) {
       state.victoryShown = true;
-      ui.addLog(`👑 Chefe derrotado na onda ${state.wave}!`, "kill");
+      ui.addLog(t("log.bossDefeated", { wave: state.wave }), "kill");
       later(1500, offerVictory);
       return;
     }
   }
 
-  ui.addLog(
-    `✨ Onda ${state.wave} concluída! 🎁 Escolha sua recompensa!`,
-    "kill",
-  );
+  ui.addLog(t("log.waveClear", { wave: state.wave }), "kill");
   later(1500, offerReward);
 }
 
@@ -256,7 +261,7 @@ function offerReward() {
   const options = generateRandomItems(REWARD_OPTIONS);
 
   if (options.length === 0) {
-    ui.addLog("✨ Todos os itens já estão no nível máximo!", "item");
+    ui.addLog(t("log.allMaxed"), "item");
     startNextWave();
     resumeGame();
     return;
@@ -269,9 +274,7 @@ function pickReward(item) {
   const { leveled, level } = addItemOrLevel(item);
   rebuildInventory();
   ui.addLog(
-    leveled
-      ? `⬆️ ${item.icon} ${item.name} subiu para o nível ${level}!`
-      : `✨ ${item.icon} ${item.name} adicionado ao inventário!`,
+    t(leveled ? "log.itemLevelUp" : "log.itemAdded", { icon: item.icon, item: item.name, level }),
     "item",
   );
 
@@ -298,7 +301,7 @@ function confirmStartingPick(items) {
   state.itemTimers = {};
   items.forEach(addItemOrLevel);
   rebuildInventory();
-  ui.addLog(`🎮 Run iniciada com ${items.map((i) => i.name).join(", ")}!`, "item");
+  ui.addLog(t("log.runStarted", { items: items.map((i) => i.name).join(", ") }), "item");
   spawnWave(1);
   save.saveRun();
   autoResume = true;
@@ -319,12 +322,12 @@ function offerVictory() {
       totalDamage: state.runStats.totalDamage,
       durationMs: performance.now() - (state.runStats.startTime || 0),
       fragments: state.fragments,
-      bossName: state.enemies.find((e) => e.isBoss)?.name || "",
+      bossKind: state.enemies.find((e) => e.isBoss)?.kind || "",
     },
     onContinue: () => {
       victory.hideVictory();
       state.endless = true;
-      ui.addLog("♾️ Modo infinito: as ondas continuam, com chefe a cada 10.", "kill");
+      ui.addLog(t("log.endless"), "kill");
       offerReward();
     },
     onEnd: endRun,
@@ -375,10 +378,7 @@ function prepareRun() {
 function startNewRun() {
   prepareRun();
   save.clearRun();
-  ui.addLog(
-    `⚡ ${state.fragments} fragmentos guardados para melhorias.`,
-    "item",
-  );
+  ui.addLog(t("log.fragmentsSaved", { n: state.fragments }), "item");
   ui.renderInventory();
   ui.updateHUD();
   ui.setPausedControls(true);
@@ -394,7 +394,7 @@ function continueRun() {
   // A vida salva vale; os bônus vêm das melhorias atuais
   meta.applyUpgrades(state.player);
   state.player.hp = Math.min(state.player.hp, state.player.maxHp);
-  ui.addLog(`🏰 Bem-vindo de volta! Continuando da onda ${state.wave}.`, "item");
+  ui.addLog(t("log.welcomeBack", { wave: state.wave }), "item");
   rebuildInventory();
   spawnWave(state.wave);
   ui.updateHUD();
@@ -409,7 +409,7 @@ function pauseGame() {
   autoResume = false;
   state.isPaused = true;
   ui.setPausedControls(true);
-  ui.addLog("⏸️ Jogo pausado.", "item");
+  ui.addLog(t("log.paused"), "item");
 }
 
 function resumeGame() {
@@ -417,19 +417,15 @@ function resumeGame() {
   state.isPaused = false;
   state.lastTime = performance.now(); // Reset timer para evitar salto no dt
   ui.setPausedControls(false);
-  ui.addLog("▶️ Jogo retomado.", "item");
+  ui.addLog(t("log.resumed"), "item");
 }
 
 function resetProgress() {
-  if (
-    !confirm(
-      "⚠️ Tem certeza que deseja resetar todo o progresso? Esta ação não pode ser desfeita!",
-    )
-  ) {
+  if (!confirm(t("controls.resetConfirm"))) {
     return;
   }
   save.resetAll();
-  ui.addLog("🔄 Progresso resetado! Recarregando...", "item");
+  ui.addLog(t("log.reset"), "item");
   setTimeout(() => location.reload(), 1000);
 }
 
@@ -543,7 +539,8 @@ function init() {
   ui.setPausedControls(true);
 
   save.loadMeta();
-  ui.addLog("🏰 Bem-vindo ao Reliquary!", "item");
+  ui.updateHUD(); // tira o texto estático em inglês da barra de onda (e mostra o recorde salvo)
+  ui.addLog(t("log.welcome"), "item");
   showTitleScreen();
 
   state.lastTime = performance.now();
@@ -563,8 +560,10 @@ async function loadItems() {
     init();
   } catch (error) {
     console.error("❌ Erro ao carregar itens:", error);
-    ui.addLog("❌ Erro ao carregar itens do jogo.", "item");
+    ui.addLog(t("log.loadError"), "item");
   }
 }
 
+// O idioma precisa estar definido antes de setItems (que traduz o catálogo)
+initLang();
 loadItems();

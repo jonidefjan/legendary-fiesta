@@ -10,6 +10,7 @@ import {
   itemLevel,
   effectiveCooldown,
 } from "./items.js";
+import { t, getLang, formatNumber } from "./i18n.js";
 
 export const isMobile =
   "ontouchstart" in window || navigator.maxTouchPoints > 0;
@@ -74,11 +75,11 @@ function showTooltip(item, e) {
   tooltip.innerHTML = `
     <div class="tt-name" style="color:${r.color}">${item.icon} ${item.name}</div>
     <div class="tt-rarity" style="color:${r.color}">${r.label}</div>
-    <div class="tt-level">Nível ${level}/${maxLevelOf(item)}</div>
+    <div class="tt-level">${t("item.level", { level, max: maxLevelOf(item) })}</div>
     <div class="tt-desc">${item.desc}</div>
     <div class="tt-effect">${item.effect}</div>
     ${item.enchant ? `<div class="tt-enchant">${item.enchant}</div>` : ""}
-    ${cooldown > 0 ? `<div class="tt-cd">⏱ Recarga: ${(cooldown / 1000).toFixed(1)}s</div>` : ""}
+    ${cooldown > 0 ? `<div class="tt-cd">${t("item.cooldown", { seconds: formatNumber(cooldown / 1000, 1) })}</div>` : ""}
   `;
 
   if (isMobile) {
@@ -142,10 +143,10 @@ export function updateHUD() {
   $("hdr-fragments").textContent = state.fragments;
 
   // Wave info bar
-  $("inv-wave").textContent = `Onda ${state.wave}`;
+  $("inv-wave").textContent = t("hud.wave", { n: state.wave });
   const alive = state.enemies.filter((e) => !e.dead).length;
-  $("inv-enemies").textContent = `${alive} inimigo${alive !== 1 ? "s" : ""}`;
-  $("inv-best").textContent = `🏆 Recorde: onda ${state.meta.best.wave}`;
+  $("inv-enemies").textContent = t("hud.enemies", { count: alive });
+  $("inv-best").textContent = t("hud.best", { wave: state.meta.best.wave });
 
   // Item cooldown bars
   state.items.forEach((item) => {
@@ -162,7 +163,7 @@ export function updateHUD() {
       slot.classList.remove("active");
       if (bar) bar.style.width = pct * 100 + "%";
       if (cdText) {
-        const remaining = ((timer.cooldown - timer.elapsed) / 1000).toFixed(1);
+        const remaining = formatNumber((timer.cooldown - timer.elapsed) / 1000, 1);
         cdText.textContent = remaining + "s";
       }
     } else {
@@ -180,7 +181,7 @@ export function addLog(msg, type = "") {
   const panel = $("log-panel");
   const entry = document.createElement("div");
   entry.className = "log-entry " + type;
-  const ts = new Date().toLocaleTimeString("pt-BR", {
+  const ts = new Date().toLocaleTimeString(getLang(), {
     hour12: false,
     hour: "2-digit",
     minute: "2-digit",
@@ -211,8 +212,8 @@ function itemCard(item, onClick) {
   const owned = state.items.some((i) => i.id === item.id);
   const level = itemLevel(item.id);
   const tag = owned
-    ? `<div class="item-choice-tag upgrade">⬆️ Nível ${level} → ${level + 1}</div>`
-    : `<div class="item-choice-tag new">Novo</div>`;
+    ? `<div class="item-choice-tag upgrade">${t("card.upgrade", { from: level, to: level + 1 })}</div>`
+    : `<div class="item-choice-tag new">${t("card.new")}</div>`;
   if (owned) card.classList.add("upgrade");
   card.innerHTML = `
     ${tag}
@@ -228,7 +229,11 @@ function itemCard(item, onClick) {
   return card;
 }
 
+// Quem redesenha o modal de escolha aberto quando o idioma muda (null = nenhum aberto)
+let refreshModal = null;
+
 export function hideItemModal() {
+  refreshModal = null;
   $("item-choice-modal").style.display = "none";
 }
 
@@ -240,28 +245,30 @@ export function showInitialPick(options, maxSelections, onConfirm) {
   const single = maxSelections === 1;
   const selected = [];
 
-  modal.querySelector(".modal-header").innerHTML = single
-    ? `
-    <h2>⚔️ Escolha sua arma</h2>
-    <p class="modal-subtitle">Ela define seu estilo de luta nesta run</p>
+  // Desenha tudo de novo: na troca de idioma a seleção feita é mantida
+  const build = () => {
+    modal.querySelector(".modal-header").innerHTML = single
+      ? `
+    <h2>${t("pick.single.title")}</h2>
+    <p class="modal-subtitle">${t("pick.single.sub")}</p>
   `
-    : `
-    <h2>⚔️ Escolha Seus Itens Iniciais</h2>
-    <p class="modal-subtitle">Selecione até ${maxSelections} itens para começar sua jornada</p>
+      : `
+    <h2>${t("pick.multi.title")}</h2>
+    <p class="modal-subtitle">${t("pick.multi.sub", { max: maxSelections })}</p>
     <div class="selection-counter">
-      <span id="selection-count">0</span> / ${maxSelections} selecionados
+      <span id="selection-count">${selected.length}</span> ${t("pick.multi.counter", { max: maxSelections })}
     </div>
   `;
-  container.innerHTML = "";
+    container.innerHTML = "";
 
-  const confirmBtn = document.createElement("div");
-  confirmBtn.className = "confirm-selection-btn";
-  confirmBtn.id = "confirm-selection-btn";
-  confirmBtn.innerHTML = single ? "Começar" : "Iniciar Jogo";
+    const confirmBtn = document.createElement("div");
+    confirmBtn.className = "confirm-selection-btn";
+    confirmBtn.id = "confirm-selection-btn";
+    confirmBtn.innerHTML = single ? t("pick.start") : t("pick.startMulti");
+    confirmBtn.classList.toggle("active", selected.length > 0);
 
-  options.forEach((item) => {
-    container.appendChild(
-      itemCard(item, (card) => {
+    options.forEach((item) => {
+      const card = itemCard(item, (card) => {
         const index = selected.findIndex((i) => i.id === item.id);
         if (single) {
           // Seleção única: troca a escolha anterior
@@ -278,34 +285,30 @@ export function showInitialPick(options, maxSelections, onConfirm) {
           selected.push(item);
           card.classList.add("selected");
         } else {
-          addLog(
-            `⚠️ Você já selecionou o máximo de ${maxSelections} itens!`,
-            "item",
-          );
+          addLog(t("pick.warnMax", { max: maxSelections }), "item");
           return;
         }
         const counter = $("selection-count");
         if (counter) counter.textContent = selected.length;
         confirmBtn.classList.toggle("active", selected.length > 0);
-      }),
-    );
-  });
+      });
+      if (selected.some((i) => i.id === item.id)) card.classList.add("selected");
+      container.appendChild(card);
+    });
 
-  confirmBtn.onclick = () => {
-    if (selected.length === 0) {
-      addLog(
-        single
-          ? "⚠️ Escolha uma arma para continuar!"
-          : "⚠️ Selecione pelo menos 1 item para continuar!",
-        "item",
-      );
-      return;
-    }
-    hideItemModal();
-    onConfirm([...selected]);
+    confirmBtn.onclick = () => {
+      if (selected.length === 0) {
+        addLog(t(single ? "pick.warnWeapon" : "pick.warnAny"), "item");
+        return;
+      }
+      hideItemModal();
+      onConfirm([...selected]);
+    };
+    container.appendChild(confirmBtn);
   };
-  container.appendChild(confirmBtn);
 
+  build();
+  refreshModal = build;
   modal.style.display = "flex";
 }
 
@@ -314,27 +317,33 @@ export function showRewardPick(options, wave, onPick) {
   const modal = $("item-choice-modal");
   const container = $("item-choices-container");
 
-  // Reescreve o cabeçalho inteiro: a escolha inicial deixa um contador de seleção nele
-  modal.querySelector(".modal-header").innerHTML = `
-    <h2>🎁 Recompensa da Onda!</h2>
-    <p class="modal-subtitle">Escolha 1 de ${options.length} opções · Onda ${wave} concluída</p>
+  const build = () => {
+    // Reescreve o cabeçalho inteiro: a escolha inicial deixa um contador de seleção nele
+    modal.querySelector(".modal-header").innerHTML = `
+    <h2>${t("reward.title")}</h2>
+    <p class="modal-subtitle">${t("reward.sub", { count: options.length, wave })}</p>
   `;
-  container.innerHTML = "";
-  options.forEach((item) => {
-    container.appendChild(
-      itemCard(item, () => {
-        hideItemModal();
-        onPick(item);
-      }),
-    );
-  });
+    container.innerHTML = "";
+    options.forEach((item) => {
+      container.appendChild(
+        itemCard(item, () => {
+          hideItemModal();
+          onPick(item);
+        }),
+      );
+    });
+  };
 
+  build();
+  refreshModal = build;
   modal.style.display = "flex";
 }
 
 // ═══════════════════════════════════════════
 //  GAME OVER SCREEN
 // ═══════════════════════════════════════════
+let gameOver = null; // dados da run congelados ao morrer; null = tela fechada
+
 export function showGameOver() {
   // Duração da run
   const elapsed = performance.now() - (state.runStats.startTime || 0);
@@ -342,29 +351,46 @@ export function showGameOver() {
   const secs = Math.floor((elapsed % 60000) / 1000);
   const duration = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 
-  // Item mais usado
+  // Item mais usado (guarda o id: o nome é buscado de novo se o idioma mudar)
   const uses = Object.entries(state.runStats.itemUses);
-  let favoriteItem = "—";
+  let favorite = null;
   if (uses.length > 0) {
     const [topId, topCount] = uses.reduce((a, b) => (b[1] > a[1] ? b : a));
-    const item = findItem(topId);
-    if (item) favoriteItem = `${item.icon} ${item.name} (${topCount}×)`;
+    if (findItem(topId)) favorite = { id: topId, count: topCount };
   }
 
-  $("go-subtitle").textContent = `Você caiu na onda ${state.wave}.`;
+  gameOver = {
+    wave: state.wave,
+    kills: state.kills,
+    score: state.score,
+    damage: state.runStats.totalDamage,
+    fragments: state.fragments,
+    duration,
+    favorite,
+  };
+  renderGameOver();
+  $("game-over-modal").style.display = "flex";
+}
+
+function renderGameOver() {
+  const g = gameOver;
+  if (!g) return;
+  let favoriteItem = "—";
+  if (g.favorite) {
+    const item = findItem(g.favorite.id);
+    if (item) favoriteItem = `${item.icon} ${item.name} (${g.favorite.count}×)`;
+  }
+
+  $("go-subtitle").textContent = t("gameover.sub", { wave: g.wave });
 
   const stats = [
-    { label: "🌊 Onda alcançada", value: state.wave },
-    { label: "💀 Inimigos mortos", value: state.kills },
-    { label: "🏆 Pontuação", value: state.score },
-    { label: "⚔ Dano total causado", value: state.runStats.totalDamage },
-    { label: "⏱ Duração da run", value: duration },
-    { label: "⭐ Item favorito", value: favoriteItem, wide: true },
-    {
-      label: "⚡ Fragmentos (mantidos)",
-      value: state.fragments,
-      wide: true,
-    },
+    { label: t("gameover.wave"), value: g.wave },
+    { label: t("gameover.kills"), value: g.kills },
+    { label: t("gameover.score"), value: g.score },
+    { label: t("gameover.damage"), value: g.damage },
+    { label: t("gameover.duration"), value: g.duration },
+    { label: t("gameover.favorite"), value: favoriteItem, wide: true },
+    { label: t("gameover.fragments"), value: g.fragments, wide: true },
   ];
 
   $("go-stats").innerHTML = stats
@@ -376,11 +402,10 @@ export function showGameOver() {
       </div>`,
     )
     .join("");
-
-  $("game-over-modal").style.display = "flex";
 }
 
 export function hideGameOver() {
+  gameOver = null;
   $("game-over-modal").style.display = "none";
 }
 
@@ -410,6 +435,16 @@ export function setupControls({
   });
   $("btn-shake").addEventListener("click", () => setShakeButton(onShake()));
   setupInventoryToggle();
+}
+
+// Troca de idioma no meio da run: redesenha o que está na tela e é montado por JS.
+// O catálogo de itens já foi traduzido (localizeItems) antes desta chamada.
+export function refreshLanguage() {
+  hideTooltip(); // o texto antigo ficaria na tela até o mouse sair do item
+  renderInventory();
+  updateHUD();
+  if (refreshModal) refreshModal();
+  if (gameOver) renderGameOver();
 }
 
 // Barra de itens recolhível. A escolha do jogador fica salva; sem escolha,

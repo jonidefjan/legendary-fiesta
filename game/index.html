@@ -1,16 +1,19 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Reliquary – Auto Battler</title>
     <meta
       name="description"
-      content="Reliquary, um auto-battler roguelite jogável no navegador: combate em ondas e recompensas de armas, armaduras e relíquias. Por Jonatas Mattos."
+      content="Reliquary, a roguelite auto-battler playable in the browser: wave combat and rewards of weapons, armor and relics. By Jonatas Mattos."
     />
-    <link rel="canonical" href="https://jm77os.com.br/game/" />
+    <link id="canonical" rel="canonical" href="https://jm77os.com.br/game/" />
+    <link rel="alternate" hreflang="en" href="https://jm77os.com.br/game/" />
+    <link rel="alternate" hreflang="pt-BR" href="https://jm77os.com.br/game/?lang=pt-BR" />
+    <link rel="alternate" hreflang="x-default" href="https://jm77os.com.br/game/" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Tiny5&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./style.css" />
@@ -32,23 +35,42 @@
       <div id="header">
         <div>
           <h1>⚔ RELIQUARY</h1>
-          <div class="subtitle">Auto-Battle Relic Collector</div>
+          <div class="subtitle" data-i18n="header.subtitle">
+            Auto-Battle Relic Collector
+          </div>
+        </div>
+        <!-- Botões EN/PT: o clique é tratado por src/i18n.js (data-lang) -->
+        <div
+          class="lang-toggle"
+          role="group"
+          aria-label="Language"
+          data-i18n-attr="aria-label:lang.label"
+        >
+          <button type="button" class="lang-btn" data-lang="en" lang="en" aria-pressed="true">
+            EN
+          </button>
+          <button type="button" class="lang-btn" data-lang="pt-BR" lang="pt-BR" aria-pressed="false">
+            PT
+          </button>
         </div>
         <div id="stats-header">
           <div class="stat-pill">
-            🌊 Wave <span class="val" id="hdr-wave">1</span>
+            <span data-i18n="header.wave">🌊 Wave</span>
+            <span class="val" id="hdr-wave">1</span>
           </div>
           <div class="stat-pill">
-            💀 Kills <span class="val" id="hdr-kills">0</span>
+            <span data-i18n="header.kills">💀 Kills</span>
+            <span class="val" id="hdr-kills">0</span>
           </div>
           <div class="stat-pill">
-            🏆 Score <span class="val" id="hdr-score">0</span>
+            <span data-i18n="header.score">🏆 Score</span>
+            <span class="val" id="hdr-score">0</span>
           </div>
           <div
             class="stat-pill"
             style="background: var(--bg4); border-color: var(--purple)"
           >
-            <span>⚡ Fragmentos</span>
+            <span data-i18n="header.fragments">⚡ Fragments</span>
             <span class="val" id="hdr-fragments" style="color: var(--purple2)"
               >0</span
             >
@@ -58,7 +80,11 @@
 
       <!-- Barra do inventário no alto: a arena fica com a largura toda e os
            inimigos que entram pela direita não ficam escondidos -->
-      <div id="inventory" aria-label="Player inventory">
+      <div
+        id="inventory"
+        aria-label="Player inventory"
+        data-i18n-attr="aria-label:inv.aria"
+      >
         <div class="inv-bar">
           <div class="bars-container">
             <div class="bar-row">
@@ -77,33 +103,35 @@
             </div>
           </div>
           <div class="wave-info">
-            <div class="wave-num" id="inv-wave">Onda 1</div>
-            <div class="enemy-count" id="inv-enemies">3 inimigos</div>
-            <div class="gold-display" id="inv-best">🏆 Recorde: onda 0</div>
+            <div class="wave-num" id="inv-wave">Wave 1</div>
+            <div class="enemy-count" id="inv-enemies">3 enemies</div>
+            <div class="gold-display" id="inv-best">🏆 Best: wave 0</div>
           </div>
           <button
             id="btn-inv-toggle"
             class="inv-toggle"
             aria-expanded="true"
             aria-controls="inv-items"
-            title="Mostrar/ocultar itens"
+            title="Show/hide items"
+            data-i18n-attr="title:inv.toggle"
           >
             <span class="inv-toggle-arrow" aria-hidden="true">▾</span>
-            Itens <span class="inv-toggle-count" id="inv-count">0</span>
+            <span data-i18n="inv.items">Items</span>
+            <span class="inv-toggle-count" id="inv-count">0</span>
           </button>
         </div>
 
         <div class="inv-items" id="inv-items">
           <div class="inv-section">
-            <div class="inv-section-title">Armas</div>
+            <div class="inv-section-title" data-i18n="inv.weapons">Weapons</div>
             <div class="slots-grid" id="slots-weapon"></div>
           </div>
           <div class="inv-section">
-            <div class="inv-section-title">Armaduras</div>
+            <div class="inv-section-title" data-i18n="inv.armors">Armor</div>
             <div class="slots-grid" id="slots-armor"></div>
           </div>
           <div class="inv-section">
-            <div class="inv-section-title">Relíquias</div>
+            <div class="inv-section-title" data-i18n="inv.relics">Relics</div>
             <div class="slots-grid" id="slots-relic"></div>
           </div>
         </div>
@@ -113,36 +141,65 @@
         <canvas id="combat-canvas"></canvas>
         <canvas id="overlay-canvas" aria-hidden="true"></canvas>
         <div id="game-controls">
-          <button id="btn-play" class="control-btn" title="Iniciar/Retomar">
+          <button
+            id="btn-play"
+            class="control-btn"
+            title="Start/Resume"
+            data-i18n-attr="title:controls.play"
+            data-i18n="controls.playLabel"
+          >
             ▶️ Play
           </button>
-          <button id="btn-pause" class="control-btn" title="Pausar">
+          <button
+            id="btn-pause"
+            class="control-btn"
+            title="Pause"
+            data-i18n-attr="title:controls.pause"
+            data-i18n="controls.pauseLabel"
+          >
             ⏸️ Pause
           </button>
-          <button id="btn-speed" class="control-btn" title="Velocidade do jogo">
+          <button
+            id="btn-speed"
+            class="control-btn"
+            title="Game speed"
+            data-i18n-attr="title:controls.speed"
+          >
             ⏩ 1×
           </button>
           <button
             id="btn-mute"
             class="control-btn"
-            title="Som ligado/desligado"
+            title="Sound on/off"
+            data-i18n-attr="title:controls.mute"
           >
             🔊
           </button>
-          <button id="btn-shake" class="control-btn" title="Tremida de tela">
+          <button
+            id="btn-shake"
+            class="control-btn"
+            title="Screen shake"
+            data-i18n-attr="title:controls.shake"
+          >
             📳
           </button>
           <button
             id="btn-reset"
             class="control-btn reset-btn"
-            title="Resetar Progresso"
+            title="Reset progress"
+            data-i18n-attr="title:controls.reset"
+            data-i18n="controls.resetLabel"
           >
             🔄 Reset
           </button>
         </div>
       </div>
 
-      <div id="log-panel" aria-label="Combat log"></div>
+      <div
+        id="log-panel"
+        aria-label="Combat log"
+        data-i18n-attr="aria-label:log.aria"
+      ></div>
     </div>
 
     <div class="tooltip" id="tooltip"></div>
@@ -151,8 +208,8 @@
     <div id="item-choice-modal" class="modal-overlay" style="display: none">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>🎁 Recompensa da Onda</h2>
-          <p class="modal-subtitle">Escolha 1 item para equipar</p>
+          <h2>🎁 Wave Reward</h2>
+          <p class="modal-subtitle">Choose 1 item to equip</p>
         </div>
         <div class="item-choices" id="item-choices-container">
           <!-- Cards de itens serão inseridos aqui -->
@@ -164,16 +221,16 @@
     <div id="game-over-modal" class="modal-overlay" style="display: none">
       <div class="modal-content game-over-content">
         <div class="modal-header">
-          <h2>☠️ Derrotado</h2>
+          <h2 data-i18n="gameover.title">☠️ Defeated</h2>
           <p class="modal-subtitle" id="go-subtitle">
-            Sua jornada termina aqui... por enquanto.
+            Your journey ends here... for now.
           </p>
         </div>
         <div class="go-stats" id="go-stats">
           <!-- Estatísticas da run serão inseridas aqui -->
         </div>
-        <button id="btn-restart" class="go-restart-btn">
-          ⚔️ Jogar Novamente
+        <button id="btn-restart" class="go-restart-btn" data-i18n="gameover.restart">
+          ⚔️ Play Again
         </button>
       </div>
     </div>
