@@ -11,30 +11,33 @@ Repositório `jonidefjan/legendary-fiesta`:
   - Testes: `npm test` (node:test), **100 passando**.
 
 ## Estado atual
-- Fases 0 a 3 já foram mergeadas na `main` (PRs #2 a #5).
+- Fases 0 a 4 já foram mergeadas na `main` (PRs #2 a #5 e #7). A última é o commit `32fa459`.
+- A câmera está 25% mais afastada (`viewHeight` 12.5, `MIN_HALF_WIDTH` 9). Os inimigos nascem até `visibleLogicRight()` (`arena.maxX`) e nunca fora da tela (branch `feat/battle-framing`).
 - O inventário virou uma barra no topo que dá para recolher (PR #6, commit `99e2a2a`). A escolha de aberto/fechado fica salva em `localStorage` (`reliquary_inv_collapsed`), e a arena é redimensionada por um ResizeObserver.
-- **Fase 4 (itens) em andamento** na branch `feat/phase-4-items`.
-  - Spec: `phase4-spec.md`, no scratchpad da sessão.
+- **Fase 4 (itens):**
   - Decisões:
     - criar o crítico (base 5%, ×1,5);
     - reescrever os textos do que o jogo não tem;
     - Manto: esquivar dá +50% no próximo ataque;
     - Anel: o Pacto vai até +25% por run;
     - cortar o tomo e a ampulheta.
-  - Implementada e revisada (Opus, 12 correções). 140 testes passam e o jogo foi testado no navegador.
+  - Todos os itens funcionam. 140 testes passam.
   - Campos novos do jogador salvos: `pactBonus`, `counters`, `harvestReady`, `empowered`.
   - `enemy.frozen` é medido em ms. `enemyAttack` devolve o resultado do ataque: dodged, blocked, absorbed ou hit.
 
 ## Fases restantes
-- **4 – Itens:**
-  - Implementar `crystal_armor`, `shadow_cloak`, `vampiric_amulet`, `speed_boots`, `lucky_coin` e `cursed_ring`.
-  - Efeitos de arma: poison, freeze, healOnHit, lifesteal e water.
-  - Remover `ancient_tome` e `time_glass`.
-- **5 – i18n do jogo:** EN/PT. Hoje o jogo é só em português.
+- **5 – i18n do jogo (próxima):** EN/PT. Hoje o jogo é só em português, e as decisões dela devem ser perguntadas em múltipla escolha.
 - **6 – Mobile retrato:**
   - Arena alta e estreita mostra uma faixa de solo abaixo da borda frontal.
   - O texto de pausa transborda no celular.
 - **7 – Docs:** reescrever `auto-battler-doc.md` e arquivar `trello-setup.md` em `docs/`.
+- **8 – Arte dos itens** (pedida pelo usuário em 2026-10-31, fase própria): trocar os emojis por imagens em pixel art fiéis ao nome de cada item.
+  - Exemplos do usuário:
+    - Arco Gélido: arco e flecha com efeito de gelo.
+    - Colete de Couro: um colete, não um escudo.
+    - Espada Enferrujada: desgastada e alaranjada.
+  - Todo item elemental mostra o efeito ou o símbolo do seu elemento.
+  - As decisões (gerar ou desenhar, tamanho, estilo) devem ser perguntadas em múltipla escolha ao começar.
 - **Ajustes opcionais depois:**
   - God rays quase invisíveis.
   - Contraste do herói verde.

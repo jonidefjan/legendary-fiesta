@@ -50,12 +50,16 @@ export function isBossWave(wave) {
 }
 
 // Atrás da escolta, mas sempre perto da borda visível da arena
-function bossX(width, mobile) {
+// Folga extra na borda: o chefe é maior que os esqueletos comuns
+const BOSS_EDGE = 30;
+
+function bossX(width, mobile, maxX = Infinity) {
   const start = width * 0.6 * (mobile ? 1.4 : 1);
-  return Math.min(start + 3 * 90, Math.max(width - 50, start + 60));
+  const x = Math.min(start + 3 * 90, Math.max(width - 50, start + 60));
+  return Math.min(x, maxX - BOSS_EDGE);
 }
 
-function createBoss(kind, wave, { width, height, mobile = false }) {
+function createBoss(kind, wave, { width, height, mobile = false, maxX = Infinity }) {
   const base = BOSS_TYPES[kind];
   const minion = ENEMY_TYPES[0];
   const scales = waveScales(wave, mobile);
@@ -68,11 +72,11 @@ function createBoss(kind, wave, { width, height, mobile = false }) {
     speed: base.speed * speedScale,
     isBoss: true,
     wave,
-    arena: { width, height, mobile },
+    arena: { width, height, mobile, maxX },
     hp,
     maxHp: hp,
     dmg: Math.round(minion.dmg * scales.dmg * BOSS_DMG_MULT),
-    x: bossX(width, mobile),
+    x: bossX(width, mobile, maxX),
     y: height * 0.55,
     phase: random() * Math.PI * 2,
     hurtTimer: 0,
@@ -97,7 +101,8 @@ export function createBossWave(wave, arena) {
     const typeIdx = Math.floor(
       random() * Math.min(ENEMY_TYPES.length, Math.ceil(wave / 2)),
     );
-    enemies.push(createEnemy(typeIdx, wave, arena, i));
+    // A escolta divide a fila com o chefe, que fica no fim dela
+    enemies.push(createEnemy(typeIdx, wave, arena, i, escort + 1));
   }
   enemies.push(createBoss(kind, wave, arena));
   return enemies;
@@ -119,7 +124,11 @@ function summon(boss, arena) {
     const minion = createEnemy(0, boss.wave, arena, 0);
     minion.name = "Esqueleto Invocado";
     minion.summoned = true;
-    minion.x = boss.x + (i === 0 ? -50 : 50) + (random() - 0.5) * 20;
+    // Invocados também nascem dentro da tela (o chefe pode estar na borda)
+    minion.x = Math.min(
+      boss.x + (i === 0 ? -50 : 50) + (random() - 0.5) * 20,
+      arena.maxX ?? Infinity,
+    );
     minion.xp = Math.round(minion.xp / 2);
     minion.fragments = 1;
     state.enemies.push(minion);

@@ -897,16 +897,20 @@ canvas {
     min-height: 300px;
   }
 
+  /* Em linha no alto: em coluna à direita os botões cobriam os inimigos que
+     chegam pela borda direita */
   #game-controls {
     top: 6px;
+    left: 6px;
     right: 6px;
-    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 4px;
   }
 
   .control-btn {
-    padding: 6px 10px;
-    font-size: 0.75rem;
+    padding: 5px 8px;
+    font-size: 0.72rem;
     white-space: nowrap;
   }
 

@@ -38,3 +38,21 @@ test("no celular os inimigos começam mais longe, mais lentos e batem menos", ()
   assert.ok(mobile.speed < desktop.speed);
   assert.ok(mobile.dmg <= desktop.dmg);
 });
+
+test("com maxX, todos os inimigos nascem dentro da tela (ondas grandes e celular)", () => {
+  setRandom(() => 0.999);
+  for (const mobile of [false, true]) {
+    for (const wave of [1, 5, 10, 20]) {
+      const maxX = 560;
+      for (const en of createWave(wave, { ...arena, mobile, maxX })) {
+        assert.ok(en.x <= maxX, `onda ${wave}${mobile ? " (celular)" : ""}: x ${en.x} > ${maxX}`);
+      }
+    }
+  }
+});
+
+test("sem maxX, a fila mantém o espaçamento de 90 px", () => {
+  setRandom(() => 0);
+  const xs = createWave(3, arena).map((e) => e.x);
+  assert.deepEqual(xs, [480, 570, 660, 750, 840]);
+});
