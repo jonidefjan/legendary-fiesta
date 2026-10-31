@@ -8,6 +8,7 @@
 // de combate (o Z vem do personagem mais próximo).
 import { state } from "../state.js";
 import * as particles from "../particles.js";
+import { ageEffects as ageList } from "../fx.js";
 import {
   paddedSize,
   worldToLowRes,
@@ -37,13 +38,9 @@ export function resizeFxCanvas() {
   }
 }
 
-// O render 2D antigo envelhecia os efeitos 1 quadro por desenho e os removia
-export function ageEffects() {
-  for (let i = state.effects.length - 1; i >= 0; i--) {
-    const ef = state.effects[i];
-    ef.life -= 1;
-    if (ef.life <= 0) state.effects.splice(i, 1);
-  }
+// Envelhece pelo tempo real do quadro (fx.js) e remove os que acabaram
+export function ageEffects(realMs) {
+  ageList(state.effects, realMs);
 }
 
 const anchor = { x: 0, y: 0 };

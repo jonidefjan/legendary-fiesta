@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #13 (commit `21de731`).
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #14 (commit `0091970`).
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -8,10 +8,14 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Tem i18n EN (padrão) e pt-BR, com a chave `lang` no localStorage, e tema claro/escuro.
 - **Reliquary** (`game/`): auto-battler em JS puro, sem build.
   - 3D pixel art com Three.js 0.170, vendorizado em `game/vendor/three`.
-  - Testes: `npm test` na raiz (**215** passando).
+  - Testes: `npm test` na raiz (**226** passando).
 
 ## Estado
-- **Fases concluídas:** 0 a 9 (PRs #2 a #13). O plano original acabou.
+- **Fases concluídas:** 0 a 10 (PRs #2 a #14).
+- **Fase 10 (tela de fim):**
+  - Card 2×3 na derrota e na vitória.
+  - Arma favorita = a de maior dano (`runStats.damageByItem`). O dano é creditado via o parâmetro `itemId` de `applyElementalDamage`, e as DoTs guardam `sourceId`.
+  - Compartilhar fica em `share.js`: imagem 1200×630 + texto com link. Usa o menu nativo e, no desktop, copia o texto e baixa a imagem.
 - **Docs (fase 9):** `README.md`, `docs/game.md` (referência do jogo, em inglês) e `docs/items.md`, gerado por `npm run docs:items` (um teste falha se ficar desatualizado). O Trello foi para `docs/archive/`.
   - Ao mudar itens, regerar `docs/items.md`. Ao mudar mecânicas, atualizar `docs/game.md`.
 - **Fase 8 (arte dos itens):**
@@ -35,11 +39,7 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
 
 ## Próximas fases
 Plano de melhorias, pedido pelo usuário em 2026-10-31. A ordem foi escolhida por ele:
-- **10 – Tela de fim de run:**
-  - Layout de 2 colunas × 3 linhas. Os fragmentos ficam ao lado da duração da run.
-  - A arma favorita continua e ganha o dano total causado por ela (precisa contar o dano por item em `runStats`).
-  - Botão para compartilhar o resultado nas redes sociais. Formato (texto, imagem do card, Web Share API ou links de cada rede) a decidir em múltipla escolha no começo da fase.
-- **11 – Revisão de todos os efeitos (grill-me, o máximo possível, em múltipla escolha):**
+- **11 – Revisão de todos os efeitos (próxima; grill-me, o máximo possível, em múltipla escolha):**
   - Os 29 itens, um a um.
   - As regras globais: crítico, armadura, barreira, esquiva, DoTs, congelamento, níveis de item e melhorias permanentes.
   - A mana: descartar e substituir o Manto do Arcano e a Pedra de Mana.

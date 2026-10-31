@@ -332,9 +332,13 @@ export function install(ctx) {
     const prevAlpha = renderer.getClearAlpha();
     scene.background = skyColor; // céu liso e frio: a água não reflete o laranja da névoa
     mesh.visible = false;
+    // Só personagens que podem aparecer na água entram no reflexo: com dezenas de
+    // inimigos, desenhar todos de novo aqui custava quase um passe inteiro
+    const hidden = ctx.characters?.hideUnreflected?.(rect) ?? [];
     renderer.setRenderTarget(target);
     renderer.clear();
     renderer.render(scene, reflCam);
+    for (const root of hidden) root.visible = true;
     mesh.visible = true;
     scene.background = prevBackground;
     renderer.setClearColor(prevColor, prevAlpha);

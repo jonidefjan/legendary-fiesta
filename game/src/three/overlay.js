@@ -28,6 +28,7 @@ export function setupOverlay(el) {
 }
 
 export function resizeOverlay(cssW, cssH, ratio) {
+  if (ratio !== dpr) sprites.clear();
   dpr = ratio;
   canvas.width = Math.round(cssW * dpr);
   canvas.height = Math.round(cssH * dpr);
@@ -58,8 +59,71 @@ function drawBar(cx, y, pct, fill, shine) {
   }
 }
 
+// ─── Emojis em bitmap ───
+// Emoji no canvas é caro (glifo colorido, e o strokeText contorna o glifo inteiro):
+// com dezenas de 🔥/⚡ por quadro numa run grande, o jogo travava. Cada combinação
+// vira um bitmap uma vez e depois é só drawImage. Texto só ASCII continua direto.
+const SPRITE_MAX = 96;
+const sprites = new Map();
+const NON_ASCII = /[^\x00-\x7f]/;
+
+// Fonte ainda carregando: não guarda (o bitmap ficaria com a fonte reserva)
+function fontReady(font, text) {
+  try {
+    return !document.fonts || document.fonts.check(font, text);
+  } catch {
+    return true;
+  }
+}
+
+function makeSprite(text, font, color, outline) {
+  const c = document.createElement("canvas");
+  const g = c.getContext("2d");
+  const setup = () => {
+    g.font = font;
+    g.textAlign = "center";
+    g.lineJoin = "round";
+    g.lineWidth = 3;
+    g.strokeStyle = PALETTE.night;
+    g.fillStyle = color;
+  };
+  setup();
+  const m = g.measureText(text);
+  const pad = outline ? 3 : 1;
+  const left = Math.ceil(m.actualBoundingBoxLeft) + pad;
+  const asc = Math.ceil(m.actualBoundingBoxAscent) + pad;
+  const w = left + Math.ceil(m.actualBoundingBoxRight) + pad;
+  const h = asc + Math.ceil(m.actualBoundingBoxDescent) + pad;
+  c.width = Math.max(1, Math.ceil(w * dpr));
+  c.height = Math.max(1, Math.ceil(h * dpr));
+  g.scale(dpr, dpr);
+  setup(); // mudar o tamanho do canvas zera o estado
+  if (outline) g.strokeText(text, left, asc);
+  g.fillText(text, left, asc);
+  return { canvas: c, left, asc, w: c.width / dpr, h: c.height / dpr };
+}
+
+// Desenha via bitmap; devolve false se não deu (fonte carregando)
+function spriteText(text, x, y, color, font, outline) {
+  const key = `${font}|${color}|${outline ? 1 : 0}|${text}`;
+  let sp = sprites.get(key);
+  if (!sp) {
+    if (!fontReady(font, text)) return false;
+    if (sprites.size >= SPRITE_MAX) sprites.clear();
+    sp = makeSprite(text, font, color, outline);
+    sprites.set(key, sp);
+  }
+  // Canto no pixel físico inteiro, como o texto direto
+  const px = Math.round((x - sp.left) * dpr) / dpr;
+  const py = Math.round((y - sp.asc) * dpr) / dpr;
+  ctx.drawImage(sp.canvas, px, py, sp.w, sp.h);
+  return true;
+}
+
 function outlinedText(text, x, y, color, size, bold = true, font = FONT) {
-  ctx.font = `${bold ? "bold " : ""}${size}px ${font}`;
+  const css = `${bold ? "bold " : ""}${size}px ${font}`;
+  if (NON_ASCII.test(text) && spriteText(text, x, y, color, css, true)) return;
+  ctx.font = css;
   ctx.textAlign = "center";
   ctx.lineJoin = "round";
   ctx.lineWidth = 3;
@@ -152,9 +216,12 @@ export function drawBars(characters) {
     if (en.dots && en.dots.length > 0) {
       let offsetX = (-14 * (en.dots.length - 1)) / 2;
       for (const d of en.dots) {
-        ctx.font = "11px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(DOT_ICONS[d.type] || "✨", s.x + offsetX, s.y - 20);
+        const icon = DOT_ICONS[d.type] || "✨";
+        if (!spriteText(icon, s.x + offsetX, s.y - 20, PALETTE.white, "11px sans-serif", false)) {
+          ctx.font = "11px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(icon, s.x + offsetX, s.y - 20);
+        }
         if (d.stacks > 1) outlinedText(`×${d.stacks}`, s.x + offsetX + 8, s.y - 15, PALETTE.white, 8, false, NUM_FONT);
         offsetX += 14;
       }

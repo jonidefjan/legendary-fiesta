@@ -96,6 +96,9 @@ export function setupCanvas(displayEl, overlayEl) {
   overlay.setupOverlay(overlayEl);
   const fxCanvas = fx.createFxCanvas();
   scene = new THREE.Scene();
+  // O quadro renderiza a cena várias vezes (reflexo, cor, normais): as matrizes são
+  // atualizadas uma vez só, em renderFrame
+  scene.matrixWorldAutoUpdate = false;
   try {
     pipeline = createPipeline(display, fxCanvas);
   } catch (err) {
@@ -113,9 +116,9 @@ export function getCanvas() {
 }
 
 // Acesso para cenário/água/god rays: cena, câmera, pipeline (renderer, alvos e
-// passes extras), cenário (waterRect, tochas), luzes ({ sun, hemi }) e a vista
+// passes extras), cenário (waterRect, tochas), luzes ({ sun, hemi }), a vista e os personagens
 export function getRenderContext() {
-  return { scene, camera: view.camera, pipeline, environment, lighting, view };
+  return { scene, camera: view.camera, pipeline, environment, lighting, view, characters };
 }
 
 // Depuração: contagem de geometrias/texturas na GPU (deve ficar estável entre ondas)
@@ -165,7 +168,8 @@ function renderFrame(gameDt, { tickEffects, showFx, tickHurt, allowSpawn }) {
 
   updateCamera(shake.x, shake.y);
   characters.update(gameDt, { tickHurt, allowSpawn });
-  if (tickEffects) fx.ageEffects();
+  scene.updateMatrixWorld();
+  if (tickEffects) fx.ageEffects(realDt);
 
   const zAt = characters.zAtLogicX;
   if (pipeline) {
