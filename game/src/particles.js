@@ -178,6 +178,48 @@ const KIND_DEFS = {
       }
     },
   },
+  // Gelo: estilhaços azuis; "ice" no inimigo, "iceBurst" em volta do herói
+  freeze: {
+    base: 12,
+    fn: (x, y, n, k) => {
+      for (let i = 0; i < n; i++) {
+        spawn(x + rnd(-12, 12), y + rnd(-14, 14), rnd(-40, 40) * k, rnd(-90, -10) * k,
+          rnd(450, 800), rnd(2.5, 4), [P.white, P.cyan, P.blue], 120, 1.5);
+      }
+    },
+  },
+  iceBurst: {
+    base: 28,
+    fn: (x, y, n, k) => {
+      for (let i = 0; i < n; i++) {
+        const a = rnd(0, Math.PI * 2);
+        const s = rnd(120, 280) * k;
+        spawn(x, y, Math.cos(a) * s, Math.sin(a) * s * 0.6 - 30, rnd(400, 750),
+          rnd(3, 5), i % 3 ? [P.white, P.cyan, P.blue] : [P.mist, P.teal, P.blue], 200, 2);
+      }
+      ring(x, y, Math.round(n * 0.6), 20, 140 * k, rnd(350, 500), 3, [P.white, P.cyan]);
+    },
+  },
+  crit: {
+    base: 8,
+    fn: (x, y, n, k, dir) => {
+      for (let i = 0; i < n; i++) {
+        const a = rnd(0, Math.PI * 2);
+        const s = rnd(100, 220) * k;
+        spawn(x, y, Math.cos(a) * s + dir * 40, Math.sin(a) * s, rnd(180, 320), rnd(2, 3.5),
+          [P.white, P.gold, P.amber], 0, 3);
+      }
+    },
+  },
+  dodge: {
+    base: 6,
+    fn: (x, y, n, k, dir) => {
+      for (let i = 0; i < n; i++) {
+        spawn(x + rnd(-8, 8), y + rnd(-14, 14), -dir * rnd(40, 110) * k, rnd(-15, 15),
+          rnd(250, 420), rnd(3, 5), [P.mist, P.silver, P.steel], 0, 3);
+      }
+    },
+  },
   revive: {
     base: 18,
     fn: (x, y, n, k) => {

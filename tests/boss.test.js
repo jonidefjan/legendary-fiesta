@@ -124,3 +124,29 @@ test("Nova de Fogo: o Parry reflete no próprio chefe e o bloqueio evita a queim
   assert.equal(state.player.dots.length, 0, "sem queimadura no bloqueio");
   assert.equal(demonWave.name, "Senhor Demônio");
 });
+
+test("chefe congelado não conjura nem avança a recarga das habilidades", () => {
+  const lich = bossWave("lich").find((e) => e.isBoss);
+  setupRun([], [lich]);
+  lich.frozen = 1000;
+  updateBosses(lich.abilityInterval * 2);
+  assert.equal(state.enemies.filter((e) => e.summoned).length, 0);
+  assert.equal(lich.abilityTimer, 0);
+
+  const demon = bossWave("demon").find((e) => e.isBoss);
+  setupRun([], [demon]);
+  demon.frozen = 1000;
+  updateBosses(demon.abilityInterval * 2);
+  assert.equal(state.player.hp, state.player.maxHp);
+  assert.equal(state.player.dots.length, 0);
+});
+
+test("esquivar da Nova de Fogo também evita a queimadura", () => {
+  const demon = bossWave("demon").find((e) => e.isBoss);
+  setupRun(["shadow_cloak"], [demon]);
+  state.player.evasion = 1;
+  demon.abilityTimer = demon.abilityInterval;
+  updateBosses(1);
+  assert.equal(state.player.hp, state.player.maxHp);
+  assert.equal(state.player.dots.length, 0);
+});

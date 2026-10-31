@@ -4,6 +4,7 @@
 // Fragmentos (state.fragments) compram níveis de atributos (state.meta.upgrades).
 // A persistência (save.saveMeta) fica por conta de quem chama buyUpgrade.
 import { state, PLAYER_BASE } from "./state.js";
+import { applyMaxHp } from "./items.js";
 
 export const BASE_COST = 20;
 export const COST_GROWTH = 1.25;
@@ -48,11 +49,12 @@ export function buyUpgrade(id) {
 }
 
 // Define (valores absolutos, idempotente) os atributos do jogador a partir das
-// melhorias compradas: maxHp, baseArmor, damageBonus, cooldownBonus
+// melhorias compradas: baseMaxHp (maxHp já com os itens), baseArmor, damageBonus, cooldownBonus
 export function applyUpgrades(player = state.player) {
   const total = (key) =>
     UPGRADES.reduce((sum, u) => sum + (u.perLevel[key] || 0) * upgradeLevel(u.id), 0);
-  player.maxHp = PLAYER_BASE.maxHp + total("maxHp");
+  player.baseMaxHp = PLAYER_BASE.maxHp + total("maxHp");
+  applyMaxHp(player); // Anel Amaldiçoado reduz o máximo; o HP atual fica limitado a ele
   player.baseArmor = PLAYER_BASE.armor + total("armor");
   player.damageBonus = total("damageBonus");
   player.cooldownBonus = Math.min(MAX_COOLDOWN_BONUS, total("cooldownBonus"));

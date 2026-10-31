@@ -21,8 +21,8 @@
     "name": "Lâmina de Brasa",
     "rarity": "rare",
     "desc": "Forjada no núcleo de um vulcão adormecido.",
-    "effect": "Ataque: 14 de dano físico + 6 de fogo.",
-    "enchant": "✦ Ignição: Chance de 25% de queimar o alvo por 3 turnos.",
+    "effect": "Ataque: 20 de dano de fogo.",
+    "enchant": "✦ Ignição: 25% de chance de queimar o alvo: 3 de dano por segundo por 4s (acumula até 5 vezes).",
     "cooldown": 3000,
     "baseDmg": 14,
     "bonusDmg": 6,
@@ -47,7 +47,7 @@
     "name": "Adaga das Sombras",
     "rarity": "epic",
     "desc": "Destila o vazio entre os mundos em cada golpe.",
-    "effect": "Duplo golpe: 2× 9 de dano + ignora 40% de armadura.",
+    "effect": "Duplo golpe: 2× 9 de dano sombrio.",
     "enchant": "✦ Sombra: Cada acerto tem 30% de chance de reduzir a recarga em 0,5s.",
     "cooldown": 2400,
     "baseDmg": 9,
@@ -72,8 +72,8 @@
     "name": "Cajado do Trovão",
     "rarity": "legendary",
     "desc": "O primeiro raio que caiu sobre a terra cristalizou nesta haste.",
-    "effect": "Relâmpago em cadeia: 22 de dano mágico, ricocheteando em até 2 alvos.",
-    "enchant": "✦ Tempestade: A cada 4 usos, invoca uma tempestade +50% de dano.",
+    "effect": "Relâmpago em cadeia: 22 de dano de raio, ricocheteando em até 2 alvos com 50% do dano.",
+    "enchant": "✦ Tempestade: A cada 4 usos, o ataque causa +50% de dano.",
     "cooldown": 4500,
     "baseDmg": 22,
     "dmgType": "lightning",
@@ -86,6 +86,12 @@
         "targets": 2,
         "ratio": 0.5,
         "element": "lightning"
+      },
+      {
+        "trigger": "attack",
+        "type": "storm",
+        "every": 4,
+        "bonus": 0.5
       }
     ]
   },
@@ -96,7 +102,7 @@
     "name": "Colete de Couro",
     "rarity": "common",
     "desc": "Proteção básica feita de peles curtidas.",
-    "effect": "Passivo: +12 de armadura. Reduz dano físico em 12%.",
+    "effect": "Passivo: +12 de armadura (reduz o dano recebido em 12%).",
     "enchant": null,
     "cooldown": 0,
     "passive": true,
@@ -139,8 +145,8 @@
     "name": "Manto do Arcano",
     "rarity": "rare",
     "desc": "Tecido de fios etéreos que absorve energia mágica.",
-    "effect": "Passivo: +20 de Mana Máxima. +15% de dano mágico.",
-    "enchant": "✦ Absorção: Ao receber dano mágico, converte 30% em Mana.",
+    "effect": "Passivo: +20 de Mana Máxima.",
+    "enchant": "✦ Absorção: Ao receber dano, converte 30% dele em Mana.",
     "cooldown": 0,
     "passive": true,
     "anim": "block",
@@ -283,13 +289,21 @@
     "name": "Arco Gélido",
     "rarity": "rare",
     "desc": "Talhado em gelo eterno das montanhas do norte.",
-    "effect": "Ataque: 12 de dano físico + 5 de gelo.",
-    "enchant": "✦ Congelamento: 20% de chance de congelar o alvo por 2 turnos.",
+    "effect": "Ataque: 17 de dano de gelo.",
+    "enchant": "✦ Congelamento: 20% de chance de congelar o alvo por 2s (ele não anda nem ataca).",
     "cooldown": 2800,
     "baseDmg": 12,
     "bonusDmg": 5,
     "dmgType": "ice",
-    "anim": "arrow"
+    "anim": "arrow",
+    "effects": [
+      {
+        "trigger": "hit",
+        "type": "freeze",
+        "duration": 2000,
+        "chance": 0.2
+      }
+    ]
   },
   {
     "id": "poison_blade",
@@ -298,12 +312,22 @@
     "name": "Lâmina Venenosa",
     "rarity": "uncommon",
     "desc": "Impregnada com toxinas mortais de serpentes antigas.",
-    "effect": "Ataque: 10 de dano + aplica veneno (3 de dano por turno por 4 turnos).",
-    "enchant": "✦ Toxina: Veneno acumula até 5 stacks.",
+    "effect": "Ataque: 10 de dano venenoso + aplica veneno: 3 de dano por segundo por 4s.",
+    "enchant": "✦ Toxina: Veneno acumula até 5 vezes.",
     "cooldown": 2500,
     "baseDmg": 10,
     "dmgType": "poison",
-    "anim": "stab"
+    "anim": "stab",
+    "effects": [
+      {
+        "trigger": "hit",
+        "type": "dot",
+        "dot": "poison",
+        "damage": 3,
+        "duration": 4,
+        "chance": 1
+      }
+    ]
   },
   {
     "id": "holy_mace",
@@ -312,13 +336,25 @@
     "name": "Maça Sagrada",
     "rarity": "epic",
     "desc": "Abençoada pelos deuses, pune os ímpios com luz divina.",
-    "effect": "Ataque: 18 de dano sagrado. Cura o portador em 5 HP.",
-    "enchant": "✦ Benção: Críticos curam +10 HP adicional.",
+    "effect": "Ataque: 18 de dano sagrado. Cura o portador em 5 HP a cada golpe.",
+    "enchant": "✦ Benção: Golpes críticos curam +10 HP adicionais.",
     "cooldown": 3500,
     "baseDmg": 18,
     "dmgType": "holy",
-    "healOnHit": 5,
-    "anim": "smash"
+    "anim": "smash",
+    "effects": [
+      {
+        "trigger": "hit",
+        "type": "heal",
+        "amount": 5
+      },
+      {
+        "trigger": "hit",
+        "type": "heal",
+        "amount": 10,
+        "onCrit": true
+      }
+    ]
   },
   {
     "id": "blood_scythe",
@@ -327,13 +363,24 @@
     "name": "Foice de Sangue",
     "rarity": "legendary",
     "desc": "Colhe almas e vida com a mesma facilidade.",
-    "effect": "Ataque: 20 de dano sombrio. Drena 30% do dano como HP.",
-    "enchant": "✦ Colheita: A cada 3 abates, próximo ataque causa dano duplo.",
+    "effect": "Ataque: 20 de dano sombrio. Rouba 30% do dano causado como HP.",
+    "enchant": "✦ Colheita: A cada 3 abates, o próximo ataque da Foice causa dano duplo.",
     "cooldown": 4000,
     "baseDmg": 20,
     "dmgType": "shadow",
-    "lifesteal": 0.3,
-    "anim": "reap"
+    "anim": "reap",
+    "effects": [
+      {
+        "trigger": "hit",
+        "type": "lifesteal",
+        "ratio": 0.3
+      },
+      {
+        "trigger": "kill",
+        "type": "harvest",
+        "every": 3
+      }
+    ]
   },
   {
     "id": "water_orb",
@@ -342,12 +389,25 @@
     "name": "Orbe Aquático",
     "rarity": "rare",
     "desc": "Concentra a fúria dos oceanos em uma esfera cristalina.",
-    "effect": "Ataque: 15 de dano aquático. Reduz recarga de outros itens em 0.3s.",
-    "enchant": "✦ Maré: Ataques consecutivos aumentam dano em 3 (máx: 5 stacks).",
+    "effect": "Ataque: 15 de dano aquático. Adianta em 0,3s a recarga dos outros itens.",
+    "enchant": "✦ Maré: Cada ataque seguido no mesmo alvo soma +3 de dano (máx. 5 acúmulos); trocar de alvo zera.",
     "cooldown": 3200,
     "baseDmg": 15,
     "dmgType": "water",
-    "anim": "water_blast"
+    "anim": "water_blast",
+    "effects": [
+      {
+        "trigger": "attack",
+        "type": "cooldownOthers",
+        "ms": 300
+      },
+      {
+        "trigger": "attack",
+        "type": "tide",
+        "damage": 3,
+        "max": 5
+      }
+    ]
   },
   {
     "id": "chainmail",
@@ -356,8 +416,8 @@
     "name": "Cota de Malha",
     "rarity": "uncommon",
     "desc": "Anéis entrelaçados que distribuem o impacto.",
-    "effect": "Passivo: +18 de armadura. -10% de dano de projéteis.",
-    "enchant": "✦ Deflexão: 15% de chance de refletir projéteis.",
+    "effect": "Passivo: +18 de armadura.",
+    "enchant": "✦ Deflexão: 15% de chance de devolver metade do dano recebido ao atacante.",
     "cooldown": 0,
     "passive": true,
     "anim": "block",
@@ -366,6 +426,12 @@
         "trigger": "passive",
         "type": "stats",
         "armor": 18
+      },
+      {
+        "trigger": "hurt",
+        "type": "reflect",
+        "chance": 0.15,
+        "ratio": 0.5
       }
     ]
   },
@@ -376,12 +442,23 @@
     "name": "Manto das Sombras",
     "rarity": "epic",
     "desc": "Tecido com a essência da escuridão pura.",
-    "effect": "Passivo: +10% de evasão. Invisível por 2s após receber hit crítico.",
-    "enchant": "✦ Fuga: Durante invisibilidade, próximo ataque causa +50% de dano.",
+    "effect": "Passivo: 10% de chance de esquivar de ataques inimigos.",
+    "enchant": "✦ Fuga: Ao esquivar, o próximo ataque de arma causa +50% de dano.",
     "cooldown": 0,
-    "evasion": 0.1,
     "passive": true,
-    "anim": "vanish"
+    "anim": "vanish",
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "evasion": 0.1
+      },
+      {
+        "trigger": "dodge",
+        "type": "empowerNext",
+        "bonus": 0.5
+      }
+    ]
   },
   {
     "id": "crystal_armor",
@@ -390,12 +467,24 @@
     "name": "Armadura Cristalina",
     "rarity": "legendary",
     "desc": "Forjada com cristais de mana comprimidos por milênios.",
-    "effect": "A cada 10s: Escudo de 40 HP que explode ao quebrar, causando 15 de dano AoE.",
-    "enchant": "✦ Ressonância: Escudo absorve dano mágico e amplifica em 2x na explosão.",
+    "effect": "A cada 10s: Barreira de 40 HP. Se quebrar absorvendo dano, explode: 15 de dano em todos os inimigos.",
+    "enchant": "✦ Ressonância: a explosão é de gelo e congela os inimigos por 1s.",
     "cooldown": 10000,
-    "barrier": 40,
-    "explosionDmg": 15,
-    "anim": "crystal_shield"
+    "anim": "crystal_shield",
+    "effects": [
+      {
+        "trigger": "use",
+        "type": "barrier",
+        "amount": 40
+      },
+      {
+        "trigger": "barrierBreak",
+        "type": "explode",
+        "damage": 15,
+        "element": "ice",
+        "freeze": 1000
+      }
+    ]
   },
   {
     "id": "vampiric_amulet",
@@ -404,12 +493,20 @@
     "name": "Amuleto Vampírico",
     "rarity": "rare",
     "desc": "Pulsa com sede de sangue.",
-    "effect": "Passivo: Rouba 8% da vida de cada ataque realizado.",
-    "enchant": "✦ Sede: Abaixo de 50% de HP, aumenta roubo para 15%.",
+    "effect": "Passivo: Rouba 8% do dano de cada golpe de arma como HP.",
+    "enchant": "✦ Sede: Abaixo de 50% de HP, o roubo sobe para 15%.",
     "cooldown": 0,
-    "lifesteal": 0.08,
     "passive": true,
-    "anim": "blood_drain"
+    "anim": "blood_drain",
+    "effects": [
+      {
+        "trigger": "anyHit",
+        "type": "lifesteal",
+        "ratio": 0.08,
+        "lowHpRatio": 0.15,
+        "threshold": 0.5
+      }
+    ]
   },
   {
     "id": "speed_boots",
@@ -418,12 +515,23 @@
     "name": "Botas da Velocidade",
     "rarity": "uncommon",
     "desc": "Costuradas com tendões de gazelas das planícies.",
-    "effect": "Passivo: +15% de velocidade de ataque e movimento.",
-    "enchant": "✦ Sprint: A cada 5 ataques, o próximo é instantâneo.",
+    "effect": "Passivo: Armas recarregam 15% mais rápido.",
+    "enchant": "✦ Sprint: A cada 5 ataques de arma, a arma que atacou fica com a recarga pronta na hora.",
     "cooldown": 0,
-    "speedBoost": 0.15,
     "passive": true,
-    "anim": "dash"
+    "anim": "dash",
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "weaponSpeed": 0.15
+      },
+      {
+        "trigger": "anyAttack",
+        "type": "sprint",
+        "every": 5
+      }
+    ]
   },
   {
     "id": "lucky_coin",
@@ -432,26 +540,28 @@
     "name": "Moeda da Fortuna",
     "rarity": "epic",
     "desc": "Sempre cai do lado que você precisa.",
-    "effect": "Passivo: +20% de chance de crítico. +10% de drop de itens.",
-    "enchant": "✦ Sorte Grande: Críticos têm 25% de chance de atacar novamente.",
+    "effect": "Passivo: +20% de chance de crítico. Abate com golpe crítico dá +1 fragmento.",
+    "enchant": "✦ Sorte Grande: Críticos têm 25% de chance de fazer a arma atacar de novo na hora.",
     "cooldown": 0,
-    "critChance": 0.2,
-    "dropBonus": 0.1,
     "passive": true,
-    "anim": "sparkle"
-  },
-  {
-    "id": "ancient_tome",
-    "type": "relic",
-    "icon": "📖",
-    "name": "Tomo Ancestral",
-    "rarity": "legendary",
-    "desc": "Contém conhecimento proibido de eras esquecidas.",
-    "effect": "A cada 6s: Conjura um feitiço aleatório (dano, cura, buff ou debuff).",
-    "enchant": "✦ Sabedoria: Cada feitiço aumenta poder mágico em 2% (máx: 30%).",
-    "cooldown": 6000,
-    "randomSpell": true,
-    "anim": "magic_burst"
+    "anim": "sparkle",
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "critChance": 0.2
+      },
+      {
+        "trigger": "crit",
+        "type": "extraAttack",
+        "chance": 0.25
+      },
+      {
+        "trigger": "kill",
+        "type": "critFragment",
+        "amount": 1
+      }
+    ]
   },
   {
     "id": "cursed_ring",
@@ -460,26 +570,25 @@
     "name": "Anel Amaldiçoado",
     "rarity": "epic",
     "desc": "Poder imenso vem com um preço terrível.",
-    "effect": "Passivo: +50% de dano total. -20% de HP máximo.",
-    "enchant": "✦ Pacto das Sombras: Cada morte inimiga drena 2 HP do usuário mas aumenta dano em 1%.",
+    "effect": "Passivo: +50% de dano. -20% de HP máximo.",
+    "enchant": "✦ Pacto das Sombras: Cada abate drena 2 HP (nunca mata) e dá +1% de dano, até +25% na run.",
     "cooldown": 0,
-    "dmgBoost": 0.5,
-    "hpPenalty": -0.2,
     "passive": true,
-    "anim": "dark_pulse"
-  },
-  {
-    "id": "time_glass",
-    "type": "relic",
-    "icon": "⏳",
-    "name": "Ampulheta Temporal",
-    "rarity": "legendary",
-    "desc": "Fragmento de um universo onde o tempo flui diferente.",
-    "effect": "A cada 15s: Congela o tempo por 3s. Apenas você pode agir.",
-    "enchant": "✦ Paradoxo: Durante congelamento, seus ataques acumulam. Ao descongelar, todos acertam simultaneamente.",
-    "cooldown": 15000,
-    "timestop": true,
-    "duration": 3000,
-    "anim": "time_stop"
+    "anim": "dark_pulse",
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "damageBoost": 0.5,
+        "maxHpMult": -0.2
+      },
+      {
+        "trigger": "kill",
+        "type": "pact",
+        "hpCost": 2,
+        "bonus": 0.01,
+        "max": 0.25
+      }
+    ]
   }
 ]

@@ -5,7 +5,7 @@
 // e o progresso permanente (fragmentos). A run guarda só os IDs dos itens:
 // mudanças no items.json valem também para quem já tem save.
 import { state } from "./state.js";
-import { findItem, UNIMPLEMENTED_ITEMS } from "./items.js";
+import { findItem } from "./items.js";
 
 export const RUN_KEY = "reliquary_run";
 export const META_KEY = "reliquary_meta_v1";
@@ -71,6 +71,10 @@ export function serializeRun() {
       maxHp: state.player.maxHp,
       mana: state.player.mana,
       maxMana: state.player.maxMana,
+      pactBonus: state.player.pactBonus,
+      counters: state.player.counters,
+      harvestReady: state.player.harvestReady,
+      empowered: state.player.empowered,
     },
     timestamp: Date.now(),
   };
@@ -117,17 +121,23 @@ export function loadRun() {
   state.wave = data.wave || 1;
   state.kills = data.kills || 0;
   state.score = data.score || 0;
-  state.items = (data.items || [])
-    .map(findItem)
-    .filter((item) => item && !UNIMPLEMENTED_ITEMS.has(item.id));
-  state.itemLevels = data.itemLevels || {};
-  state.itemTimers = data.itemTimers || {};
+  // Itens que saíram do jogo (ex.: Tomo Ancestral) são descartados, junto com nível e recarga
+  state.items = (data.items || []).map(findItem).filter(Boolean);
+  const owned = new Set(state.items.map((i) => i.id));
+  const onlyOwned = (obj) =>
+    Object.fromEntries(Object.entries(obj || {}).filter(([id]) => owned.has(id)));
+  state.itemLevels = onlyOwned(data.itemLevels);
+  state.itemTimers = onlyOwned(data.itemTimers);
   state.endless = !!data.endless;
   state.victoryShown = !!data.victoryShown;
   state.player.hp = data.player?.hp || 100;
   state.player.maxHp = data.player?.maxHp || 100;
   state.player.mana = data.player?.mana || 0;
   state.player.maxMana = data.player?.maxMana || 100;
+  state.player.pactBonus = data.player?.pactBonus || 0;
+  state.player.counters = { ...data.player?.counters };
+  state.player.harvestReady = !!data.player?.harvestReady;
+  state.player.empowered = data.player?.empowered || 0;
   return true;
 }
 

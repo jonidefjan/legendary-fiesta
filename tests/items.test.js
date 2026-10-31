@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { ITEMS, setupRun, item } from "./helpers.js";
 import { state } from "../game/src/state.js";
 import {
-  UNIMPLEMENTED_ITEMS,
   generateRandomItems,
   isActivatable,
   applyPassives,
@@ -23,9 +22,9 @@ test("todo efeito do items.json tem um gatilho e um tipo que o jogo executa", ()
   }
 });
 
-test("todo item implementado com recarga faz algo quando fica pronto", () => {
+test("todo item com recarga faz algo quando fica pronto", () => {
   for (const it of ITEMS) {
-    if (UNIMPLEMENTED_ITEMS.has(it.id) || it.cooldown <= 0) continue;
+    if (it.cooldown <= 0) continue;
     assert.ok(isActivatable(it), `${it.id} tem recarga mas nada para ativar`);
   }
 });
@@ -43,23 +42,21 @@ test("sorteio respeita a quantidade e não repete itens", () => {
   }
 });
 
-test("sorteio nunca oferece itens sem efeito nem itens excluídos", () => {
+test("sorteio nunca oferece itens excluídos", () => {
   const owned = new Set(["rusted_sword", "health_crystal", "ember_blade"]);
   for (let run = 0; run < 200; run++) {
     for (const it of generateRandomItems(3, owned)) {
-      assert.ok(!UNIMPLEMENTED_ITEMS.has(it.id), `${it.id} não implementado`);
       assert.ok(!owned.has(it.id), `${it.id} já era do jogador`);
     }
   }
 });
 
 test("sorteio devolve menos itens quando o catálogo acaba", () => {
-  const available = ITEMS.filter((i) => !UNIMPLEMENTED_ITEMS.has(i.id));
-  const allButOne = new Set(available.slice(1).map((i) => i.id));
+  const allButOne = new Set(ITEMS.slice(1).map((i) => i.id));
   const picked = generateRandomItems(3, allButOne);
   assert.deepEqual(
     picked.map((i) => i.id),
-    [available[0].id],
+    [ITEMS[0].id],
   );
 });
 

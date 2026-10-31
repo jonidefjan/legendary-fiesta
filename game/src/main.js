@@ -98,6 +98,11 @@ on("playerHurt", ({ x, y, damage }) =>
 );
 on("revive", ({ x, y }) => particles.emit("revive", x, y - 30));
 on("enemyDied", ({ x, y }) => particles.emit("death", x, y - 20));
+// Fase 4: crítico, esquiva, congelar e cristal explodindo
+on("crit", ({ x, y }) => particles.emit("crit", x, y - 25, { direction: 1 }));
+on("dodge", ({ x, y }) => particles.emit("dodge", x, y - 25, { direction: 1 }));
+on("freeze", ({ x, y }) => particles.emit("freeze", x, y - 25));
+on("explode", ({ x, y }) => particles.emit("iceBurst", x, y - 30, { intensity: 1 }));
 
 // Tremida e hit-stop: sutis, pois no 3× acontecem muitos golpes por segundo
 on("hit", ({ damage, weak }) => {
@@ -117,6 +122,14 @@ on("playerHurt", ({ damage }) => {
   feel.hitStop(45, state.gameSpeed);
 });
 on("blocked", () => feel.addShake(0.15));
+on("crit", () => {
+  feel.addShake(0.12);
+  feel.hitStop(30, state.gameSpeed);
+});
+on("explode", () => {
+  feel.addShake(0.35);
+  feel.hitStop(50, state.gameSpeed);
+});
 on("revive", () => {
   feel.addShake(0.6);
   feel.hitStop(90, state.gameSpeed);
