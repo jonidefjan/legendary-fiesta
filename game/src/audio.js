@@ -232,6 +232,39 @@ export const sfx = (() => {
         noise(a, 0.6, 0.025, "bandpass", 300, 900, 2);
       });
     },
+    // ─── Fase 4 ───
+    // Crítico: estalo agudo e seco
+    crit() {
+      play("crit", 2, (a) => {
+        tone(a, 1800, 0.07, "square", 0.04, 700);
+        noise(a, 0.05, 0.04, "highpass", 4500, 0, 0.8);
+        tone(a, 220, 0.08, "square", 0.035, 110);
+      });
+    },
+    // Esquiva: sopro rápido
+    dodge() {
+      play("dodge", 1, (a) => {
+        noise(a, 0.14, 0.04, "bandpass", 500, 2800, 1.4);
+      });
+    },
+    // Congelar: sino gelado + estalinhos de cristal
+    freeze() {
+      play("freeze", 1, (a) => {
+        tone(a, 2093, 0.3, "sine", 0.03, 0, 0, 0.005);
+        tone(a, 3136, 0.22, "triangle", 0.02, 0, 0.04);
+        noise(a, 0.03, 0.025, "highpass", 8000);
+        noise(a, 0.03, 0.02, "highpass", 7000, 0, 1, 0.07);
+      });
+    },
+    // Cristal estilhaça: caco agudo + estrondo grave
+    explode() {
+      play("explode", 2, (a) => {
+        noise(a, 0.18, 0.05, "highpass", 6000, 3000, 0.8);
+        [2637, 3322, 3951].forEach((f, i) => tone(a, f, 0.16, "triangle", 0.02, f * 0.7, i * 0.02));
+        tone(a, 120, 0.4, "sawtooth", 0.05, 40);
+        noise(a, 0.35, 0.05, "lowpass", 1400, 100, 1);
+      });
+    },
     enemyHit() {
       play("enemyHit", 1, (a) => {
         tone(a, 160, 0.1, "sawtooth", 0.035, 90);

@@ -12,7 +12,12 @@
 //   "playerHurt"  jogador tomou dano: damage
 //   "revive"      jogador reviveu
 //   "enemyDied"   inimigo morreu: size
-// Sons: sound(nome, detalhe) -> "hit" + elemento, "use" + tipo do efeito, "dot" + tipo.
+//   "crit"        golpe crítico do herói: damage
+//   "dodge"       herói esquivou de um ataque
+//   "freeze"      inimigo congelado (enemy.frozen = ms restantes)
+//   "explode"     explosão da Armadura Cristalina
+// Sons: sound(nome, detalhe) -> "hit" + elemento, "use" + tipo do efeito, "dot" + tipo,
+// além de "crit", "dodge", "freeze" e "explode".
 import { state } from "./state.js";
 import { random } from "./random.js";
 import { emit, log, sound } from "./events.js";
@@ -26,6 +31,9 @@ import {
 
 // Redução máxima de dano pela armadura (%): com Guarda sem teto, nada fica imune
 export const MAX_ARMOR = 75;
+
+// Golpe crítico: a chance base está em PLAYER_BASE.critChance
+export const CRIT_MULT = 1.5;
 
 // Duração (ms) das poses de animação; o renderer 3D (three/characters.js) usa o tempo restante
 export const ANIM_MS = {
@@ -48,6 +56,12 @@ const DOTS = {
   bleeding: { icon: "💉", verb: "está sangrando", color: "#ff0000" },
 };
 
+// Bônus de dano permanentes (melhoria Força, Anel, Pacto): valem para armas, DoT e explosão
+function permanentDamage() {
+  const p = state.player;
+  return 1 + (p.damageBonus || 0) + (p.damageBoost || 0) + (p.pactBonus || 0);
+}
+
 function rolls(effect) {
   return random() < (effect.chance ?? 1);
 }
@@ -55,9 +69,10 @@ function rolls(effect) {
 // ═══════════════════════════════════════════
 //  ELEMENTAL & DOT SYSTEM
 // ═══════════════════════════════════════════
-export function applyElementalDamage(target, baseDmg, element, source) {
+export function applyElementalDamage(target, baseDmg, element, source, crit = false) {
   if (!target.resist) target.resist = {};
   const resist = target.resist[element] || 0;
+  target.lastHitCrit = !!crit; // quem mata paga Moeda da Fortuna só se este golpe foi crítico
   const finalDmg = Math.max(1, Math.round(baseDmg * (1 - resist)));
 
   target.hp -= finalDmg;
@@ -65,7 +80,7 @@ export function applyElementalDamage(target, baseDmg, element, source) {
   if (source === "player") state.runStats.totalDamage += finalDmg;
 
   // Visual feedback based on resistance
-  let color = "#ff4444";
+  let color = crit ? "#ffdd44" : "#ff4444";
   if (resist > 0.3)
     color = "#888888"; // Resisted
   else if (resist < -0.1) color = "#ffaa22"; // Weak to element
@@ -75,7 +90,7 @@ export function applyElementalDamage(target, baseDmg, element, source) {
     target.y - 40,
     `-${finalDmg}`,
     color,
-    resist < -0.1 ? 5 : 4,
+    crit ? 6 : resist < -0.1 ? 5 : 4,
   );
 
   // Show resistance feedback
@@ -101,6 +116,7 @@ export function applyElementalDamage(target, baseDmg, element, source) {
     source,
     resisted: resist > 0.3,
     weak: resist < -0.1,
+    crit,
   });
   return finalDmg;
 }
@@ -140,6 +156,7 @@ export function processDots(dt) {
         const dmg = Math.round(dot.damage * dot.stacks);
         entity.hp -= dmg;
         entity.hurtTimer = 8;
+        entity.lastHitCrit = false; // abate por dano contínuo não conta como crítico
         spawnNumber(
           entity.x,
           entity.y - 30,
@@ -175,9 +192,7 @@ const HIT_EFFECTS = {
   dot(effect, item, ctx) {
     if (!rolls(effect)) return;
     // Dano contínuo cresce com o nível; a chance não muda
-    const damage = Math.round(
-      effect.damage * levelMultiplier(item.id) * (1 + (state.player.damageBonus || 0)),
-    );
+    const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
     applyDot(ctx.target, effect.dot, damage, effect.duration, true);
     const dot = DOTS[effect.dot];
     log(
@@ -189,6 +204,75 @@ const HIT_EFFECTS = {
     if (!rolls(effect)) return;
     ctx.refund += effect.ms;
     log(`${item.icon} ${item.name}: recarga reduzida!`, "item");
+  },
+  freeze(effect, item, ctx) {
+    if (!rolls(effect)) return;
+    freezeEnemy(ctx.target, effect.duration);
+    log(`❄️ ${ctx.target.name} foi congelado por ${effect.duration / 1000}s!`, "item");
+  },
+  // heal com onCrit só vale quando o golpe foi crítico
+  heal(effect, item, ctx) {
+    if (effect.onCrit && !ctx.crit) return;
+    healPlayer(Math.round(effect.amount * levelMultiplier(item.id)), item);
+  },
+  lifesteal(effect, item, ctx) {
+    healPlayer(Math.round(ctx.dealt * effect.ratio * levelMultiplier(item.id)), item);
+  },
+};
+
+// trigger "anyHit": a cada golpe de arma, de qualquer item possuído
+const ANY_HIT_EFFECTS = {
+  // Abaixo do limite de vida o roubo sobe (lowHpRatio)
+  lifesteal(effect, item, ctx) {
+    const p = state.player;
+    const low = effect.lowHpRatio && p.hp / p.maxHp < effect.threshold;
+    const ratio = (low ? effect.lowHpRatio : effect.ratio) * levelMultiplier(item.id);
+    healPlayer(Math.round(ctx.dealt * ratio), item);
+  },
+};
+
+// trigger "anyAttack": a cada ataque de arma completo, de qualquer item possuído
+const ANY_ATTACK_EFFECTS = {
+  // A cada N ataques, a arma que atacou recarrega na hora
+  sprint(effect, item, ctx) {
+    const counters = state.player.counters;
+    counters.sprint = (counters.sprint || 0) + 1;
+    if (counters.sprint % effect.every !== 0) return;
+    ctx.refund = Infinity;
+    log(`${item.icon} ${item.name}: sprint! Recarga de ${ctx.weapon.name} zerada.`, "item");
+  },
+};
+
+// trigger "crit": a cada golpe crítico, de qualquer item possuído
+const CRIT_EFFECTS = {
+  // O ataque extra é feito no fim do ataque atual, e nunca gera outro extra
+  extraAttack(effect, item, ctx) {
+    if (ctx.extra || ctx.wantExtra || !rolls(effect)) return;
+    ctx.wantExtra = item;
+  },
+};
+
+// trigger "kill": a cada inimigo derrotado, de qualquer item possuído
+const KILL_EFFECTS = {
+  // A cada N abates, o próximo ataque da arma com este efeito causa dano ×2
+  harvest(effect, item) {
+    const p = state.player;
+    p.counters.harvest = (p.counters.harvest || 0) + 1;
+    if (p.counters.harvest % effect.every !== 0) return;
+    p.harvestReady = true;
+    log(`${item.icon} ${item.name}: colheita pronta! Próximo ataque causa dano duplo.`, "item");
+  },
+  critFragment(effect, item, en) {
+    if (!en.lastHitCrit) return;
+    state.fragments += effect.amount;
+    spawnNumber(en.x + 20, en.y - 65, `⚡+${effect.amount}`, "#ffdd44", 2);
+    log(`${item.icon} ${item.name}: abate crítico! +${effect.amount} fragmento.`, "item");
+  },
+  // Cada abate custa vida (nunca mata) e soma dano até o teto, pela run toda
+  pact(effect, item) {
+    const p = state.player;
+    if (p.hp > 1) p.hp = Math.max(1, p.hp - effect.hpCost);
+    p.pactBonus = Math.min(effect.max, (p.pactBonus || 0) + effect.bonus);
   },
 };
 
@@ -214,6 +298,35 @@ const ATTACK_EFFECTS = {
       log(`⚡ Relâmpago ricocheteou em ${others.length} alvos!`, "item");
     }
   },
+  // Adianta a recarga dos outros itens (não do próprio)
+  cooldownOthers(effect, item, ctx) {
+    if (ctx.extra) return;
+    for (const other of state.items) {
+      const timer = state.itemTimers[other.id];
+      if (other.id === item.id || !timer) continue;
+      timer.elapsed = Math.min(timer.cooldown, timer.elapsed + effect.ms);
+    }
+  },
+};
+
+// Efeitos "attack" que mudam o dano do ataque inteiro: rodam antes do primeiro golpe
+// e preenchem ctx.mult (multiplicador) e ctx.flat (dano somado por golpe)
+const ATTACK_MODS = {
+  // A cada N-ésimo uso: +bonus de dano
+  storm(effect, item, ctx) {
+    const counters = state.player.counters;
+    counters.storm = (counters.storm || 0) + 1;
+    if (counters.storm % effect.every !== 0) return;
+    ctx.mult *= 1 + effect.bonus;
+    log(`⛈️ ${item.name}: tempestade! +${Math.round(effect.bonus * 100)}% de dano.`, "item");
+  },
+  // Ataques seguidos no mesmo alvo acumulam dano; trocar de alvo zera
+  tide(effect, item, ctx) {
+    const p = state.player;
+    if (!p.tide || p.tide.target !== ctx.target) p.tide = { target: ctx.target, stacks: 0 };
+    ctx.flat += p.tide.stacks * effect.damage;
+    p.tide.stacks = Math.min(effect.max, p.tide.stacks + 1);
+  },
 };
 
 // trigger "use": itens que não são armas, quando a recarga fica pronta
@@ -226,12 +339,18 @@ const USE_EFFECTS = {
   },
   barrier(effect, item, p) {
     const amount = Math.round(effect.amount * levelMultiplier(item.id));
-    p.barrier = amount;
-    spawnEffect("dragon_roar", p.x, p.y - 40, { life: 50 });
-    log(
-      `${item.icon} ${item.name}: barreira de ${amount} HP ativada!`,
-      "item",
-    );
+    // Nova barreira só vale se for maior que a atual; quem a criou guarda a origem
+    if (amount >= p.barrier) {
+      p.barrier = amount;
+      p.barrierSource = item.id;
+      spawnEffect("dragon_roar", p.x, p.y - 40, { life: 50 });
+      log(
+        `${item.icon} ${item.name}: barreira de ${amount} HP ativada!`,
+        "item",
+      );
+    } else {
+      log(`${item.icon} ${item.name}: a barreira atual é maior, mantida.`, "item");
+    }
     p.anim = "berserk";
   },
   heal(effect, item, p) {
@@ -279,16 +398,87 @@ const USE_EFFECTS = {
   },
 };
 
+// trigger "barrierBreak": a barreira criada pelo item chegou a 0 absorvendo dano
+const BARRIER_BREAK_EFFECTS = {
+  explode(effect, item, p) {
+    const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
+    for (const en of state.enemies.filter((e) => !e.dead && e.hp > 0)) {
+      applyElementalDamage(en, damage, effect.element, "player");
+      if (effect.freeze) freezeEnemy(en, effect.freeze, true);
+    }
+    if (effect.freeze) {
+      sound("freeze");
+      emit("freeze", { x: p.x, y: p.y });
+    }
+    spawnEffect("dragon_roar", p.x, p.y - 30, { life: 40 });
+    sound("explode");
+    emit("explode", { x: p.x, y: p.y });
+    log(`${item.icon} ${item.name}: a barreira explodiu! ${damage} de dano em todos os inimigos.`, "item");
+  },
+};
+
+// trigger "dodge": quando o herói esquiva
+const DODGE_EFFECTS = {
+  empowerNext(effect, item) {
+    state.player.empowered = Math.max(state.player.empowered || 0, effect.bonus);
+    log(`${item.icon} ${item.name}: próximo ataque +${Math.round(effect.bonus * 100)}%!`, "item");
+  },
+};
+
+// trigger "hurt": ao tomar dano de HP. ctx = { enemy, damage }
+const HURT_EFFECTS = {
+  manaFromDamage(effect, item, ctx) {
+    const p = state.player;
+    const manaAbsorb = Math.round(ctx.damage * effect.ratio * levelMultiplier(item.id));
+    p.mana = Math.min(p.maxMana, p.mana + manaAbsorb);
+    if (manaAbsorb > 0)
+      log(`${item.icon} ${item.name} absorve: +${manaAbsorb} Mana.`, "item");
+  },
+  // Devolve parte do dano recebido ao atacante
+  reflect(effect, item, ctx) {
+    if (!rolls(effect)) return;
+    const reflected = Math.round(ctx.damage * effect.ratio * levelMultiplier(item.id));
+    if (reflected <= 0) return;
+    applyElementalDamage(ctx.enemy, reflected, "physical", "reflect");
+    log(`${item.icon} ${item.name}: ${reflected} de dano devolvido a ${ctx.enemy.name}!`, "item");
+  },
+};
+
+function healPlayer(amount, item) {
+  const p = state.player;
+  const healed = Math.min(amount, p.maxHp - p.hp);
+  if (healed <= 0) return;
+  p.hp += healed;
+  spawnNumber(p.x, p.y - 60, `+${healed}`, "#44cc88", 2);
+  log(`${item.icon} ${item.name}: +${healed} HP.`, "heal");
+}
+
+// Congelado: o inimigo não anda nem ataca por `ms` de tempo de jogo
+// quiet: o chamador avisa som e evento uma vez só (explosão em vários inimigos)
+function freezeEnemy(en, ms, quiet = false) {
+  en.frozen = Math.max(en.frozen || 0, ms);
+  spawnEffect("text", en.x, en.y - 60, { life: 30, text: "❄️", color: "#88ddff" });
+  if (quiet) return;
+  sound("freeze");
+  emit("freeze", { x: en.x, y: en.y });
+}
+
 // Tipos que o jogo sabe executar, por gatilho (os testes conferem o items.json contra isto)
 export const KNOWN_EFFECTS = {
   hit: Object.keys(HIT_EFFECTS),
-  attack: Object.keys(ATTACK_EFFECTS),
+  attack: [...Object.keys(ATTACK_EFFECTS), ...Object.keys(ATTACK_MODS)],
+  anyHit: Object.keys(ANY_HIT_EFFECTS),
+  anyAttack: Object.keys(ANY_ATTACK_EFFECTS),
+  crit: Object.keys(CRIT_EFFECTS),
+  kill: Object.keys(KILL_EFFECTS),
+  dodge: Object.keys(DODGE_EFFECTS),
+  barrierBreak: Object.keys(BARRIER_BREAK_EFFECTS),
   use: Object.keys(USE_EFFECTS),
   passive: ["stats"],
   damage: ["lowHpBonus"],
   block: ["reflect"],
   barrierAbsorb: ["reflect"],
-  hurt: ["manaFromDamage"],
+  hurt: Object.keys(HURT_EFFECTS),
   death: ["revive"],
   lowHp: ["useNow"],
 };
@@ -296,47 +486,115 @@ export const KNOWN_EFFECTS = {
 // ═══════════════════════════════════════════
 //  ITEM ACTIVATION LOGIC
 // ═══════════════════════════════════════════
-function weaponAttack(item, target) {
+// Dano de um golpe. Ordem: base × nível × (bônus de dano), modificadores do ataque,
+// transbordamento e vida baixa, e por fim o crítico. Devolve { dmg, crit }.
+function attackDamage(item, ctx, firstHit) {
+  const p = state.player;
+  let dmg = Math.round(
+    (item.baseDmg + (item.bonusDmg || 0)) *
+      levelMultiplier(item.id) *
+      permanentDamage(),
+  );
+  // Tempestade, Maré, Colheita e Fuga (calculados uma vez por ataque)
+  dmg = Math.round((dmg + ctx.flat) * ctx.mult);
+  // Transbordamento de mana: bônus só no primeiro golpe
+  if (p.manaOverflow) {
+    dmg = Math.round(dmg * (1 + p.manaOverflow));
+    if (firstHit) {
+      log(
+        `🔮 Transbordamento: +${Math.round(p.manaOverflow * 100)}% de dano!`,
+        "item",
+      );
+    }
+    p.manaOverflow = 0;
+  }
+  // Bônus de dano com vida baixa (ex.: Escama Dracônica)
+  for (const { item: owner, effect } of ownedEffects("damage")) {
+    if (effect.type === "lowHpBonus" && p.hp / p.maxHp < effect.threshold) {
+      dmg = Math.round(dmg * (1 + effect.bonus * levelMultiplier(owner.id)));
+    }
+  }
+  const crit = random() < (p.critChance || 0);
+  const base = dmg; // sem o crítico: é o que o Relâmpago em cadeia repassa
+  if (crit) dmg = Math.round(dmg * CRIT_MULT);
+  return { dmg, crit, base };
+}
+
+// Modificadores do ataque inteiro. Um ataque extra herda os do ataque que o gerou.
+function attackModifiers(item, target, extra) {
+  const p = state.player;
+  const ctx = {
+    target,
+    weapon: item,
+    damage: 0,
+    dealt: 0,
+    crit: false,
+    refund: 0,
+    extra,
+    mult: 1,
+    flat: 0,
+    wantExtra: false,
+  };
+  if (extra) return ctx;
+  for (const effect of effectsOf(item, "attack")) {
+    ATTACK_MODS[effect.type]?.(effect, item, ctx);
+  }
+  // Colheita: a foice cobra os abates acumulados
+  if (p.harvestReady && effectsOf(item, "kill").some((e) => e.type === "harvest")) {
+    p.harvestReady = false;
+    ctx.mult *= 2;
+    log(`${item.icon} ${item.name}: colheita! Dano duplo.`, "item");
+  }
+  // Fuga: esquiva reforça o próximo ataque de arma
+  if (p.empowered > 0) {
+    ctx.mult *= 1 + p.empowered;
+    log(`🦇 Fuga: +${Math.round(p.empowered * 100)}% de dano!`, "item");
+    p.empowered = 0;
+  }
+  return ctx;
+}
+
+// extra: objeto quando é o ataque extra da Moeda: ataque comum, sem bônus de uso único
+// (Colheita, Tempestade, Fuga, Maré) e sem contar para Sprint nem gerar outro extra
+function weaponAttack(item, target, extra = null) {
   const p = state.player;
   const hits = item.hits || 1;
-  const ctx = { target, damage: 0, refund: 0 };
+  const ctx = attackModifiers(item, target, extra);
   let totalDmg = 0;
 
   for (let h = 0; h < hits; h++) {
-    // Nível do item e bônus permanente de dano
-    let dmg = Math.round(
-      (item.baseDmg + (item.bonusDmg || 0)) *
-        levelMultiplier(item.id) *
-        (1 + (p.damageBonus || 0)),
-    );
-    // Transbordamento de mana: bônus só no primeiro golpe
-    if (p.manaOverflow) {
-      dmg = Math.round(dmg * (1 + p.manaOverflow));
-      if (h === 0) {
-        log(
-          `🔮 Transbordamento: +${Math.round(p.manaOverflow * 100)}% de dano!`,
-          "item",
-        );
-      }
-      p.manaOverflow = 0;
-    }
-    // Bônus de dano com vida baixa (ex.: Escama Dracônica)
-    for (const { item: owner, effect } of ownedEffects("damage")) {
-      if (effect.type === "lowHpBonus" && p.hp / p.maxHp < effect.threshold) {
-        dmg = Math.round(dmg * (1 + effect.bonus * levelMultiplier(owner.id)));
-      }
-    }
-
-    totalDmg += applyElementalDamage(
+    // Alvo já morto (outra arma, ou o golpe anterior): não gasta mais nada nele
+    if (h > 0 && target.hp <= 0) break;
+    const { dmg, crit, base } = attackDamage(item, ctx, h === 0);
+    const dealt = applyElementalDamage(
       target,
       dmg,
       item.dmgType || "physical",
       "player",
+      crit,
     );
-    ctx.damage = dmg;
+    totalDmg += dealt;
+    ctx.damage = base;
+    ctx.dealt = dealt;
+    ctx.crit = crit;
 
+    if (crit) {
+      spawnEffect("text", target.x, target.y - 75, {
+        life: 35,
+        text: "CRÍTICO!",
+        color: "#ffdd44",
+      });
+      sound("crit");
+      emit("crit", { x: target.x, y: target.y, damage: dealt });
+      for (const { item: owner, effect } of ownedEffects("crit")) {
+        CRIT_EFFECTS[effect.type]?.(effect, owner, ctx);
+      }
+    }
     for (const effect of effectsOf(item, "hit")) {
       HIT_EFFECTS[effect.type]?.(effect, item, ctx);
+    }
+    for (const { item: owner, effect } of ownedEffects("anyHit")) {
+      ANY_HIT_EFFECTS[effect.type]?.(effect, owner, ctx);
     }
     if (h === 0) {
       for (const effect of effectsOf(item, "attack")) {
@@ -362,12 +620,23 @@ function weaponAttack(item, target) {
     life: 35,
     color: item.fxColor,
   });
+
+  if (!extra) {
+    for (const { item: owner, effect } of ownedEffects("anyAttack")) {
+      ANY_ATTACK_EFFECTS[effect.type]?.(effect, owner, ctx);
+    }
+    if (ctx.wantExtra && target.hp > 0) {
+      log(`${ctx.wantExtra.icon} ${ctx.wantExtra.name}: ataque extra!`, "item");
+      ctx.refund += weaponAttack(item, target, { extra: true });
+    }
+  }
   return ctx.refund;
 }
 
 export function activateItem(item) {
   const p = state.player;
-  const enemies = state.enemies.filter((e) => !e.dead);
+  // Inimigo com vida 0 ainda não foi marcado como morto (isso é no updateEnemies)
+  const enemies = state.enemies.filter((e) => !e.dead && e.hp > 0);
   if (enemies.length === 0) return false;
   // Alvo: inimigo mais próximo do jogador
   const target = enemies.reduce((closest, en) =>
@@ -410,9 +679,11 @@ export function updateItemTimers(dt) {
   for (const item of state.items) {
     if (!isActivatable(item)) continue;
     const timer = state.itemTimers[item.id];
-    // Frenesi: armas recarregam mais rápido enquanto dura
+    // Armas recarregam mais rápido com as Botas e enquanto o Frenesi dura
     const speed =
-      item.type === "weapon" && p.berserking ? 1 + p.berserkSpeed : 1;
+      item.type === "weapon"
+        ? 1 + (p.weaponSpeed || 0) + (p.berserking ? p.berserkSpeed : 0)
+        : 1;
     if (timer.elapsed < timer.cooldown) {
       timer.elapsed += dt * speed;
     }
@@ -459,10 +730,23 @@ export function updatePlayerAnim(dt) {
 // ═══════════════════════════════════════════
 //  ENEMY ATTACKS PLAYER
 // ═══════════════════════════════════════════
+// Devolve o resultado: "dodged" | "blocked" | "absorbed" (barreira) | "hit" (dano em HP)
 export function enemyAttack(en) {
   const p = state.player;
   let dmg = en.dmg;
   en.attackAnim = ANIM_MS.enemyAttack;
+
+  // Esquiva (antes do bloqueio): sem dano e sem gastar o escudo
+  if (p.evasion > 0 && random() < p.evasion) {
+    spawnEffect("text", p.x, p.y - 60, { life: 30, text: "ESQUIVA", color: "#aaddff" });
+    log(`🦇 Você esquivou do ataque de ${en.name}!`, "item");
+    sound("dodge");
+    emit("dodge", { x: p.x, y: p.y });
+    for (const { item, effect } of ownedEffects("dodge")) {
+      DODGE_EFFECTS[effect.type]?.(effect, item, p);
+    }
+    return "dodged";
+  }
 
   // Block
   if (p.nextBlockActive) {
@@ -477,6 +761,7 @@ export function enemyAttack(en) {
       );
     if (reflected > 0) {
       en.hp -= reflected;
+      en.lastHitCrit = false;
       en.hurtTimer = 12;
       log(
         `🔰 Parry! Bloqueio reflete ${reflected} de dano para ${en.name}!`,
@@ -488,24 +773,27 @@ export function enemyAttack(en) {
     sound("block");
     spawnEffect("shield", p.x, p.y - 40, { life: 25 });
     emit("blocked", { x: p.x, y: p.y });
-    return;
+    return "blocked";
   }
 
   // Barrier
   if (p.barrier > 0) {
     const absorbed = Math.min(dmg, p.barrier);
     p.barrier -= absorbed;
+    const broke = p.barrier <= 0;
     const ratio = ownedEffects("barrierAbsorb")
       .filter(({ effect }) => effect.type === "reflect")
       .reduce((sum, { item, effect }) => sum + effect.ratio * levelMultiplier(item.id), 0);
     const reflected = Math.round(absorbed * ratio);
     en.hp -= reflected;
+    if (reflected > 0) en.lastHitCrit = false;
     dmg -= absorbed;
     if (reflected > 0)
       log(`🐉 Barreira reflete ${reflected} de dano para ${en.name}!`, "item");
+    if (broke) breakBarrier(p);
     if (dmg <= 0) {
       log(`🐉 Barreira absorve o ataque!`, "item");
-      return;
+      return "absorbed";
     }
   }
 
@@ -513,13 +801,10 @@ export function enemyAttack(en) {
   // Armadura reduz até MAX_ARMOR% (melhoria Guarda não tem teto de nível)
   dmg = Math.max(1, Math.round(dmg * (1 - Math.min(p.armor, MAX_ARMOR) / 100)));
 
-  // Dano recebido vira mana (ex.: Manto do Mago)
+  // Dano recebido vira mana (Manto do Arcano) ou volta ao atacante (Cota de Malha)
+  const hurtCtx = { enemy: en, damage: dmg };
   for (const { item, effect } of ownedEffects("hurt")) {
-    if (effect.type !== "manaFromDamage") continue;
-    const manaAbsorb = Math.round(dmg * effect.ratio * levelMultiplier(item.id));
-    p.mana = Math.min(p.maxMana, p.mana + manaAbsorb);
-    if (manaAbsorb > 0)
-      log(`${item.icon} ${item.name} absorve: +${manaAbsorb} Mana.`, "item");
+    HURT_EFFECTS[effect.type]?.(effect, item, hurtCtx);
   }
 
   p.hp -= dmg;
@@ -529,6 +814,17 @@ export function enemyAttack(en) {
   log(`💀 ${en.name} ataca: ${dmg} de dano!`, "dmg");
 
   checkPlayerDeath();
+  return "hit";
+}
+
+// A barreira chegou a 0 absorvendo dano: o item que a criou pode reagir (explosão)
+function breakBarrier(p) {
+  const source = state.items.find((i) => i.id === p.barrierSource);
+  p.barrierSource = null;
+  if (!source) return;
+  for (const effect of effectsOf(source, "barrierBreak")) {
+    BARRIER_BREAK_EFFECTS[effect.type]?.(effect, source, p);
+  }
 }
 
 // Morte ou renascimento quando a vida do herói chega a 0 (golpes e dano contínuo)
@@ -577,7 +873,10 @@ export function updateEnemies(dt) {
     const dist = en.x - playerX;
     const combatDist = 80;
 
-    if (dist > combatDist && en.moving) {
+    if (en.frozen > 0) {
+      // Congelado: não anda e o tempo de ataque não avança
+      en.frozen = Math.max(0, en.frozen - dt);
+    } else if (dist > combatDist && en.moving) {
       en.x -= en.speed * dt * 0.06;
     } else {
       en.moving = false;
@@ -606,6 +905,9 @@ export function updateEnemies(dt) {
         `💀 ${en.name} foi derrotado! +${en.fragments || 1} fragmentos.`,
         "kill",
       );
+      for (const { item, effect } of ownedEffects("kill")) {
+        KILL_EFFECTS[effect.type]?.(effect, item, en);
+      }
     }
   });
 }

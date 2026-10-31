@@ -227,8 +227,12 @@ class Rig {
     return this.current.time >= this.current.getClip().duration - 1e-3 || !this.current.isRunning();
   }
 
-  setFlash(amount) {
-    for (const m of this.flashMaterials) m.emissive.setScalar(amount);
+  // freeze 0..1: brilho azul gelado no mesmo emissive do flash (sem material novo)
+  setFlash(amount, freeze = 0) {
+    const r = amount + 0.08 * freeze;
+    const g = amount + 0.3 * freeze;
+    const b = amount + 0.5 * freeze;
+    for (const m of this.flashMaterials) m.emissive.setRGB(r, g, b);
   }
 
   update(dtSec) {
@@ -731,8 +735,10 @@ export function createCharacters(scene) {
       }
       if (rec.rig) {
         const flash = !en.dead && en.hurtTimer > 0 ? 0.55 * Math.min(1, en.hurtTimer / 12) : 0;
-        rec.rig.setFlash(flash);
-        rec.rig.update(dtSec);
+        // Congelado: tom gelado e animação parada no quadro atual
+        const frozen = !en.dead && en.frozen > 0;
+        rec.rig.setFlash(flash, frozen ? 1 : 0);
+        rec.rig.update(frozen ? 0 : dtSec);
       }
       if (tickHurt && !en.dead && en.hurtTimer > 0) en.hurtTimer -= 1;
       rec.lastHurt = en.hurtTimer;

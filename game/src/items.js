@@ -14,18 +14,6 @@ export const RARITIES = {
   legendary: { label: "Lendário", color: "#c9a84c" },
 };
 
-// Itens que ainda não têm efeito no código: ficam fora do sorteio até a fase de itens
-export const UNIMPLEMENTED_ITEMS = new Set([
-  "crystal_armor",
-  "ancient_tome",
-  "time_glass",
-  "shadow_cloak",
-  "vampiric_amulet",
-  "speed_boots",
-  "lucky_coin",
-  "cursed_ring",
-]);
-
 // Pesos de raridade no sorteio (maior = mais comum)
 const RARITY_WEIGHTS = {
   common: 40,
@@ -122,19 +110,44 @@ export function addItemOrLevel(item) {
   return { leveled: false, level: 1 };
 }
 
+// Evasão não passa disso, por mais itens e níveis que existam
+export const MAX_EVASION = 0.5;
+
+// Vida máxima = base (meta.applyUpgrades) × (1 + penalidades dos itens). Idempotente:
+// sempre parte de baseMaxHp, e a vida atual nunca passa do novo máximo.
+export function applyMaxHp(p = state.player) {
+  const mult = ownedEffects("passive").reduce(
+    (sum, { effect }) => (effect.type === "stats" ? sum + (effect.maxHpMult || 0) : sum),
+    1,
+  );
+  p.maxHp = Math.max(1, Math.round((p.baseMaxHp ?? PLAYER_BASE.maxHp) * mult));
+  p.hp = Math.min(p.hp, p.maxHp);
+}
+
 // Recalcula os atributos vindos de efeitos passivos ("stats")
 export function applyPassives() {
   const p = state.player;
   p.armor = p.baseArmor ?? PLAYER_BASE.armor;
   p.maxMana = PLAYER_BASE.maxMana;
   p.magicBoost = PLAYER_BASE.magicBoost;
+  p.critChance = PLAYER_BASE.critChance;
+  p.evasion = 0;
+  p.weaponSpeed = 0;
+  p.damageBoost = 0;
   for (const { item, effect } of ownedEffects("passive")) {
     if (effect.type !== "stats") continue;
     const k = levelMultiplier(item.id);
     p.armor += Math.round((effect.armor || 0) * k);
     p.maxMana += Math.round((effect.maxMana || 0) * k);
     p.magicBoost += (effect.magicBoost || 0) * k;
+    p.critChance += (effect.critChance || 0) * k;
+    p.evasion += (effect.evasion || 0) * k;
+    p.weaponSpeed += (effect.weaponSpeed || 0) * k;
+    p.damageBoost += (effect.damageBoost || 0) * k;
   }
+  p.critChance = Math.min(1, p.critChance);
+  p.evasion = Math.min(MAX_EVASION, p.evasion);
+  applyMaxHp(p);
 }
 
 // Itens novos começam com a recarga pronta; os existentes acompanham nível e melhorias
@@ -151,16 +164,22 @@ export function ensureTimers() {
   }
 }
 
+// Nível de um item que o jogador já tem (0 se não tem). Save migrado pode ter o
+// item sem entrada em itemLevels: conta como nível 1.
+function ownedLevel(id) {
+  if (state.itemLevels[id]) return state.itemLevels[id];
+  return state.items.some((i) => i.id === id) ? 1 : 0;
+}
+
 // ─── Sorteio ───
 // excludeIds: itens que não podem aparecer; type: só um tipo (ex.: "weapon").
-// Itens no nível máximo nunca aparecem.
+// Itens no nível máximo nunca aparecem (os que o jogador ainda não tem sempre podem).
 export function generateRandomItems(count, excludeIds = new Set(), { type } = {}) {
   const pool = catalog.filter(
     (i) =>
-      !UNIMPLEMENTED_ITEMS.has(i.id) &&
       !excludeIds.has(i.id) &&
       (!type || i.type === type) &&
-      itemLevel(i.id) < maxLevelOf(i),
+      ownedLevel(i.id) < maxLevelOf(i),
   );
   const selectedItems = [];
   const usedIds = new Set();

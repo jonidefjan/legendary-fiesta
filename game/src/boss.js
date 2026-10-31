@@ -138,13 +138,12 @@ function fireNova(boss) {
   log(`🔥 ${boss.name} lança uma Nova de Fogo!`, "dmg");
   // O próprio chefe ataca (com dano temporário), para o Parry e o reflexo da
   // barreira acertarem ele e não uma cópia
-  const blocked = p.nextBlockActive;
   const dmg = boss.dmg;
   boss.dmg = Math.round(dmg * 1.5);
-  enemyAttack(boss);
+  const outcome = enemyAttack(boss);
   boss.dmg = dmg;
-  // Bloqueio perfeito também evita a queimadura
-  if (!blocked && state.running && p.hp > 0) {
+  // Esquiva e bloqueio perfeito evitam a queimadura; barreira que absorve não
+  if (outcome !== "dodged" && outcome !== "blocked" && state.running && p.hp > 0) {
     applyDot(p, "burning", Math.max(1, Math.round(boss.dmg * 0.25)), 3);
   }
 }
@@ -167,6 +166,8 @@ export function updateBosses(dt) {
     if (boss.kind === "demon" && !boss.enraged && boss.hp / boss.maxHp < ENRAGE_RATIO) {
       enrage(boss);
     }
+    // Congelado: nem a recarga das habilidades avança
+    if (boss.frozen > 0) continue;
     boss.abilityTimer += dt;
     if (boss.abilityTimer < boss.abilityInterval) continue;
     boss.abilityTimer = 0;

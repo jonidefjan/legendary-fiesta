@@ -1,6 +1,6 @@
 // Utilidades dos testes: catálogo real do items.json, runs prontas e eventos capturados
 import { readFileSync } from "node:fs";
-import { state, resetRun } from "../game/src/state.js";
+import { state, resetRun, PLAYER_BASE } from "../game/src/state.js";
 import {
   setItems,
   findItem,
@@ -9,6 +9,11 @@ import {
 } from "../game/src/items.js";
 import { setRandom } from "../game/src/random.js";
 import { on, clearListeners } from "../game/src/events.js";
+
+// Os 5% de crítico base deixariam os testes de dano aleatórios: aqui começa em 0.
+// Testes de crítico definem state.player.critChance (ou usam REAL_CRIT_CHANCE).
+export const REAL_CRIT_CHANCE = PLAYER_BASE.critChance;
+PLAYER_BASE.critChance = 0;
 
 export const ITEMS = JSON.parse(
   readFileSync(new URL("../game/assets/items.json", import.meta.url), "utf8"),

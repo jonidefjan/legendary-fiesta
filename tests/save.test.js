@@ -55,14 +55,14 @@ test("resetar tudo apaga também os fragmentos", () => {
   assert.deepEqual(storage.data, {});
 });
 
-test("save da versão 1 é migrado: IDs, fragmentos e itens sem efeito removidos", () => {
+test("save da versão 1 é migrado: IDs, fragmentos e itens cortados removidos", () => {
   const legacy = {
     wave: 3,
     kills: 7,
     score: 210,
     gold: 40,
     fragments: 12,
-    items: [item("ember_blade"), { id: "lucky_coin", name: "antigo" }],
+    items: [item("ember_blade"), { id: "time_glass", name: "antigo" }],
     itemTimers: { ember_blade: { elapsed: 1000, cooldown: 3000 } },
     playerHp: 55,
     playerMaxHp: 100,
@@ -91,7 +91,7 @@ test("save da versão 1 é migrado: IDs, fragmentos e itens sem efeito removidos
   assert.equal(storage.data.reliquary_save_v1, undefined, "chave antiga removida");
   assert.deepEqual(JSON.parse(storage.data[save.RUN_KEY]).items, [
     "ember_blade",
-    "lucky_coin",
+    "time_glass",
   ]);
 });
 
