@@ -14,7 +14,10 @@ export const PAD = 1;
 const PITCH = THREE.MathUtils.degToRad(CAMERA.pitchDeg);
 const DISTANCE = 60; // da câmera ao alvo (ortográfica: só afeta near/far)
 // Meia largura mínima da vista: herói em X ≈ -5,6 e inimigos parados à frente
-const MIN_HALF_WIDTH = 7.2;
+// (25% mais aberta, junto com CAMERA.viewHeight)
+const MIN_HALF_WIDTH = 9;
+// Folga na borda direita para o inimigo inteiro (corpo, nome e barra de vida) caber
+const SPAWN_MARGIN = 2;
 // Altura em mundo de 1 px lógico (vertical e tamanhos de efeitos/partículas)
 export const LOGIC_Y_SCALE = 0.032;
 const GROUND_RATIO = 0.55; // chão lógico = 55% da altura da arena (waves.js)
@@ -98,6 +101,14 @@ export function logicToWorldY(y) {
 
 export function logicGroundY() {
   return arena.height * GROUND_RATIO;
+}
+
+// Maior x lógico que ainda aparece inteiro na tela: os inimigos nascem até aqui
+// (em tela estreita a vista não alcança a borda direita da arena lógica)
+export function visibleLogicRight() {
+  const edge = CAMERA.target.x + view.halfW - SPAWN_MARGIN;
+  const x = (edge / WORLD.battleWidth + 0.5) * arena.width;
+  return Math.min(arena.width, Math.max(0, x));
 }
 
 // Texels do quadro baixa resolução por px lógico (tamanho de efeitos)

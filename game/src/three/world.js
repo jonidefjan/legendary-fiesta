@@ -25,6 +25,6 @@ export const LOW_RES_HEIGHT = 240;
 // Câmera ortográfica em diorama 3/4: inclinação para baixo e altura da vista em unidades
 export const CAMERA = {
   pitchDeg: 35,
-  viewHeight: 10, // quanto do mundo cabe na altura da tela (herói com ~45 px de arte)
+  viewHeight: 12.5, // quanto do mundo cabe na altura da tela (25% mais aberta que os 10 originais)
   target: { x: 0, y: 0.8, z: -1 }, // ponto que fica no centro da tela
 };

@@ -57,12 +57,26 @@ export function waveScales(waveNum, mobile = false) {
   };
 }
 
-// Um inimigo comum da onda. index espaça os inimigos em fila
-export function createEnemy(typeIdx, waveNum, { width, height, mobile = false }, index = 0) {
+// Fila de entrada: do ponto inicial (mais longe no celular) até a borda direita
+// visível (maxX). Ondas grandes ficam mais juntas em vez de nascer fora da tela;
+// sem maxX o espaçamento é o de sempre (90 px)
+const LINEUP_SPACING = 90;
+const LINEUP_JITTER = 40;
+
+export function lineupX(index, count, { width, mobile = false, maxX = Infinity }) {
+  const start = Math.min(width * 0.6 * (mobile ? 1.4 : 1), maxX - LINEUP_JITTER);
+  const room = maxX - LINEUP_JITTER - start;
+  const spacing =
+    count > 1 ? Math.max(0, Math.min(LINEUP_SPACING, room / (count - 1))) : 0;
+  return start + index * spacing + random() * LINEUP_JITTER;
+}
+
+// Um inimigo comum da onda: index e count posicionam ele na fila de entrada
+export function createEnemy(typeIdx, waveNum, arena, index = 0, count = 1) {
+  const { height, mobile = false } = arena;
   const base = ENEMY_TYPES[typeIdx];
   const scales = waveScales(waveNum, mobile);
   const groundY = height * 0.55;
-  const mobileMultiplier = mobile ? 1.4 : 1.0;
   const mobileSpeedReduction = mobile ? 0.7 : 1.0;
   return {
     ...base,
@@ -70,7 +84,7 @@ export function createEnemy(typeIdx, waveNum, { width, height, mobile = false },
     maxHp: Math.round(base.hp * scales.hp),
     dmg: Math.round(base.dmg * scales.dmg),
     speed: base.speed * mobileSpeedReduction,
-    x: width * 0.6 * mobileMultiplier + index * 90 + random() * 40,
+    x: lineupX(index, count, arena),
     y: groundY,
     phase: random() * Math.PI * 2,
     hurtTimer: 0,
@@ -90,7 +104,7 @@ export function createWave(waveNum, arena) {
     const typeIdx = Math.floor(
       random() * Math.min(ENEMY_TYPES.length, Math.ceil(waveNum / 2)),
     );
-    enemies.push(createEnemy(typeIdx, waveNum, arena, i));
+    enemies.push(createEnemy(typeIdx, waveNum, arena, i, count));
   }
   return enemies;
 }

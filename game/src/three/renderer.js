@@ -14,6 +14,9 @@ import * as THREE from "three";
 import { state } from "../state.js";
 import * as particles from "../particles.js";
 import { arena, view, resizeView, updateCamera, logicGroundY } from "./view.js";
+
+// Limite de nascimento dos inimigos (main.js passa para waves.js/boss.js)
+export { visibleLogicRight } from "./view.js";
 import { createPipeline } from "./pipeline.js";
 import { createLighting } from "./lighting.js";
 import { createCharacters } from "./characters.js";

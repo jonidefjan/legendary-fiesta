@@ -150,3 +150,13 @@ test("esquivar da Nova de Fogo também evita a queimadura", () => {
   assert.equal(state.player.hp, state.player.maxHp);
   assert.equal(state.player.dots.length, 0);
 });
+
+test("chefe, escolta e invocados nascem dentro da tela (maxX)", () => {
+  setupRun();
+  setRandom(() => 0.999);
+  const maxX = 600;
+  const enemies = createBossWave(10, { ...arena, maxX });
+  for (const en of enemies) assert.ok(en.x <= maxX, `${en.name}: x ${en.x} > ${maxX}`);
+  const boss = enemies.find((e) => e.isBoss);
+  assert.equal(boss.arena.maxX, maxX);
+});

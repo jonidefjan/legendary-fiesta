@@ -190,6 +190,8 @@ function spawnWave(waveNum) {
     width: canvas.width,
     height: canvas.height,
     mobile: ui.isMobile,
+    // Ninguém nasce fora da tela: o herói ataca o mais próximo, visível ou não
+    maxX: render.visibleLogicRight(),
   };
   state.enemies = boss.isBossWave(waveNum)
     ? boss.createBossWave(waveNum, arena)
