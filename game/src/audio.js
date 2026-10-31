@@ -207,6 +207,31 @@ export const sfx = (() => {
         });
       });
     },
+    // ─── Chefes ───
+    // Lich invoca: sussurro grave subindo + sinos frios
+    summon() {
+      play("summon", 2, (a) => {
+        tone(a, 110, 0.6, "sawtooth", 0.03, 220, 0, 0.15, 7);
+        noise(a, 0.5, 0.02, "bandpass", 400, 1600, 3);
+        [880, 740, 988].forEach((f, i) => tone(a, f, 0.25, "sine", 0.02, 0, 0.25 + i * 0.09));
+      });
+    },
+    // Senhor Demônio: explosão de fogo (ruído grave descendo + estalo)
+    nova() {
+      play("nova", 2, (a) => {
+        noise(a, 0.7, 0.06, "lowpass", 2400, 120, 1);
+        tone(a, 140, 0.5, "sawtooth", 0.04, 45);
+        noise(a, 0.12, 0.04, "highpass", 3000, 0, 1, 0.05);
+      });
+    },
+    // Fúria: rugido rouco subindo
+    enrage() {
+      play("enrage", 2, (a) => {
+        tone(a, 70, 0.8, "sawtooth", 0.05, 160, 0, 0.1, 12);
+        tone(a, 72, 0.8, "square", 0.025, 150, 0, 0.1, -12);
+        noise(a, 0.6, 0.025, "bandpass", 300, 900, 2);
+      });
+    },
     enemyHit() {
       play("enemyHit", 1, (a) => {
         tone(a, 160, 0.1, "sawtooth", 0.035, 90);

@@ -49,39 +49,48 @@ export const ENEMY_TYPES = [
   },
 ];
 
-// Cria os inimigos de uma onda. mobile: começam mais longe, mais lentos e batem menos
-export function createWave(waveNum, { width, height, mobile = false }) {
-  const groundY = height * 0.55;
-  const count = 2 + waveNum;
-  const hpScale = 1 + (waveNum - 1) * 0.2;
-  const dmgScale = 1 + (waveNum - 1) * 0.15;
+// Escalas da onda (vida +20%, dano +15% por onda); mobile bate menos
+export function waveScales(waveNum, mobile = false) {
+  return {
+    hp: 1 + (waveNum - 1) * 0.2,
+    dmg: (1 + (waveNum - 1) * 0.15) * (mobile ? 0.85 : 1),
+  };
+}
 
+// Um inimigo comum da onda. index espaça os inimigos em fila
+export function createEnemy(typeIdx, waveNum, { width, height, mobile = false }, index = 0) {
+  const base = ENEMY_TYPES[typeIdx];
+  const scales = waveScales(waveNum, mobile);
+  const groundY = height * 0.55;
   const mobileMultiplier = mobile ? 1.4 : 1.0;
   const mobileSpeedReduction = mobile ? 0.7 : 1.0;
-  const mobileDmgReduction = mobile ? 0.85 : 1.0;
+  return {
+    ...base,
+    hp: Math.round(base.hp * scales.hp),
+    maxHp: Math.round(base.hp * scales.hp),
+    dmg: Math.round(base.dmg * scales.dmg),
+    speed: base.speed * mobileSpeedReduction,
+    x: width * 0.6 * mobileMultiplier + index * 90 + random() * 40,
+    y: groundY,
+    phase: random() * Math.PI * 2,
+    hurtTimer: 0,
+    atkTimer: 0,
+    dead: false,
+    moving: true,
+    dots: [],
+    burning: 0,
+  };
+}
 
+// Cria os inimigos de uma onda. mobile: começam mais longe, mais lentos e batem menos
+export function createWave(waveNum, arena) {
+  const count = 2 + waveNum;
   const enemies = [];
   for (let i = 0; i < count; i++) {
     const typeIdx = Math.floor(
       random() * Math.min(ENEMY_TYPES.length, Math.ceil(waveNum / 2)),
     );
-    const base = ENEMY_TYPES[typeIdx];
-    enemies.push({
-      ...base,
-      hp: Math.round(base.hp * hpScale),
-      maxHp: Math.round(base.hp * hpScale),
-      dmg: Math.round(base.dmg * dmgScale * mobileDmgReduction),
-      speed: base.speed * mobileSpeedReduction,
-      x: width * 0.6 * mobileMultiplier + i * 90 + random() * 40,
-      y: groundY,
-      phase: random() * Math.PI * 2,
-      hurtTimer: 0,
-      atkTimer: 0,
-      dead: false,
-      moving: true,
-      dots: [],
-      burning: 0,
-    });
+    enemies.push(createEnemy(typeIdx, waveNum, arena, i));
   }
   return enemies;
 }

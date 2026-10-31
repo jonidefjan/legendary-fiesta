@@ -17,7 +17,12 @@ import { state } from "./state.js";
 import { random } from "./random.js";
 import { emit, log, sound } from "./events.js";
 import { spawnEffect, spawnNumber } from "./fx.js";
-import { effectsOf, ownedEffects, isActivatable } from "./items.js";
+import {
+  effectsOf,
+  ownedEffects,
+  isActivatable,
+  levelMultiplier,
+} from "./items.js";
 
 // Duração (ms) das poses de animação; o renderer 3D (three/characters.js) usa o tempo restante
 export const ANIM_MS = {
@@ -164,7 +169,9 @@ export function processDots(dt) {
 const HIT_EFFECTS = {
   dot(effect, item, ctx) {
     if (!rolls(effect)) return;
-    applyDot(ctx.target, effect.dot, effect.damage, effect.duration, true);
+    // Dano contínuo cresce com o nível; a chance não muda
+    const damage = Math.round(effect.damage * levelMultiplier(item.id));
+    applyDot(ctx.target, effect.dot, damage, effect.duration, true);
     const dot = DOTS[effect.dot];
     log(
       `${dot?.icon || "✨"} ${ctx.target.name} ${dot?.verb || "sofre dano contínuo"}! (DoT stacking)`,
@@ -211,10 +218,11 @@ const USE_EFFECTS = {
     p.anim = "block";
   },
   barrier(effect, item, p) {
-    p.barrier = effect.amount;
+    const amount = Math.round(effect.amount * levelMultiplier(item.id));
+    p.barrier = amount;
     spawnEffect("dragon_roar", p.x, p.y - 40, { life: 50 });
     log(
-      `${item.icon} ${item.name}: barreira de ${effect.amount} HP ativada!`,
+      `${item.icon} ${item.name}: barreira de ${amount} HP ativada!`,
       "item",
     );
     p.anim = "berserk";
@@ -225,7 +233,9 @@ const USE_EFFECTS = {
     const bonus = effect.bonusEvery
       ? Math.floor(charges / effect.bonusEvery) * effect.bonusAmount
       : 0;
-    const healAmt = effect.amount + bonus;
+    const healAmt = Math.round(
+      (effect.amount + bonus) * levelMultiplier(item.id),
+    );
     p.hp = Math.min(p.maxHp, p.hp + healAmt);
     spawnEffect("heal", p.x, p.y - 50, { life: 45 });
     spawnNumber(p.x, p.y - 60, `+${healAmt}`, "#44cc88", 2);
@@ -234,7 +244,8 @@ const USE_EFFECTS = {
   },
   mana(effect, item, p) {
     const overflow = p.mana >= p.maxMana;
-    p.mana = Math.min(p.maxMana, p.mana + effect.amount);
+    const amount = Math.round(effect.amount * levelMultiplier(item.id));
+    p.mana = Math.min(p.maxMana, p.mana + amount);
     spawnEffect("mana_orb", p.x, p.y - 50, { life: 35 });
     if (overflow && effect.overflowBonus) {
       p.manaOverflow = effect.overflowBonus;
@@ -243,17 +254,18 @@ const USE_EFFECTS = {
         "item",
       );
     } else {
-      log(`${item.icon} ${item.name}: +${effect.amount} Mana.`, "item");
+      log(`${item.icon} ${item.name}: +${amount} Mana.`, "item");
     }
     p.anim = "heal";
   },
   frenzy(effect, item, p) {
     p.berserking = true;
-    p.berserkRemaining = effect.duration;
+    const duration = Math.round(effect.duration * levelMultiplier(item.id));
+    p.berserkRemaining = duration;
     p.berserkSpeed = effect.speedBonus;
     spawnEffect("berserk", p.x, p.y - 40, { life: 60 });
     log(
-      `${item.icon} ${item.name}: Frenesi ativado por ${effect.duration / 1000} segundos!`,
+      `${item.icon} ${item.name}: Frenesi ativado por ${duration / 1000} segundos!`,
       "item",
     );
     p.anim = "berserk";
@@ -284,7 +296,12 @@ function weaponAttack(item, target) {
   let totalDmg = 0;
 
   for (let h = 0; h < hits; h++) {
-    let dmg = item.baseDmg + (item.bonusDmg || 0);
+    // Nível do item e bônus permanente de dano
+    let dmg = Math.round(
+      (item.baseDmg + (item.bonusDmg || 0)) *
+        levelMultiplier(item.id) *
+        (1 + (p.damageBonus || 0)),
+    );
     // Transbordamento de mana: bônus só no primeiro golpe
     if (p.manaOverflow) {
       dmg = Math.round(dmg * (1 + p.manaOverflow));
@@ -446,7 +463,11 @@ export function enemyAttack(en) {
     // Parry: itens com efeito "block" refletem dano
     const reflected = ownedEffects("block")
       .filter(({ effect }) => effect.type === "reflect")
-      .reduce((sum, { effect }) => sum + effect.damage, 0);
+      .reduce(
+        (sum, { item, effect }) =>
+          sum + Math.round(effect.damage * levelMultiplier(item.id)),
+        0,
+      );
     if (reflected > 0) {
       en.hp -= reflected;
       en.hurtTimer = 12;

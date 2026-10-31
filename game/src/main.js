@@ -110,6 +110,30 @@ on("revive", () => {
   feel.hitStop(90, state.gameSpeed);
 });
 
+// Habilidades dos chefes: partículas no chefe e tremida proporcional ao perigo
+on("bossAbility", ({ kind, x, y }) => {
+  if (kind === "summon") {
+    particles.emit("hit", x, y - 30, { element: "shadow", intensity: 1 });
+    particles.emit("death", x - 50, y - 10);
+    particles.emit("death", x + 50, y - 10);
+    feel.addShake(0.25);
+  } else if (kind === "nova") {
+    for (const dx of [-60, -30, 0, 30, 60]) {
+      particles.emit("hit", x + dx, y - 20, { element: "fire", intensity: 1 });
+    }
+    particles.emit("hit", state.player.x, state.player.y - 25, {
+      element: "fire",
+      intensity: 1,
+      direction: -1,
+    });
+    feel.addShake(0.5);
+    feel.hitStop(70, state.gameSpeed);
+  } else if (kind === "enrage") {
+    particles.emit("frenzy", x, y - 40, { intensity: 1 });
+    feel.addShake(0.4);
+  }
+});
+
 on("playerDied", () => {
   // A run acaba aqui: recarregar a página não pode trazê-la de volta
   save.clearRun();
