@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arte dos itens (dev)</title>
+    <!-- Folha de contato para revisar a arte; não é linkada pelo jogo. ?lang=en troca o idioma -->
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #12101a;
+        color: #ead4aa;
+        font: 13px monospace;
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0 0 12px;
+      }
+      #grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+      }
+      .cell {
+        background: #1c1828;
+        border: 1px solid #3a3350;
+        border-radius: 6px;
+        padding: 8px;
+        text-align: center;
+      }
+      /* 16 px × 4 = 64 px, escala inteira e sem suavização */
+      .art {
+        position: relative;
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 6px;
+      }
+      .art img.item-sprite {
+        width: 64px;
+        height: 64px;
+        image-rendering: pixelated;
+        display: block;
+      }
+      .art img.element-badge {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 28px;
+        height: 28px;
+        image-rendering: pixelated;
+      }
+      .id {
+        color: #8a82a6;
+        font-size: 11px;
+      }
+      .name {
+        margin: 2px 0;
+        font-size: 13px;
+      }
+      .missing {
+        color: #e05050;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Arte dos itens</h1>
+    <div id="grid"></div>
+    <script type="module">
+      import { setItems } from "../src/items.js";
+      import { setLangQuiet, normalizeLang } from "../src/i18n.js";
+      import { itemSpriteURL, itemElement, elementSpriteURL } from "../src/sprites.js";
+
+      const lang = normalizeLang(new URLSearchParams(location.search).get("lang")) || "pt-BR";
+      setLangQuiet(lang);
+      document.documentElement.lang = lang;
+      // setItems já traduz o catálogo no idioma escolhido
+      const items = await (await fetch("../assets/items.json")).json();
+      setItems(items);
+
+      const grid = document.getElementById("grid");
+      for (const item of items) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        const url = itemSpriteURL(item.id);
+        const el = itemElement(item.id);
+        const elUrl = el ? elementSpriteURL(el) : null;
+        cell.innerHTML = `
+          <div class="art">
+            ${url ? `<img class="item-sprite" src="${url}" alt="">` : `<span style="font-size:48px">${item.icon}</span>`}
+            ${elUrl ? `<img class="element-badge" src="${elUrl}" alt="">` : ""}
+          </div>
+          <div class="name">${item.name}</div>
+          <div class="id">${item.id} · ${item.rarity}</div>
+          <div class="id ${url ? "" : "missing"}">${url ? (el || "sem elemento") : "SEM ARTE"}</div>`;
+        grid.appendChild(cell);
+      }
+    </script>
+  </body>
+</html>

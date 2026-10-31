@@ -12,6 +12,7 @@ import {
 } from "./items.js";
 import { t, formatNumber } from "./i18n.js";
 import { defaultCollapsed } from "./layout.js";
+import { itemIconHTML } from "./sprites.js";
 
 export const isMobile =
   "ontouchstart" in window || navigator.maxTouchPoints > 0;
@@ -36,7 +37,7 @@ export function renderInventory() {
       const level = itemLevel(item.id);
       if (level >= maxLevelOf(item) && maxLevelOf(item) > 1) slot.classList.add("max-level");
       slot.innerHTML = `
-        <div class="item-icon">${item.icon}</div>
+        <div class="item-icon">${itemIconHTML(item)}</div>
         <div class="rarity-gem rarity-${item.rarity}"></div>
         ${level > 1 ? `<div class="level-badge">${ROMAN[level]}</div>` : ""}
         <div class="cooldown-overlay" id="cd-text-${item.id}"></div>
@@ -74,7 +75,7 @@ function showTooltip(item, e) {
   const level = itemLevel(item.id);
   const cooldown = item.cooldown > 0 ? effectiveCooldown(item) : 0;
   tooltip.innerHTML = `
-    <div class="tt-name" style="color:${r.color}">${item.icon} ${item.name}</div>
+    <div class="tt-name" style="color:${r.color}"><span class="inline-icon tt-icon">${itemIconHTML(item, { badge: false })}</span> ${item.name}</div>
     <div class="tt-rarity" style="color:${r.color}">${r.label}</div>
     <div class="tt-level">${t("item.level", { level, max: maxLevelOf(item) })}</div>
     <div class="tt-desc">${item.desc}</div>
@@ -195,7 +196,7 @@ function itemCard(item, onClick) {
   card.innerHTML = `
     ${tag}
     <div class="item-choice-type">${getTypeLabel(item.type)}</div>
-    <div class="item-choice-icon">${item.icon}</div>
+    <div class="item-choice-icon">${itemIconHTML(item)}</div>
     <div class="item-choice-name">${item.name}</div>
     <div class="item-choice-rarity rarity-${item.rarity}">${rarityInfo.label}</div>
     <div class="item-choice-desc">${item.desc}</div>
@@ -353,7 +354,7 @@ function renderGameOver() {
   let favoriteItem = "—";
   if (g.favorite) {
     const item = findItem(g.favorite.id);
-    if (item) favoriteItem = `${item.icon} ${item.name} (${g.favorite.count}×)`;
+    if (item) favoriteItem = `<span class="inline-icon">${itemIconHTML(item, { badge: false })}</span> ${item.name} (${g.favorite.count}×)`;
   }
 
   $("go-subtitle").textContent = t("gameover.sub", { wave: g.wave });

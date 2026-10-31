@@ -1,109 +1,101 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Atualizado em 2026-10-30. Este arquivo é reescrito sempre que o contexto da conversa chega perto do limite.
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #11 (commit `117f7cf`).
 
 ## O que é
-Repositório `jonidefjan/legendary-fiesta`:
-- **Portfólio** (`index.html`): site jm77os.com.br (o usuário **não** é dono de jonatas.dev).
-  - Já em produção: i18n EN (padrão) / pt-BR, tema claro/escuro seguindo o sistema, seção Projetos comentada e link para `/game`.
-  - Scripts inline de propósito.
-- **Reliquary** (`game/`): auto-battler em JS puro (ES modules, sem build), 3D pixel art com Three.js 0.170 vendorizado em `game/vendor/three` (import map).
-  - Testes: `npm test` (node:test), **100 passando**.
+O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
+- **Portfólio** (`index.html`): o site jm77os.com.br. O usuário **não** é dono de jonatas.dev.
+  - Tem i18n EN (padrão) e pt-BR, com a chave `lang` no localStorage, e tema claro/escuro.
+- **Reliquary** (`game/`): auto-battler em JS puro, sem build.
+  - 3D pixel art com Three.js 0.170, vendorizado em `game/vendor/three`.
+  - Testes: `npm test` na raiz (**206** passando).
 
-## Estado atual
-- Fases 0 a 4 já foram mergeadas na `main` (PRs #2 a #5 e #7). A última é o commit `32fa459`.
-- A câmera está 25% mais afastada (`viewHeight` 12.5, `MIN_HALF_WIDTH` 9). Os inimigos nascem até `visibleLogicRight()` (`arena.maxX`) e nunca fora da tela (PR #8, commit `7913c11`). No celular (até 480 px), os botões ficam numa linha no alto da arena.
-- O inventário virou uma barra no topo que dá para recolher (PR #6, commit `99e2a2a`). A escolha de aberto/fechado fica salva em `localStorage` (`reliquary_inv_collapsed`), e a arena é redimensionada por um ResizeObserver.
-- **Fase 4 (itens):**
-  - Decisões:
-    - criar o crítico (base 5%, ×1,5);
-    - reescrever os textos do que o jogo não tem;
-    - Manto: esquivar dá +50% no próximo ataque;
-    - Anel: o Pacto vai até +25% por run;
-    - cortar o tomo e a ampulheta.
-  - Todos os itens funcionam. 140 testes passam.
-  - Campos novos do jogador salvos: `pactBonus`, `counters`, `harvestReady`, `empowered`.
-  - `enemy.frozen` é medido em ms. `enemyAttack` devolve o resultado do ataque: dodged, blocked, absorbed ou hit.
+## Estado
+- **Fases concluídas:** 0 a 7 (PRs #2 a #11).
+- **Fase 7 (Itens II):**
+  - **Queimadura:** dano fixo por stack; o máximo é 3 + 1 por nível.
+  - **Veneno:** base `1 + 3·(nível−1)` + 1 por stack, sem limite e sem contágio.
+  - **Itens novos:**
+    - `ember_heart`: lendário; espalha os stacks de queimadura para os n mais próximos (n = nível).
+    - `seismic_hammer`: respingo.
+    - `blast_core`: explosão em volta do herói.
+    - `judgment_tome`: acerta todos.
+    - `thorn_mail`: espinhos.
+  - **Lendário garantido:** depois de 4 telas de recompensa sem nenhum, e nas recompensas de chefe do modo infinito (`state.rewardsSinceLegendary`).
+  - **Lâmina de Brasa:** sem dano direto, queima em todo golpe. Armas com dano base 0 só aplicam efeitos.
+- **Aguardando o usuário: mana.** Ela vai ser descartada. O usuário vai redesenhar o **Manto do Arcano** (`mage_robe`: maxMana, magicBoost não usado, manaFromDamage) e a **Pedra de Mana** (`mana_stone`: mana + transbordamento).
+  - Depois disso, remover a mana do jogo inteiro: a barra MP, `p.mana`/`maxMana`, o save e as traduções.
 
-## Fases restantes
-- **5 – i18n do jogo:** concluída (PR #9, commit `f512bb6`).
-  - Inglês é o padrão; `?lang=` tem prioridade; a escolha fica na chave `lang`, compartilhada com o portfólio.
-  - Botão EN/PT na tela inicial e no cabeçalho.
-  - API em `game/src/i18n.js` (`t`, `setLang`, `formatNumber`); textos em `game/locales/{en,pt-BR}.js` e `items.{en,pt-BR}.js`.
-  - Inimigos têm `kind`; os nomes vêm de `enemyName()`.
-  - Fonte dos números: Tiny5 (OFL). A família `"Reliquary Digits"` (só 0-9, via unicode-range) fica na frente de toda pilha Pixelify Sans, no CSS e no canvas.
-  - A Pixel Game (1001fonts) foi recusada: a licença é só para uso pessoal e o repositório é público.
-- **6 – Celular:** concluída (PR #10, commit `2f98f39`).
-  - Retrato (qualquer largura): a arena ocupa o espaço que sobra, limitada a quadrada (`max-height: min(100vw, 1280px)`), com mínimo de 260 px. Há fallback em `vh` para navegadores sem `dvh`.
-  - O cenário vai de `frontZ` 18 até `backZ` -20, então o chão cobre o quadro na proporção mais alta que o layout permite.
-  - Paisagem com altura de até 500 px: modo compacto, com cabeçalho de 34 px e barra de 38 px, sem rolar.
-  - Itens abertos por padrão: decidido em `layout.js` (`defaultCollapsed`) a partir da altura medida do cabeçalho e dos itens. A escolha salva manda.
-  - O log de combate saiu da tela. `log()` continua chamado, mas nada o exibe; o erro de carga aparece num `.load-error`.
-- **7 – Itens II:** feita na branch `feat/phase-7-items-ii`, com PR aberta. Itens novos: `ember_heart`, `seismic_hammer`, `blast_core`, `judgment_tome` e `thorn_mail`. O contador de lendário é `state.rewardsSinceLegendary`.
-  - Queimadura: dano fixo por stack; o máximo é 3 + 1 por nível.
-  - Veneno: dano = (1 + 3 × (nível−1)) + 1 por stack, sem limite de stacks e sem contágio.
-  - Lendário de contágio, só de fogo: ao morrer, o inimigo passa os stacks para os n mais próximos, com n = nível.
-  - 4 itens de área: arma com respingo, relíquia de explosão, arma que acerta todos e armadura de espinhos.
-  - Lendário garantido depois de 4 telas de recompensa sem nenhum, e na recompensa pós-chefe do modo infinito.
-  - Modal de escolha ajustado; itens abertos por padrão em todo lugar.
-- **Mana (aguardando o usuário):** vai ser descartada. O usuário vai redesenhar o Manto do Arcano (`mage_robe`) e a Pedra de Mana (`mana_stone`) e mandar as mudanças.
-- **9 – Docs (por último, para documentar o estado final):** reescrever `auto-battler-doc.md` e arquivar `trello-setup.md` em `docs/`.
-- **8 – Arte dos itens** (pedida pelo usuário em 2026-10-31, fase própria): trocar os emojis por imagens em pixel art fiéis ao nome de cada item.
+## Próximas fases
+- **8 – Arte dos itens:** trocar os emojis por imagens em pixel art fiéis ao nome de cada item.
   - Exemplos do usuário:
-    - Arco Gélido: arco e flecha com efeito de gelo.
-    - Colete de Couro: um colete, não um escudo.
+    - Arco Gélido: arco e flecha com gelo.
+    - Colete de Couro: um colete.
     - Espada Enferrujada: desgastada e alaranjada.
-  - Todo item elemental mostra o efeito ou o símbolo do seu elemento.
-  - As decisões (gerar ou desenhar, tamanho, estilo) devem ser perguntadas em múltipla escolha ao começar.
-- **Ajustes opcionais depois:**
-  - God rays quase invisíveis.
-  - Contraste do herói verde.
-  - GLBs pesados (22 MB).
-  - O reflexo da água renderiza a cena inteira.
-  - O ataque do Lich é genérico.
-  - `durationMs` da vitória zera após "Continuar".
-  - `state.endless` é salvo mas quase não é lido.
+  - Item elemental mostra o efeito ou o símbolo do elemento.
+  - As decisões devem ser perguntadas em múltipla escolha.
+- **9 – Docs (por último):** reescrever `auto-battler-doc.md` e arquivar `trello-setup.md` em `docs/`.
+- **Opcionais:**
+  - god rays fracos;
+  - contraste do herói;
+  - GLBs pesados (22 MB);
+  - reflexo da água renderiza a cena toda;
+  - ataque do Lich genérico;
+  - `durationMs` da vitória zera ao continuar;
+  - chaves `log.*` sem uso desde que o log saiu da tela.
 
 ## Regras de trabalho (do usuário)
-- **Perguntas:**
-  - Sempre em múltipla escolha (AskUserQuestion), com a opção recomendada primeiro.
+- **Perguntas:** sempre em múltipla escolha (AskUserQuestion), com a opção recomendada primeiro.
 - **Agentes:**
-  - Tarefas simples com Haiku/Sonnet, complexas e revisão com Opus.
-- **Fluxo por fase:**
-  - Cada fase tem uma branch e uma PR.
+  - Delegar por modelo: Haiku/Sonnet no simples, Opus para revisar.
+  - Spec da fase em arquivo no scratchpad.
+  - Relatórios curtos.
+  - Reaproveitar o agente da fase (SendMessage) para aplicar as correções da revisão.
+- **Fluxo:**
+  - Uma branch e uma PR por fase.
   - Merge só quando o usuário mandar: `gh pr merge N --merge --delete-branch`.
-  - Em PRs empilhadas, apagar a branch base fecha a PR dependente. Faça o retarget antes.
-- **Downloads:** pedir permissão antes de baixar qualquer coisa.
-- **Contexto:** reescrever este arquivo quando o contexto atingir ~80%.
+  - Depois do merge, reescrever este arquivo.
+- **Downloads:** pedir permissão antes. Fontes e arquivos com licença restrita **não** entram no repositório público.
+- **Contexto:** a eficiência é prioridade. Quando a prática estiver firme, criar uma skill sobre isso.
+- **Testes no navegador:** o localStorage tem a run real do usuário.
+  - Antes de testar, copiar tudo para `sessionStorage.__reliq_backup`.
+  - Depois, restaurar exatamente.
+  - Preferir medições via JS a screenshots.
 
-## Arquitetura do jogo (o essencial)
-- **Arquivos principais** (`game/src/`):
-  - `main.js`: fluxo da run. Usa o padrão `runId` + `later(ms, fn)` para que timeouts de uma run morta não disparem; também tem a flag `autoResume`.
-  - `state.js`: `freshRun`, `meta`, `resetRun`/`resetMeta`.
-  - `save.js`: a run fica em `reliquary_run` (v2) e a meta em `reliquary_meta_v1`; migra o legado `reliquary_save_v1`.
-  - `items.js` + `assets/items.json`:
-    - Efeitos data-driven (`effects: [{trigger, type, ...}]`); a lista `KNOWN_EFFECTS` fica em `combat.js`.
-    - Níveis vão até 5: +20% de efeito e −5% de recarga por nível. O teto por item vem de `maxLevelOf`.
-  - `combat.js`: armadura limitada em 75%; `checkPlayerDeath()` também roda após DoT.
-  - `meta.js`:
-    - Upgrades vitality, might, guard e haste (haste tem máximo de 16).
-    - Custo: `round(20×1.25^nível)`.
-  - `boss.js`: Lich (invoca esqueletos) e Senhor Demônio (nova de fogo, enfurece abaixo de 33%). Aparecem a cada 10 ondas.
-  - `waves.js`: inimigos.
-  - Interface: `ui.js`, `ui-title.js` e `ui-victory.js`.
-  - Feedback: `audio.js`, `feel.js` (hit-stop e shake) e `particles.js`.
-  - Eventos: `events.js` (`emit`/`on`, `log`, `sound`).
+## Arquitetura do jogo
+- **Fluxo** (`main.js`):
+  - Tela inicial → escolha de 1 arma de 3 → recompensa a cada onda → chefe na onda 10 → vitória e modo infinito (chefe a cada 10 ondas).
+  - O padrão `runId` + `later()` impede timeouts de uma run morta.
+- **Dados:** `game/assets/items.json` só tem números e efeitos (`effects: [{trigger, type, ...}]`).
+  - Handlers e `KNOWN_EFFECTS` ficam em `combat.js`.
+  - Níveis vão até 5 (`levelMultiplier`).
+  - O dano permanente vem de `permanentDamage()`.
+  - `enemyAttack` devolve dodged / blocked / absorbed / hit.
+  - Toda morte de inimigo passa pelo kill check de `updateEnemies`.
+- **i18n:** `game/src/i18n.js` (`t`, `setLang`, `formatNumber`), com textos em `game/locales/{en,pt-BR}.js` e `items.{en,pt-BR}.js`.
+  - Os testes exigem as mesmas chaves nos dois idiomas.
+  - Inimigos têm `kind`; os nomes vêm de `enemyName()`.
+- **Save:**
+  - A run fica em `reliquary_run` (v2): ids, níveis, pity, pacto, contadores.
+  - A meta fica em `reliquary_meta_v1`.
+  - A escolha da barra de itens fica em `reliquary_inv_collapsed`; o padrão é aberta.
+- **Layout:**
+  - Barra de itens no topo e arena com largura total. Não há log na tela.
+  - Celular em pé: a arena tem no máximo um quadrado.
+  - Paisagem com altura de até 500 px: modo compacto.
+  - Regras puras ficam em `layout.js`.
 - **Render** (`game/src/three/`):
-  - Pipeline: alvo de 240 px de altura, contorno, toon com 3 faixas e câmera ortográfica com snap de pixel.
-  - Personagens KayKit em glTF (`game/assets/models`).
-  - Água, god rays e grama billboard.
-- Fonte: Pixelify Sans.
+  - Câmera ortográfica (`viewHeight` 12.5, `MIN_HALF_WIDTH` 9).
+  - Cenário de z −20 a 18.
+  - Inimigos nascem até `visibleLogicRight()`.
+- **Fontes:**
+  - Texto em Pixelify Sans.
+  - Dígitos em Tiny5, pela família `"Reliquary Digits"` (unicode-range 0-9).
 
-## Dicas de ambiente
-- **Windows/PowerShell:** o gh fica em `C:\Program Files\GitHub CLI\gh.exe`.
-- **Quebras de linha:** os arquivos usam CRLF, então patches multi-linha falham.
-  - Use o `patch.cjs` do scratchpad, que normaliza o CRLF, ou faça edits de uma linha.
-- **Browser pane:**
-  - O rAF pausa com a aba em segundo plano; chame `tabs_select` antes de testar o loop do jogo.
-  - O estado do jogo pode ser controlado no console via `await import('/game/src/state.js')`.
-- **Preview local:** servidor na porta 8766.
+## Ambiente
+- **Windows:** o gh fica em `C:\Program Files\GitHub CLI\gh.exe` (usar pelo PowerShell).
+- **Arquivos CRLF:** editar com um script node que normaliza `\r\n` e grava de volta.
+- **Preview:** `http://localhost:8766/game/` (aba `tab-2`).
+  - Chamar `tabs_select` antes de testar o loop.
+  - Para furar o cache do CSS, trocar os `href` com `?v=`.
+  - O estado do jogo fica em `await import('/game/src/state.js')`.
