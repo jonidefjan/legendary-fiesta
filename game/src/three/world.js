@@ -31,3 +31,16 @@ export const CAMERA = {
   viewHeight: 12.5, // quanto do mundo cabe na altura da tela (25% mais aberta que os 10 originais)
   target: { x: 0, y: 0.8, z: -1 }, // ponto que fica no centro da tela
 };
+
+const COT_PITCH = 1 / Math.tan((CAMERA.pitchDeg * Math.PI) / 180);
+
+// Um personagem em (x, z), com essa altura, pode aparecer no reflexo da água
+// (rect = { minX, maxX, minZ, maxZ, y })? A câmera não gira em Y, então o reflexo fica
+// no mesmo X; no plano da água, um ponto a h acima dele aparece h·cot(inclinação) mais
+// perto da câmera em Z. Folga generosa (braços, armas, chefes): uma altura em X e meia
+// altura a mais em cima. Na dúvida responde sim (só serve para pular desenho).
+export function reflectsInWater(x, z, height, rect) {
+  if (x + height < rect.minX || x - height > rect.maxX) return false;
+  const reachZ = (WORLD.groundY - rect.y + height * 1.5) * COT_PITCH;
+  return z + reachZ >= rect.minZ && z - height <= rect.maxZ;
+}

@@ -8,7 +8,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { toonMaterial } from "./materials.js";
-import { WORLD } from "./world.js";
+import { WORLD, reflectsInWater } from "./world.js";
+import { shareSkeleton, updateOncePerFrame } from "./skeleton.js";
 import { logicToWorldX, arena } from "./view.js";
 import { state } from "../state.js";
 import { on } from "../events.js";
@@ -163,12 +164,19 @@ function requestTemplate(name) {
   return entry.data;
 }
 
+// Quadro do jogo para os esqueletos (skeleton.js): sobe a cada update()
+let skeletonFrame = 0;
+const currentFrame = () => skeletonFrame;
+
 // ─── Rig: modelo clonado + mixer + troca de animação ───
 class Rig {
   constructor(template, height, { perInstanceMaterials = false } = {}) {
     this.template = template;
     this.model = SkeletonUtils.clone(template.scene);
     this.model.scale.setScalar(height / template.height);
+    // Um esqueleto por rig, calculado uma vez por quadro (skeleton.js)
+    const skeleton = shareSkeleton(this.model);
+    if (skeleton) updateOncePerFrame(skeleton, currentFrame);
     this.mixer = new THREE.AnimationMixer(this.model);
     this.actions = new Map();
     this.current = null;
@@ -684,6 +692,7 @@ export function createCharacters(scene) {
   // tickHurt: decrementa hurtTimer como o render 2D fazia (1 por quadro desenhado)
   function update(dtMs, { tickHurt = true, allowSpawn = false } = {}) {
     const dtSec = dtMs / 1000;
+    skeletonFrame++;
     updateHero(hero, dtMs);
 
     aliveSet.clear();
@@ -723,6 +732,9 @@ export function createCharacters(scene) {
           if (rec.sink >= SINK_TIME) {
             rec.gone = true;
             rec.root.visible = false;
+            // Sai da cena já (a limpeza fica para a troca de onda): invisível, os
+            // ~50 ossos de cada morto ainda pesavam na atualização de matrizes
+            group.remove(rec.root);
           }
         }
       }
@@ -783,5 +795,20 @@ export function createCharacters(scene) {
     return wSum > 1e-4 ? zSum / wSum : 0;
   }
 
-  return { update, enemyAnchor, heroAnchor, zAtLogicX, group };
+  // Esconde quem não pode aparecer no reflexo da água (rect = waterRect, conta em
+  // world.js) e devolve a lista para a água voltar a mostrar depois do passe
+  const hiddenRoots = [];
+  function hideUnreflected(rect) {
+    hiddenRoots.length = 0;
+    const consider = (root, height) => {
+      if (!root.visible || reflectsInWater(root.position.x, root.position.z, height, rect)) return;
+      root.visible = false;
+      hiddenRoots.push(root);
+    };
+    consider(hero.root, WORLD.heroHeight);
+    for (const rec of enemies.values()) consider(rec.root, rec.height);
+    return hiddenRoots;
+  }
+
+  return { update, enemyAnchor, heroAnchor, zAtLogicX, hideUnreflected, group };
 }
