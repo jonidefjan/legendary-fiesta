@@ -3,10 +3,11 @@
 // ═══════════════════════════════════════════
 import { random } from "./random.js";
 
+// shape = modelo 3D (KayKit Skeletons): minion, rogue, warrior; "mage" fica para o chefe Lich
 export const ENEMY_TYPES = [
   {
     name: "Esqueleto",
-    shape: "skeleton",
+    shape: "minion",
     hp: 35,
     dmg: 6,
     speed: 0.4,
@@ -18,8 +19,8 @@ export const ENEMY_TYPES = [
     resist: { fire: 0, water: 0, ice: 0.2, lightning: 0.3, physical: 0 },
   },
   {
-    name: "Goblin",
-    shape: "goblin",
+    name: "Esqueleto Ladino",
+    shape: "rogue",
     hp: 25,
     dmg: 8,
     speed: 0.7,
@@ -31,8 +32,8 @@ export const ENEMY_TYPES = [
     resist: { fire: -0.2, water: 0, ice: 0, lightning: 0, physical: 0.1 },
   },
   {
-    name: "Demônio",
-    shape: "demon",
+    name: "Esqueleto Guerreiro",
+    shape: "warrior",
     hp: 55,
     dmg: 14,
     speed: 0.3,

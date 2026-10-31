@@ -1,4 +1,4 @@
-// Efeitos visuais são só dados em state.effects; o render.js desenha e os remove
+// Efeitos visuais são só dados em state.effects; o renderer 3D (three/effects2d.js) desenha e os remove
 import { state } from "./state.js";
 
 export function spawnEffect(type, x, y, opts = {}) {

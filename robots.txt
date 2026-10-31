@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+# Páginas de desenvolvimento do jogo (preview do cenário 3D)
+Disallow: /game/dev/
 
 Sitemap: https://jm77os.com.br/sitemap.xml
