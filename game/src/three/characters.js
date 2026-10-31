@@ -471,11 +471,11 @@ function addHorns(rec) {
   rec.rig.model.updateMatrixWorld(true);
   const ws = new THREE.Vector3();
   head.getWorldScale(ws);
-  const k = rec.height / ws.y; // altura do mundo -> unidades locais do osso
+  const k = 1 / ws.y; // unidades do mundo -> unidades locais do osso
   for (const side of [-1, 1]) {
     const horn = new THREE.Group();
-    const h = rec.height * 0.13;
-    const r = rec.height * 0.032;
+    const h = rec.height * 0.1; // em unidades do mundo (a escala k converte)
+    const r = rec.height * 0.028;
     const base = hornPart(rec, r, h * 0.55, PALETTE.crimson);
     const tip = hornPart(rec, r * 0.62, h * 0.7, PALETTE.bone);
     tip.position.y = h * 0.5;

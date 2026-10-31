@@ -314,3 +314,33 @@ test("dano contínuo emite dotTick com o tipo", () => {
   processDots(1000);
   assert.deepEqual(ticks[0], { x: 220, y: 300, type: "poison", damage: 3, onPlayer: false });
 });
+
+test("dano contínuo no herói mata (sem Pena de Fênix) e dispara playerDied", () => {
+  setupRun([]);
+  const died = [];
+  on("playerDied", () => died.push(true));
+  state.player.hp = 3;
+  applyDot(state.player, "burning", 5, 3);
+  processDots(1000);
+  assert.equal(state.player.hp, 0);
+  assert.equal(state.running, false);
+  assert.equal(died.length, 1);
+  processDots(1000);
+  assert.equal(died.length, 1, "não morre duas vezes");
+});
+
+test("dano contínuo letal aciona a Pena de Fênix", () => {
+  setupRun(["phoenix_feather"]);
+  state.player.hp = 2;
+  applyDot(state.player, "burning", 5, 3);
+  processDots(1000);
+  assert.equal(state.running, true);
+  assert.equal(state.player.hp, 40);
+});
+
+test("armadura reduz no máximo 75% do dano", () => {
+  setupRun([]);
+  state.player.armor = 300;
+  enemyAttack(enemy({ dmg: 100 }));
+  assert.equal(state.player.hp, 100 - 25);
+});

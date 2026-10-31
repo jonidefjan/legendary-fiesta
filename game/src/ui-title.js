@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════
 // Desenha dentro de #title-screen (index.html); estilos em game/title.css.
 import { state } from "./state.js";
-import { UPGRADES, upgradeLevel, upgradeCost, buyUpgrade, describeLevel } from "./meta.js";
+import { UPGRADES, upgradeLevel, upgradeCost, buyUpgrade, describeLevel, isMaxed } from "./meta.js";
 import * as save from "./save.js";
 import { sfx } from "./audio.js";
 
@@ -23,6 +23,7 @@ function shopCard(u) {
   const cost = upgradeCost(u.id);
   const can = state.fragments >= cost;
   const now = lvl > 0 ? describeLevel(u.id, lvl) : "nenhum bônus";
+  const maxed = isMaxed(u.id);
   return `
     <div class="shop-card${u.id === lastBought ? " bought" : ""}" data-id="${u.id}">
       <div class="shop-head">
@@ -32,9 +33,9 @@ function shopCard(u) {
       </div>
       <div class="shop-desc">${esc(u.desc)}</div>
       <div class="shop-effect">Atual: <b>${esc(now)}</b></div>
-      <div class="shop-effect">Próximo: <b>${esc(describeLevel(u.id, lvl + 1))}</b></div>
-      <button class="title-btn shop-buy" data-buy="${u.id}"${can ? "" : " disabled"}>
-        Comprar · ⚡ ${cost}
+      <div class="shop-effect">${maxed ? "<b>Nível máximo</b>" : `Próximo: <b>${esc(describeLevel(u.id, lvl + 1))}</b>`}</div>
+      <button class="title-btn shop-buy" data-buy="${u.id}"${can && !maxed ? "" : " disabled"}>
+        ${maxed ? "Máximo" : `Comprar · ⚡ ${cost}`}
       </button>
     </div>`;
 }

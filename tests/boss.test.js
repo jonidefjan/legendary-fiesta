@@ -8,6 +8,7 @@ import {
 } from "../game/src/boss.js";
 import { setRandom } from "../game/src/random.js";
 import { setupRun } from "./helpers.js";
+import { state } from "../game/src/state.js";
 
 const arena = { width: 800, height: 400 };
 
@@ -108,4 +109,18 @@ test("Senhor Demônio enfurece abaixo de 33% de vida", () => {
   assert.ok(boss.enraged);
   assert.ok(boss.atkInterval < interval);
   assert.ok(state.enemies.includes(boss));
+});
+
+test("Nova de Fogo: o Parry reflete no próprio chefe e o bloqueio evita a queimadura", () => {
+  const enemies = bossWave("demon");
+  const demonWave = enemies.find((e) => e.isBoss);
+  setupRun(["iron_shield"], enemies);
+  demonWave.abilityTimer = demonWave.abilityInterval;
+  const hpBefore = demonWave.hp;
+  state.player.nextBlockActive = true;
+  updateBosses(1);
+  assert.equal(state.player.hp, state.player.maxHp, "ataque bloqueado");
+  assert.ok(demonWave.hp < hpBefore, "reflexo acerta o chefe");
+  assert.equal(state.player.dots.length, 0, "sem queimadura no bloqueio");
+  assert.equal(demonWave.name, "Senhor Demônio");
 });

@@ -14,7 +14,7 @@ export const UPGRADES = [
   { id: "vitality", icon: "❤️", name: "Vitalidade", desc: "+10 de vida máxima por nível", perLevel: { maxHp: 10 } },
   { id: "might", icon: "⚔️", name: "Força", desc: "+5% de dano por nível", perLevel: { damageBonus: 0.05 } },
   { id: "guard", icon: "🛡️", name: "Guarda", desc: "+2 de armadura por nível", perLevel: { armor: 2 } },
-  { id: "haste", icon: "⏱️", name: "Celeridade", desc: "Recargas 3% mais rápidas por nível", perLevel: { cooldownBonus: 0.03 } },
+  { id: "haste", icon: "⏱️", name: "Celeridade", desc: "Recargas 3% mais rápidas por nível", perLevel: { cooldownBonus: 0.03 }, maxLevel: 16 },
 ];
 
 function find(id) {
@@ -25,15 +25,21 @@ export function upgradeLevel(id) {
   return state.meta.upgrades[id] || 0;
 }
 
-// Custo do próximo nível do upgrade
+// Celeridade tem teto (MAX_COOLDOWN_BONUS); as outras sobem sem limite
+export function isMaxed(id) {
+  const u = find(id);
+  return !!u?.maxLevel && upgradeLevel(id) >= u.maxLevel;
+}
+
+// Custo do próximo nível do upgrade (Infinity no nível máximo)
 export function upgradeCost(id) {
-  if (!find(id)) return Infinity;
+  if (!find(id) || isMaxed(id)) return Infinity;
   return Math.round(BASE_COST * Math.pow(COST_GROWTH, upgradeLevel(id)));
 }
 
 // Gasta fragmentos e sobe um nível; devolve true se comprou
 export function buyUpgrade(id) {
-  if (!find(id)) return false;
+  if (!find(id) || isMaxed(id)) return false;
   const cost = upgradeCost(id);
   if (state.fragments < cost) return false;
   state.fragments -= cost;

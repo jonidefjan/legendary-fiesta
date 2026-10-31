@@ -4,7 +4,7 @@
 import { state } from "./state.js";
 import {
   RARITIES,
-  MAX_ITEM_LEVEL,
+  maxLevelOf,
   getTypeLabel,
   findItem,
   itemLevel,
@@ -31,7 +31,7 @@ export function renderInventory() {
       slot.className = "item-slot";
       slot.dataset.id = item.id;
       const level = itemLevel(item.id);
-      if (level >= MAX_ITEM_LEVEL) slot.classList.add("max-level");
+      if (level >= maxLevelOf(item) && maxLevelOf(item) > 1) slot.classList.add("max-level");
       slot.innerHTML = `
         <div class="item-icon">${item.icon}</div>
         <div class="rarity-gem rarity-${item.rarity}"></div>
@@ -73,7 +73,7 @@ function showTooltip(item, e) {
   tooltip.innerHTML = `
     <div class="tt-name" style="color:${r.color}">${item.icon} ${item.name}</div>
     <div class="tt-rarity" style="color:${r.color}">${r.label}</div>
-    <div class="tt-level">Nível ${level}/${MAX_ITEM_LEVEL}</div>
+    <div class="tt-level">Nível ${level}/${maxLevelOf(item)}</div>
     <div class="tt-desc">${item.desc}</div>
     <div class="tt-effect">${item.effect}</div>
     ${item.enchant ? `<div class="tt-enchant">${item.enchant}</div>` : ""}

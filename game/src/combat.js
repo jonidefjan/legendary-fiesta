@@ -24,6 +24,9 @@ import {
   levelMultiplier,
 } from "./items.js";
 
+// Redução máxima de dano pela armadura (%): com Guarda sem teto, nada fica imune
+export const MAX_ARMOR = 75;
+
 // Duração (ms) das poses de animação; o renderer 3D (three/characters.js) usa o tempo restante
 export const ANIM_MS = {
   playerAction: 320, // golpe ou uso de item (player.animTimer)
@@ -159,6 +162,8 @@ export function processDots(dt) {
       return dot.duration > 0;
     });
   });
+  // Queimadura do chefe também mata (ou aciona a Pena de Fênix)
+  checkPlayerDeath();
 }
 
 // ═══════════════════════════════════════════
@@ -170,7 +175,9 @@ const HIT_EFFECTS = {
   dot(effect, item, ctx) {
     if (!rolls(effect)) return;
     // Dano contínuo cresce com o nível; a chance não muda
-    const damage = Math.round(effect.damage * levelMultiplier(item.id));
+    const damage = Math.round(
+      effect.damage * levelMultiplier(item.id) * (1 + (state.player.damageBonus || 0)),
+    );
     applyDot(ctx.target, effect.dot, damage, effect.duration, true);
     const dot = DOTS[effect.dot];
     log(
@@ -314,9 +321,9 @@ function weaponAttack(item, target) {
       p.manaOverflow = 0;
     }
     // Bônus de dano com vida baixa (ex.: Escama Dracônica)
-    for (const { effect } of ownedEffects("damage")) {
+    for (const { item: owner, effect } of ownedEffects("damage")) {
       if (effect.type === "lowHpBonus" && p.hp / p.maxHp < effect.threshold) {
-        dmg = Math.round(dmg * (1 + effect.bonus));
+        dmg = Math.round(dmg * (1 + effect.bonus * levelMultiplier(owner.id)));
       }
     }
 
@@ -490,7 +497,7 @@ export function enemyAttack(en) {
     p.barrier -= absorbed;
     const ratio = ownedEffects("barrierAbsorb")
       .filter(({ effect }) => effect.type === "reflect")
-      .reduce((sum, { effect }) => sum + effect.ratio, 0);
+      .reduce((sum, { item, effect }) => sum + effect.ratio * levelMultiplier(item.id), 0);
     const reflected = Math.round(absorbed * ratio);
     en.hp -= reflected;
     dmg -= absorbed;
@@ -503,12 +510,13 @@ export function enemyAttack(en) {
   }
 
   // Armor reduction
-  dmg = Math.max(1, Math.round(dmg * (1 - p.armor / 100)));
+  // Armadura reduz até MAX_ARMOR% (melhoria Guarda não tem teto de nível)
+  dmg = Math.max(1, Math.round(dmg * (1 - Math.min(p.armor, MAX_ARMOR) / 100)));
 
   // Dano recebido vira mana (ex.: Manto do Mago)
   for (const { item, effect } of ownedEffects("hurt")) {
     if (effect.type !== "manaFromDamage") continue;
-    const manaAbsorb = Math.round(dmg * effect.ratio);
+    const manaAbsorb = Math.round(dmg * effect.ratio * levelMultiplier(item.id));
     p.mana = Math.min(p.maxMana, p.mana + manaAbsorb);
     if (manaAbsorb > 0)
       log(`${item.icon} ${item.name} absorve: +${manaAbsorb} Mana.`, "item");
@@ -520,8 +528,13 @@ export function enemyAttack(en) {
   spawnNumber(p.x - 20, p.y - 60, `-${dmg}`, "#ff6666", 2);
   log(`💀 ${en.name} ataca: ${dmg} de dano!`, "dmg");
 
-  // Death / revive
-  if (p.hp <= 0) {
+  checkPlayerDeath();
+}
+
+// Morte ou renascimento quando a vida do herói chega a 0 (golpes e dano contínuo)
+export function checkPlayerDeath() {
+  const p = state.player;
+  if (state.running && p.hp <= 0) {
     const revive = ownedEffects("death").find(
       ({ effect }) => effect.type === "revive",
     );

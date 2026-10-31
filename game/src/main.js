@@ -51,6 +51,18 @@ const STARTING_PICK = { options: 3, max: 1, type: "weapon" };
 const REWARD_OPTIONS = 3;
 const GAME_SPEEDS = [1, 2, 3];
 
+// Cada run (e cada morte) troca o runId: ações agendadas de uma run que já acabou
+// (recompensa, vitória, retomar) não podem rodar em cima da run seguinte.
+let runId = 0;
+function later(ms, fn) {
+  const id = runId;
+  setTimeout(() => {
+    if (id === runId && state.running) fn();
+  }, ms);
+}
+// Retomar sozinho depois de uma escolha só se o jogador não apertou Pause no meio
+let autoResume = false;
+
 // ─── Ligações: a lógica emite, a interface e o áudio reagem ───
 on("log", ({ msg, type }) => ui.addLog(msg, type));
 on("sfx", ({ name, detail }) => sfx[name]?.(detail));
@@ -136,6 +148,7 @@ on("bossAbility", ({ kind, x, y }) => {
 
 on("playerDied", () => {
   // A run acaba aqui: recarregar a página não pode trazê-la de volta
+  runId++;
   save.clearRun();
   recordBest();
   save.saveMeta();
@@ -175,19 +188,21 @@ function spawnWave(waveNum) {
 }
 
 function checkWaveComplete() {
-  if (state.waveTransition || !state.enemies.every((e) => e.dead)) return;
+  if (!state.running || state.waveTransition) return;
+  if (!state.enemies.every((e) => e.dead)) return;
   state.waveTransition = true;
   state.score += state.wave * 50;
   sfx.waveClear();
 
   if (boss.isBossWave(state.wave)) {
+    // Salvo junto com a run (próxima onda ou fim da run): salvar aqui deixaria
+    // recarregar a página e repetir o chefe para ganhar os fragmentos de novo
     state.meta.bossesBeaten++;
-    save.saveMeta();
     // Primeira vitória da run (onda 10): tela de vitória; no infinito segue normal
     if (!state.victoryShown) {
       state.victoryShown = true;
       ui.addLog(`👑 Chefe derrotado na onda ${state.wave}!`, "kill");
-      setTimeout(offerVictory, 1500);
+      later(1500, offerVictory);
       return;
     }
   }
@@ -196,7 +211,7 @@ function checkWaveComplete() {
     `✨ Onda ${state.wave} concluída! 🎁 Escolha sua recompensa!`,
     "kill",
   );
-  setTimeout(offerReward, 1500);
+  later(1500, offerReward);
 }
 
 // A run é salva no começo de cada onda: recarregar a página repete a onda
@@ -208,6 +223,7 @@ function startNextWave() {
   p.berserking = false;
   p.berserkRemaining = 0;
   p.lowHpUsed = {};
+  p.dots = []; // queimadura do chefe não passa para a onda seguinte
   p.hp = Math.min(p.maxHp, p.hp + 20);
   spawnWave(state.wave);
   state.waveTransition = false;
@@ -246,7 +262,8 @@ function pickReward(item) {
 
   // A próxima onda começa (e é salva) já com o item; o combate volta após um instante
   startNextWave();
-  setTimeout(resumeGame, 800);
+  autoResume = true;
+  later(800, () => autoResume && resumeGame());
 }
 
 function showStartingPick() {
@@ -269,7 +286,8 @@ function confirmStartingPick(items) {
   ui.addLog(`🎮 Run iniciada com ${items.map((i) => i.name).join(", ")}!`, "item");
   spawnWave(1);
   save.saveRun();
-  setTimeout(resumeGame, 500);
+  autoResume = true;
+  later(500, () => autoResume && resumeGame());
 }
 
 // ═══════════════════════════════════════════
@@ -278,7 +296,6 @@ function confirmStartingPick(items) {
 function offerVictory() {
   state.isPaused = true;
   recordBest();
-  save.saveMeta();
   victory.showVictory({
     stats: {
       wave: state.wave,
@@ -328,6 +345,8 @@ function showTitleScreen() {
 }
 
 function prepareRun() {
+  runId++;
+  autoResume = false;
   const canvas = render.getCanvas();
   resetRun({ x: canvas.width * 0.22, y: canvas.height * 0.55 });
   meta.applyUpgrades(state.player);
@@ -372,6 +391,7 @@ function continueRun() {
 // ═══════════════════════════════════════════
 function pauseGame() {
   if (state.isPaused || !state.running) return;
+  autoResume = false;
   state.isPaused = true;
   ui.setPausedControls(true);
   ui.addLog("⏸️ Jogo pausado.", "item");

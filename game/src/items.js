@@ -87,6 +87,11 @@ export const MAX_ITEM_LEVEL = 5;
 export const LEVEL_POWER = 0.2;
 export const LEVEL_COOLDOWN = 0.05;
 
+// Itens cujo efeito não cresce (ex.: Pena de Fênix revive uma vez) declaram maxLevel no JSON
+export function maxLevelOf(item) {
+  return item.maxLevel ?? MAX_ITEM_LEVEL;
+}
+
 export function itemLevel(id) {
   return state.itemLevels[id] || 1;
 }
@@ -106,7 +111,7 @@ export function effectiveCooldown(item) {
 // Adiciona o item ou, se já existe, sobe o nível. Devolve { leveled, level }.
 export function addItemOrLevel(item) {
   if (state.items.some((i) => i.id === item.id)) {
-    const level = Math.min(MAX_ITEM_LEVEL, itemLevel(item.id) + 1);
+    const level = Math.min(maxLevelOf(item), itemLevel(item.id) + 1);
     state.itemLevels[item.id] = level;
     ensureTimers();
     return { leveled: true, level };
@@ -155,7 +160,7 @@ export function generateRandomItems(count, excludeIds = new Set(), { type } = {}
       !UNIMPLEMENTED_ITEMS.has(i.id) &&
       !excludeIds.has(i.id) &&
       (!type || i.type === type) &&
-      itemLevel(i.id) < MAX_ITEM_LEVEL,
+      itemLevel(i.id) < maxLevelOf(i),
   );
   const selectedItems = [];
   const usedIds = new Set();

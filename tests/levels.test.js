@@ -121,3 +121,11 @@ test("generateRandomItems filtra por tipo e esconde itens no nível máximo", ()
     assert.ok(picks.every((p) => p.id !== "rusted_sword"));
   }
 });
+
+test("Pena de Fênix não sobe de nível e sai do sorteio depois de pega", () => {
+  setupRun(["phoenix_feather"]);
+  assert.equal(addItemOrLevel(item("phoenix_feather")).level, 1);
+  for (let i = 0; i < 200; i++) {
+    assert.ok(!generateRandomItems(3).some((it) => it.id === "phoenix_feather"));
+  }
+});

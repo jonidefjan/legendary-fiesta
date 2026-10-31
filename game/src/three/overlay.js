@@ -64,6 +64,20 @@ function outlinedText(text, x, y, color, size, bold = true) {
   ctx.fillText(text, x, y);
 }
 
+// Em telas estreitas os botões (#game-controls) cobrem o alto da arena:
+// se a barra colidir com eles, ela desce para o pé da arena
+function bossBarY(W, h, b, x, w) {
+  const top = 80;
+  const controls = document.getElementById("game-controls");
+  if (!controls || !canvas || W > 768) return top;
+  const c = controls.getBoundingClientRect();
+  const a = canvas.getBoundingClientRect();
+  const hitsX = c.left - a.left < x + w + b && c.right - a.left > x - b;
+  const hitsY = c.top - a.top < top + h + b + 6 && c.bottom - a.top > top - 30;
+  if (!hitsX || !hitsY) return top;
+  return Math.max(top, Math.round(arena.height - h - 16));
+}
+
 // Barra grossa do chefe, no alto da arena: nome em cima, 10 marcas de 10%
 function drawBossBar(boss) {
   const W = arena.width;
@@ -71,7 +85,7 @@ function drawBossBar(boss) {
   const h = W < 520 ? 14 : 18;
   const b = 3;
   const x = Math.round((W - w) / 2);
-  const y = 80;
+  const y = bossBarY(W, h, b, x, w);
   const pct = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
   const enraged = !!boss.enraged;
   outlinedText(boss.name, W / 2, y - 8, enraged ? PALETTE.pink : PALETTE.bone, W < 520 ? 14 : 18);

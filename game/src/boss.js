@@ -59,10 +59,13 @@ function createBoss(kind, wave, { width, height, mobile = false }) {
   const base = BOSS_TYPES[kind];
   const minion = ENEMY_TYPES[0];
   const scales = waveScales(wave, mobile);
+  // No celular os inimigos andam mais devagar (createEnemy faz o mesmo)
+  const speedScale = mobile ? 0.7 : 1;
   const hp = Math.round(minion.hp * scales.hp * BOSS_HP_MULT);
   return {
     ...base,
     resist: { ...base.resist },
+    speed: base.speed * speedScale,
     isBoss: true,
     wave,
     arena: { width, height, mobile },
@@ -133,9 +136,15 @@ function fireNova(boss) {
   emit("bossAbility", { kind: "nova", x: boss.x, y: boss.y, bossName: boss.name });
   sound("nova");
   log(`🔥 ${boss.name} lança uma Nova de Fogo!`, "dmg");
-  const novaDamage = Math.round(boss.dmg * 1.5);
-  enemyAttack({ ...boss, dmg: novaDamage, name: "Nova de Fogo" });
-  if (state.running && p.hp > 0) {
+  // O próprio chefe ataca (com dano temporário), para o Parry e o reflexo da
+  // barreira acertarem ele e não uma cópia
+  const blocked = p.nextBlockActive;
+  const dmg = boss.dmg;
+  boss.dmg = Math.round(dmg * 1.5);
+  enemyAttack(boss);
+  boss.dmg = dmg;
+  // Bloqueio perfeito também evita a queimadura
+  if (!blocked && state.running && p.hp > 0) {
     applyDot(p, "burning", Math.max(1, Math.round(boss.dmg * 0.25)), 3);
   }
 }

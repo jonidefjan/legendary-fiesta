@@ -54,3 +54,15 @@ test("describeLevel", () => {
   assert.equal(meta.describeLevel("guard", 1), "+2 armadura");
   assert.equal(meta.describeLevel("haste", 2), "-6% recarga");
 });
+
+test("Celeridade para de ser vendida no nível máximo", () => {
+  state.fragments = 1e9;
+  let bought = 0;
+  while (meta.buyUpgrade("haste")) bought++;
+  assert.equal(bought, 16);
+  assert.equal(meta.isMaxed("haste"), true);
+  assert.equal(meta.upgradeCost("haste"), Infinity);
+  const p = createPlayer();
+  meta.applyUpgrades(p);
+  assert.equal(p.cooldownBonus, 0.48);
+});
