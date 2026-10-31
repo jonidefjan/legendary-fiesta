@@ -66,6 +66,7 @@ export function serializeRun() {
     itemTimers: state.itemTimers,
     endless: state.endless,
     victoryShown: state.victoryShown,
+    rewardsSinceLegendary: state.rewardsSinceLegendary,
     player: {
       hp: state.player.hp,
       maxHp: state.player.maxHp,
@@ -130,6 +131,7 @@ export function loadRun() {
   state.itemTimers = onlyOwned(data.itemTimers);
   state.endless = !!data.endless;
   state.victoryShown = !!data.victoryShown;
+  state.rewardsSinceLegendary = data.rewardsSinceLegendary || 0;
   state.player.hp = data.player?.hp || 100;
   state.player.maxHp = data.player?.maxHp || 100;
   state.player.mana = data.player?.mana || 0;

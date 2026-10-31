@@ -196,7 +196,13 @@ function ownedLevel(id) {
 // ─── Sorteio ───
 // excludeIds: itens que não podem aparecer; type: só um tipo (ex.: "weapon").
 // Itens no nível máximo nunca aparecem (os que o jogador ainda não tem sempre podem).
-export function generateRandomItems(count, excludeIds = new Set(), { type } = {}) {
+// guaranteeLegendary: pelo menos 1 lendário entre as opções, se ainda houver algum
+// sorteável; sem nenhum, o sorteio segue normal (sem aviso).
+export function generateRandomItems(
+  count,
+  excludeIds = new Set(),
+  { type, guaranteeLegendary = false } = {},
+) {
   const pool = catalog.filter(
     (i) =>
       !excludeIds.has(i.id) &&
@@ -206,7 +212,17 @@ export function generateRandomItems(count, excludeIds = new Set(), { type } = {}
   const selectedItems = [];
   const usedIds = new Set();
 
-  for (let i = 0; i < count; i++) {
+  // O lendário garantido sai primeiro e depois troca de lugar com uma opção sorteada,
+  // para não ficar sempre na primeira posição
+  let guaranteed = null;
+  const legendaries = pool.filter((i) => i.rarity === "legendary");
+  if (guaranteeLegendary && count > 0 && legendaries.length > 0) {
+    guaranteed = legendaries[Math.floor(random() * legendaries.length)];
+    usedIds.add(guaranteed.id);
+    selectedItems.push(guaranteed);
+  }
+
+  for (let i = selectedItems.length; i < count; i++) {
     let item = null;
     let attempts = 0;
 
@@ -242,7 +258,28 @@ export function generateRandomItems(count, excludeIds = new Set(), { type } = {}
     }
   }
 
+  if (guaranteed && selectedItems.length > 1) {
+    const j = Math.floor(random() * selectedItems.length);
+    [selectedItems[0], selectedItems[j]] = [selectedItems[j], selectedItems[0]];
+  }
   return selectedItems;
+}
+
+// ─── Recompensa: lendário garantido ───
+// Depois de PITY_SCREENS telas seguidas sem lendário, a próxima garante um.
+// Chefe (a cada 10 ondas) também garante. rewardsSinceLegendary vai na run salva.
+export const PITY_SCREENS = 4;
+
+export function rewardOptions(count, { boss = false } = {}) {
+  const guaranteeLegendary = boss || state.rewardsSinceLegendary >= PITY_SCREENS;
+  const options = generateRandomItems(count, new Set(), { guaranteeLegendary });
+  // Tela sem opções não existe: não conta
+  if (options.length > 0) {
+    state.rewardsSinceLegendary = options.some((i) => i.rarity === "legendary")
+      ? 0
+      : state.rewardsSinceLegendary + 1;
+  }
+  return options;
 }
 
 export function getWeightedRarity(weights) {

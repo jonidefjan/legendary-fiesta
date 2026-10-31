@@ -139,13 +139,14 @@ test("congelado não avança o tempo de ataque", () => {
   assert.equal(target.atkTimer, 300);
 });
 
-test("Lâmina Venenosa acumula veneno até 5 vezes", () => {
+test("Lâmina Venenosa acumula veneno sem limite de stacks", () => {
   const target = enemy();
   setupRun(["poison_blade"], [target]);
   for (let i = 0; i < 7; i++) activateItem(item("poison_blade"));
   const poison = target.dots.find((d) => d.type === "poison");
-  assert.equal(poison.stacks, 5);
-  assert.equal(poison.damage, 3);
+  assert.equal(poison.stacks, 7);
+  assert.equal(poison.damage, 1);
+  assert.equal(poison.base, 1);
   assert.equal(poison.duration, 4);
 });
 
@@ -529,7 +530,8 @@ test("veneno e explosão usam o bônus de dano do Anel", () => {
   const b = enemy({ x: 300 });
   setupRun(["poison_blade", "cursed_ring", "crystal_armor"], [a, b]);
   activateItem(item("poison_blade"));
-  assert.equal(a.dots[0].damage, Math.round(3 * 1.5));
+  assert.equal(a.dots[0].damage, 1.5);
+  assert.equal(a.dots[0].base, 1.5);
 
   state.player.barrier = 0;
   state.player.barrierSource = "crystal_armor";

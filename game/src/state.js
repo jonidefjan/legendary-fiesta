@@ -71,6 +71,8 @@ function freshRun() {
     // Depois de vencer o chefe da onda 10, a run segue no modo infinito
     endless: false,
     victoryShown: false,
+    // Telas de recompensa seguidas sem lendário (4 seguidas garantem um na próxima)
+    rewardsSinceLegendary: 0,
     runStats: { totalDamage: 0, itemUses: {}, startTime: 0 },
   };
 }

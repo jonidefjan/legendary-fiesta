@@ -200,6 +200,32 @@ const KIND_DEFS = {
       ring(x, y, Math.round(n * 0.6), 20, 140 * k, rnd(350, 500), 3, [P.white, P.cyan]);
     },
   },
+  // Explosão de fogo (Núcleo Explosivo): mesma forma do iceBurst, cores quentes
+  fireBurst: {
+    base: 28,
+    fn: (x, y, n, k) => {
+      for (let i = 0; i < n; i++) {
+        const a = rnd(0, Math.PI * 2);
+        const s = rnd(120, 280) * k;
+        spawn(x, y, Math.cos(a) * s, Math.sin(a) * s * 0.6 - 30, rnd(400, 750),
+          rnd(3, 5), i % 3 ? [P.amber, P.orange, P.rust] : [P.white, P.amber, P.orange], 80, 2);
+      }
+      ring(x, y, Math.round(n * 0.6), 20, 140 * k, rnd(350, 500), 3, [P.amber, P.orange]);
+    },
+  },
+  // Rastro de brasas de (x, y) até (toX, toY): poucas partículas, para o contágio
+  trail: {
+    base: 6,
+    fn: (x, y, n, k, dir, opts) => {
+      const dx = (opts.toX ?? x) - x;
+      const dy = (opts.toY ?? y) - y;
+      for (let i = 0; i < n; i++) {
+        const f = n > 1 ? i / (n - 1) : 1;
+        spawn(x + dx * f + rnd(-4, 4), y + dy * f + rnd(-4, 4), rnd(-10, 10), rnd(-40, -15),
+          rnd(250, 450), rnd(2.5, 4), [P.white, P.amber, P.orange, P.rust], 0, 1.5);
+      }
+    },
+  },
   crit: {
     base: 8,
     fn: (x, y, n, k, dir) => {

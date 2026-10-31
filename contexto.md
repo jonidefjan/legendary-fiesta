@@ -33,13 +33,21 @@ Repositório `jonidefjan/legendary-fiesta`:
   - Inimigos têm `kind`; os nomes vêm de `enemyName()`.
   - Fonte dos números: Tiny5 (OFL). A família `"Reliquary Digits"` (só 0-9, via unicode-range) fica na frente de toda pilha Pixelify Sans, no CSS e no canvas.
   - A Pixel Game (1001fonts) foi recusada: a licença é só para uso pessoal e o repositório é público.
-- **6 – Celular:** feita na branch `feat/phase-6-mobile`, com PR aberta.
+- **6 – Celular:** concluída (PR #10, commit `2f98f39`).
   - Retrato (qualquer largura): a arena ocupa o espaço que sobra, limitada a quadrada (`max-height: min(100vw, 1280px)`), com mínimo de 260 px. Há fallback em `vh` para navegadores sem `dvh`.
   - O cenário vai de `frontZ` 18 até `backZ` -20, então o chão cobre o quadro na proporção mais alta que o layout permite.
   - Paisagem com altura de até 500 px: modo compacto, com cabeçalho de 34 px e barra de 38 px, sem rolar.
   - Itens abertos por padrão: decidido em `layout.js` (`defaultCollapsed`) a partir da altura medida do cabeçalho e dos itens. A escolha salva manda.
   - O log de combate saiu da tela. `log()` continua chamado, mas nada o exibe; o erro de carga aparece num `.load-error`.
-- **7 – Docs:** reescrever `auto-battler-doc.md` e arquivar `trello-setup.md` em `docs/`.
+- **7 – Itens II:** feita na branch `feat/phase-7-items-ii`, com PR aberta. Itens novos: `ember_heart`, `seismic_hammer`, `blast_core`, `judgment_tome` e `thorn_mail`. O contador de lendário é `state.rewardsSinceLegendary`.
+  - Queimadura: dano fixo por stack; o máximo é 3 + 1 por nível.
+  - Veneno: dano = (1 + 3 × (nível−1)) + 1 por stack, sem limite de stacks e sem contágio.
+  - Lendário de contágio, só de fogo: ao morrer, o inimigo passa os stacks para os n mais próximos, com n = nível.
+  - 4 itens de área: arma com respingo, relíquia de explosão, arma que acerta todos e armadura de espinhos.
+  - Lendário garantido depois de 4 telas de recompensa sem nenhum, e na recompensa pós-chefe do modo infinito.
+  - Modal de escolha ajustado; itens abertos por padrão em todo lugar.
+- **Mana (aguardando o usuário):** vai ser descartada. O usuário vai redesenhar o Manto do Arcano (`mage_robe`) e a Pedra de Mana (`mana_stone`) e mandar as mudanças.
+- **9 – Docs (por último, para documentar o estado final):** reescrever `auto-battler-doc.md` e arquivar `trello-setup.md` em `docs/`.
 - **8 – Arte dos itens** (pedida pelo usuário em 2026-10-31, fase própria): trocar os emojis por imagens em pixel art fiéis ao nome de cada item.
   - Exemplos do usuário:
     - Arco Gélido: arco e flecha com efeito de gelo.

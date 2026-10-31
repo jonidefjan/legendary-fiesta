@@ -28,6 +28,7 @@ import {
   ensureTimers,
   starterItems,
   generateRandomItems,
+  rewardOptions,
   addItemOrLevel,
 } from "./items.js";
 import { createWave } from "./waves.js";
@@ -112,7 +113,16 @@ on("enemyDied", ({ x, y }) => particles.emit("death", x, y - 20));
 on("crit", ({ x, y }) => particles.emit("crit", x, y - 25, { direction: 1 }));
 on("dodge", ({ x, y }) => particles.emit("dodge", x, y - 25, { direction: 1 }));
 on("freeze", ({ x, y }) => particles.emit("freeze", x, y - 25));
-on("explode", ({ x, y }) => particles.emit("iceBurst", x, y - 30, { intensity: 1 }));
+on("explode", ({ x, y, kind }) =>
+  particles.emit(kind === "fire" ? "fireBurst" : "iceBurst", x, y - 30, { intensity: 1 }),
+);
+// Contágio: rastro de fogo do inimigo morto até cada alvo e brasas onde a queimadura pega
+on("spread", ({ from, to }) => {
+  for (const dest of to) {
+    particles.emit("trail", from.x, from.y - 25, { toX: dest.x, toY: dest.y - 25 });
+    particles.emit("hit", dest.x, dest.y - 25, { element: "fire", intensity: 0.4 });
+  }
+});
 
 // Tremida e hit-stop: sutis, pois no 3× acontecem muitos golpes por segundo
 on("hit", ({ damage, weak }) => {
@@ -225,6 +235,9 @@ function checkWaveComplete() {
       later(1500, offerVictory);
       return;
     }
+    // Chefe do infinito: a recompensa garante um lendário
+    later(1500, () => offerReward({ boss: true }));
+    return;
   }
   later(1500, offerReward);
 }
@@ -250,10 +263,10 @@ function startNextWave() {
 // ═══════════════════════════════════════════
 //  ESCOLHA DE ITENS
 // ═══════════════════════════════════════════
-function offerReward() {
+function offerReward({ boss = false } = {}) {
   state.isPaused = true;
-  // Itens novos ou que ainda podem subir de nível
-  const options = generateRandomItems(REWARD_OPTIONS);
+  // Itens novos ou que ainda podem subir de nível; chefe e 4 telas sem lendário garantem um
+  const options = rewardOptions(REWARD_OPTIONS, { boss });
 
   if (options.length === 0) {
     startNextWave();
@@ -316,7 +329,8 @@ function offerVictory() {
     onContinue: () => {
       victory.hideVictory();
       state.endless = true;
-      offerReward();
+      // A primeira recompensa do infinito vem logo após o chefe da onda 10: garante lendário
+      offerReward({ boss: true });
     },
     onEnd: endRun,
   });

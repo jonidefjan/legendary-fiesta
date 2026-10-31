@@ -78,14 +78,15 @@ test("duração do frenesi cresce, bônus de velocidade não", () => {
   assert.equal(state.player.berserkSpeed, 0.4);
 });
 
-test("dano contínuo cresce com o nível", () => {
+test("nível da queimadura sobe o teto de stacks, não o dano por stack", () => {
   setupRun(["ember_blade"]);
   fixedRandom(0); // a chance do dot sempre passa
   setLevel("ember_blade", 5);
   const target = enemy();
   state.enemies = [target];
   activateItem(item("ember_blade"));
-  assert.equal(target.dots[0].damage, Math.round(3 * 1.8));
+  assert.equal(target.dots[0].damage, 3);
+  assert.equal(target.dots[0].maxStacks, 7);
 });
 
 test("recarga encurta 5% por nível e com cooldownBonus", () => {
