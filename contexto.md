@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #14 (commit `0091970`).
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #15 (commit `9bb3dd0`).
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -8,10 +8,16 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Tem i18n EN (padrão) e pt-BR, com a chave `lang` no localStorage, e tema claro/escuro.
 - **Reliquary** (`game/`): auto-battler em JS puro, sem build.
   - 3D pixel art com Three.js 0.170, vendorizado em `game/vendor/three`.
-  - Testes: `npm test` na raiz (**226** passando).
+  - Testes: `npm test` na raiz (**239** passando).
 
 ## Estado
-- **Fases concluídas:** 0 a 10 (PRs #2 a #14).
+- **Fases concluídas:** 0 a 10 e 13 (PRs #2 a #15).
+- **Fase 13 (desempenho):** passou de 6–10 para ~50 fps numa run gigante.
+  - Emojis do overlay ficam em cache de bitmap.
+  - `fx.js` envelhece os efeitos por tempo real, com teto de 240.
+  - Os rigs compartilham um esqueleto, atualizado uma vez por quadro (`three/skeleton.js`).
+  - O reflexo da água ignora personagens que não aparecem nela.
+  - `updateMatrixWorld` roda uma vez por quadro.
 - **Fase 10 (tela de fim):**
   - Card 2×3 na derrota e na vitória.
   - Arma favorita = a de maior dano (`runStats.damageByItem`). O dano é creditado via o parâmetro `itemId` de `applyElementalDamage`, e as DoTs guardam `sourceId`.
@@ -48,14 +54,10 @@ Plano de melhorias, pedido pelo usuário em 2026-10-31. A ordem foi escolhida po
   - Projétil e posição de parada mais distante.
   - Modelo `Skeleton_Mage` ou `Skeleton_Rogue`, que já estão no repositório.
   - As decisões vão por múltipla escolha.
-- **13 – Desempenho (meta: só não travar em runs muito grandes):**
-  - Medir antes com uma run artificial (muitos inimigos e efeitos).
-  - Suspeitas:
-    - `particles.shift()` a cada nova partícula;
-    - `state.effects` sem teto;
-    - um modelo animado com mixer e sombra por inimigo;
-    - texto do overlay a cada quadro.
-  - Corrigir só os gargalos medidos.
+- **14 – Itens no celular** (pedido em 2026-10-31):
+  - As descrições dos itens (tooltip e cartas) ficaram ruins de ler no celular.
+  - A pilha de itens no celular atrapalha: a caixa de itens deve rolar quando passar de 6 itens.
+  - Os detalhes vão por múltipla escolha no começo da fase.
 - **Opcionais:**
   - god rays fracos;
   - contraste do herói;

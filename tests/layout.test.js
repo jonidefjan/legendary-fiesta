@@ -5,6 +5,8 @@ import {
   defaultCollapsed,
   visibleGroundRange,
   halfHeightFor,
+  usesItemPanel,
+  needsInvScroll,
 } from "../game/src/layout.js";
 import { WORLD, LOW_RES_HEIGHT } from "../game/src/three/world.js";
 
@@ -49,4 +51,18 @@ test("meia altura mínima segue o viewHeight em telas largas", () => {
 test("sem o limite 1:1 o chão não cobriria (por isso o max-height no CSS)", () => {
   const { front } = visibleGroundRange(halfHeightFor(800, 1280, LOW_RES_HEIGHT, 9));
   assert.ok(front > WORLD.frontZ);
+});
+
+test("painel de item: toque (sem hover) ou tela estreita usa o painel", () => {
+  assert.equal(usesItemPanel({ hoverNone: true, width: 1366 }), true);
+  assert.equal(usesItemPanel({ hoverNone: false, width: 375 }), true);
+  assert.equal(usesItemPanel({ hoverNone: false, width: 768 }), true);
+  assert.equal(usesItemPanel({ hoverNone: false, width: 1366 }), false);
+});
+
+test("caixa de itens rola só com mais de 6 itens", () => {
+  assert.equal(needsInvScroll(0), false);
+  assert.equal(needsInvScroll(6), false);
+  assert.equal(needsInvScroll(7), true);
+  assert.equal(needsInvScroll(12), true);
 });

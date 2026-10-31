@@ -11,7 +11,7 @@ import {
   effectiveCooldown,
 } from "./items.js";
 import { t, formatNumber } from "./i18n.js";
-import { defaultCollapsed } from "./layout.js";
+import { defaultCollapsed, usesItemPanel, needsInvScroll } from "./layout.js";
 import { itemIconHTML } from "./sprites.js";
 import { runResult, formatDuration, favoriteCellHTML, createShareControls } from "./share.js";
 
@@ -27,6 +27,8 @@ const ROMAN = ["", "I", "II", "III", "IV", "V"];
 // ═══════════════════════════════════════════
 export function renderInventory() {
   $("inv-count").textContent = state.items.length;
+  // Muitos itens: a caixa rola por dentro e não empurra a arena (só no celular, via CSS)
+  $("inv-items").classList.toggle("inv-scroll", needsInvScroll(state.items.length));
   ["weapon", "armor", "relic"].forEach((type) => {
     const el = $("slots-" + type);
     el.innerHTML = "";
@@ -48,14 +50,15 @@ export function renderInventory() {
       slot.addEventListener("mouseenter", (e) => showTooltip(item, e));
       slot.addEventListener("mouseleave", hideTooltip);
       slot.addEventListener("mousemove", (e) => moveTooltip(e));
-      // Mobile: touch events
-      slot.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        showTooltip(item, e.touches[0]);
+      // Celular: toque abre o painel (sem preventDefault, para a caixa poder rolar)
+      slot.addEventListener("click", () => {
+        if (panelMode()) toggleItemPanel(item.id);
       });
+      if (item.id === panelItemId) slot.classList.add("selected");
       el.appendChild(slot);
     });
   });
+  refreshItemPanel();
 }
 
 export function flashItem(id) {
@@ -72,6 +75,7 @@ export function flashItem(id) {
 const tooltip = $("tooltip");
 
 function showTooltip(item, e) {
+  if (panelMode()) return; // no celular os detalhes vão para o painel
   const r = RARITIES[item.rarity];
   const level = itemLevel(item.id);
   const cooldown = item.cooldown > 0 ? effectiveCooldown(item) : 0;
@@ -119,14 +123,93 @@ function moveTooltip(e) {
   tooltip.style.top = y + "px";
 }
 
-// Fechar tooltip ao tocar fora em mobile
-if (isMobile) {
-  document.addEventListener("touchstart", (e) => {
-    if (tooltip.classList.contains("show") && !e.target.closest(".item-slot")) {
-      hideTooltip();
-    }
+// ═══════════════════════════════════════════
+//  PAINEL DE ITEM (celular)
+// ═══════════════════════════════════════════
+// Medido a cada uso: girar a tela ou emular um aparelho muda o modo sem recarregar
+function panelMode() {
+  return usesItemPanel({
+    hoverNone: window.matchMedia("(hover: none)").matches,
+    width: window.innerWidth,
   });
 }
+
+const panel = $("item-panel");
+let panelItemId = null;
+
+function panelHTML(item) {
+  const r = RARITIES[item.rarity];
+  const level = itemLevel(item.id);
+  const cooldown = item.cooldown > 0 ? effectiveCooldown(item) : 0;
+  return `
+    <button type="button" class="item-panel-close" id="item-panel-close" aria-label="${t("item.close")}">✕</button>
+    <div class="item-panel-head">
+      <div class="item-panel-icon">${itemIconHTML(item)}</div>
+      <div class="item-panel-title">
+        <div class="item-panel-name" id="item-panel-name" style="color:${r.color}">${item.name}</div>
+        <div class="item-panel-meta"><span style="color:${r.color}">${r.label}</span> · ${getTypeLabel(item.type)}</div>
+        <div class="item-panel-meta">${t("item.level", { level, max: maxLevelOf(item) })}${cooldown > 0 ? " · " + t("item.cooldown", { seconds: formatNumber(cooldown / 1000, 1) }) : ""}</div>
+      </div>
+    </div>
+    <div class="item-panel-effect">${item.effect}</div>
+    ${item.enchant ? `<div class="item-panel-enchant">${item.enchant}</div>` : ""}
+  `;
+}
+
+function markSelectedSlot() {
+  document.querySelectorAll(".item-slot.selected").forEach((el) => el.classList.remove("selected"));
+  if (panelItemId) {
+    const slot = document.querySelector(`.item-slot[data-id="${panelItemId}"]`);
+    if (slot) slot.classList.add("selected");
+  }
+}
+
+function openItemPanel(id) {
+  const item = state.items.find((i) => i.id === id);
+  if (!item) return;
+  const wasOpen = !panel.hidden;
+  panelItemId = id;
+  panel.innerHTML = panelHTML(item);
+  panel.hidden = false;
+  markSelectedSlot();
+  // Foco no X só na abertura; trocar de item não rouba o foco
+  if (!wasOpen) $("item-panel-close").focus({ preventScroll: true });
+}
+
+export function closeItemPanel() {
+  panelItemId = null;
+  panel.hidden = true;
+  markSelectedSlot();
+}
+
+function toggleItemPanel(id) {
+  if (panelItemId === id && !panel.hidden) closeItemPanel();
+  else openItemPanel(id);
+}
+
+// Redesenha o painel aberto (subida de nível, troca de idioma); fecha se o item sumiu
+function refreshItemPanel() {
+  if (!panelItemId) return;
+  if (!panelMode() || !state.items.some((i) => i.id === panelItemId)) {
+    closeItemPanel();
+    return;
+  }
+  const hadFocus = panel.contains(document.activeElement);
+  panel.innerHTML = panelHTML(state.items.find((i) => i.id === panelItemId));
+  if (hadFocus) $("item-panel-close").focus({ preventScroll: true });
+}
+
+panel.addEventListener("click", (e) => {
+  if (e.target.closest("#item-panel-close")) closeItemPanel();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !panel.hidden) closeItemPanel();
+});
+// Tocar fora fecha; tocar noutro item é tratado pelo clique do próprio slot
+document.addEventListener("pointerdown", (e) => {
+  if (panel.hidden || e.target.closest("#item-panel, .item-slot")) return;
+  closeItemPanel();
+});
 
 // ═══════════════════════════════════════════
 //  HUD
@@ -286,6 +369,7 @@ export function showInitialPick(options, maxSelections, onConfirm) {
 
   build();
   refreshModal = build;
+  closeItemPanel(); // o modal cobre a tela; o painel aberto ficaria preso embaixo
   modal.style.display = "flex";
 }
 
@@ -313,6 +397,7 @@ export function showRewardPick(options, wave, onPick) {
 
   build();
   refreshModal = build;
+  closeItemPanel(); // o modal cobre a tela; o painel aberto ficaria preso embaixo
   modal.style.display = "flex";
 }
 
@@ -427,7 +512,10 @@ function setupInventoryToggle() {
   btn.addEventListener("click", () => {
     const collapsed = !inv.classList.contains("collapsed");
     apply(collapsed);
-    if (collapsed) hideTooltip();
+    if (collapsed) {
+      hideTooltip();
+      closeItemPanel();
+    }
     writeSaved(INV_COLLAPSED_KEY, collapsed ? "1" : "0");
   });
 }

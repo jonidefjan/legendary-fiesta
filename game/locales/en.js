@@ -55,6 +55,7 @@ export default {
   // Tooltip e cartas de item
   "item.level": "Level {level}/{max}",
   "item.cooldown": "⏱ Cooldown: {seconds}s",
+  "item.close": "Close",
   "card.new": "New",
   "card.upgrade": "⬆️ Level {from} → {to}",
 

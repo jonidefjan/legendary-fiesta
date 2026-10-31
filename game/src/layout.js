@@ -28,3 +28,15 @@ export function halfHeightFor(cssW, cssH, lowH, minHalfWidth) {
   const lowW = Math.max(1, Math.round((lowH * cssW) / cssH));
   return Math.max(CAMERA.viewHeight / 2, (minHalfWidth * lowH) / lowW);
 }
+
+// Itens no celular: detalhes num painel embaixo (sem tooltip flutuante).
+// Vale para telas sem hover (toque) ou estreitas.
+export function usesItemPanel({ hoverNone, width }) {
+  return Boolean(hoverNone) || width <= 768;
+}
+
+// Acima disso a caixa de itens vira rolável no celular (classe inv-scroll)
+export const INV_SCROLL_THRESHOLD = 6;
+export function needsInvScroll(count) {
+  return count > INV_SCROLL_THRESHOLD;
+}

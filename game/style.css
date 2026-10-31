@@ -2021,3 +2021,150 @@ canvas {
     left: -4px;
   }
 }
+
+/* ───── Fase 14: itens no celular ───── */
+.item-panel[hidden] {
+  display: none;
+}
+.item-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900; /* abaixo dos modais (1100) */
+  max-height: 60vh;
+  max-height: 60dvh;
+  overflow-y: auto;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg2);
+  border-top: 2px solid var(--border2);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.75);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.5;
+  animation: itemPanelIn 0.18s ease-out;
+}
+@keyframes itemPanelIn {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.item-panel-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 44px;
+  height: 44px;
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  color: var(--gold3);
+  font-size: 18px;
+  cursor: pointer;
+}
+.item-panel-close:focus-visible {
+  outline: 2px solid var(--gold2);
+  outline-offset: 2px;
+}
+.item-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 48px; /* espaço do X */
+  margin-bottom: 12px;
+}
+.item-panel-icon {
+  position: relative;
+  flex: none;
+  font-size: 48px;
+  line-height: 1;
+}
+.item-panel-icon .item-sprite {
+  width: 64px;
+  height: 64px;
+}
+.item-panel-icon .element-badge {
+  top: -3px;
+  left: -5px;
+  width: 21px;
+  height: 21px;
+}
+.item-panel-name {
+  font-family: "Reliquary Digits", "Pixelify Sans", sans-serif;
+  font-size: 20px;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+.item-panel-meta {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.item-panel-effect {
+  padding: 10px 12px;
+  background: var(--bg4);
+  border-left: 3px solid var(--gold);
+  border-radius: 6px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--gold3);
+}
+.item-panel-enchant {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: rgba(136, 68, 204, 0.18);
+  border: 1px solid rgba(136, 68, 204, 0.4);
+  border-radius: 6px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #d3a6ff;
+}
+.item-slot.selected {
+  border-color: var(--gold2);
+  box-shadow: 0 0 8px rgba(232, 201, 106, 0.5);
+}
+
+/* Celular: com mais de 6 itens a caixa rola por dentro e a arena não desce */
+@media (max-width: 768px), (hover: none) {
+  .inv-items.inv-scroll {
+    max-height: var(--inv-scroll-h, 168px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gold) var(--bg3);
+  }
+  .inv-items.inv-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .inv-items.inv-scroll::-webkit-scrollbar-thumb {
+    background: var(--gold);
+    border-radius: 3px;
+  }
+  .inv-items.inv-scroll::-webkit-scrollbar-track {
+    background: var(--bg3);
+  }
+}
+
+/* Cartas de recompensa e escolha inicial no celular: texto maior e com mais contraste */
+@media (max-width: 768px) {
+  /* Linhas do tamanho do conteúdo: sem isso o grid espreme os cartões em vez de rolar */
+  .item-choices {
+    grid-auto-rows: max-content;
+  }
+  .item-choice-desc {
+    font-size: 14px;
+    color: var(--text);
+  }
+  .item-choice-effect {
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--gold3);
+  }
+  .item-choice-enchant {
+    font-size: 14px;
+    line-height: 1.45;
+    color: #d3a6ff;
+  }
+}
