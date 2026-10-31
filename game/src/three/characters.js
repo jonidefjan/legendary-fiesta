@@ -13,6 +13,7 @@ import { logicToWorldX, arena } from "./view.js";
 import { state } from "../state.js";
 import { on } from "../events.js";
 import { PALETTE } from "../palette.js";
+import { LAYERS } from "./layers.js";
 
 const MODEL_FILES = {
   hero: "Rogue_Hooded.glb",
@@ -32,6 +33,10 @@ const YAW_TO_CAMERA = 0.35; // rad: vira um pouco para a câmera (3/4)
 const MIN_SEPARATION = 0.95; // distância mínima entre inimigos vivos
 const LANE_Z = WORLD.laneHalfDepth * 0.8;
 const MAX_PUSH_BACK = 3; // unidades que um inimigo pode ser empurrado para trás
+// Personagens: rampa de luz mais clara + luz de contorno
+const CHAR_MAT = { rim: true, character: true };
+// Sombra de contato (a do sol some atrás da grama)
+const SHADOW_BLOB = { width: 0.62, y: 0.04, opacity: 1, renderOrder: 5 }; // largura = fração da altura
 
 // Tipo de ação (player.anim ou item.anim) -> clipe do Rogue
 const HERO_ACTIONS = {
@@ -87,6 +92,7 @@ function toToon(source, cache) {
         map: source.map ?? null,
         transparent: source.transparent,
         alphaTest: source.alphaTest,
+        ...CHAR_MAT,
       });
   mat.name = source.name;
   mat.userData.glow = glow;
@@ -105,6 +111,7 @@ function prepare(gltf) {
     o.castShadow = true;
     o.receiveShadow = true;
     o.frustumCulled = false; // animação sai da caixa de bind
+    o.layers.set(LAYERS.character); // contorno de silhueta próprio
   });
   // Altura real só das malhas com esqueleto (armas fora)
   scene.updateMatrixWorld(true);
@@ -154,7 +161,7 @@ class Rig {
       this.model.traverse((o) => {
         if (!o.isMesh || o.material.userData.glow) return;
         if (!own.has(o.material)) {
-          const m = toonMaterial(0xffffff, { map: o.material.map });
+          const m = toonMaterial(0xffffff, { map: o.material.map, ...CHAR_MAT });
           m.color.copy(o.material.color);
           own.set(o.material, m);
           this.flashMaterials.push(m);
@@ -214,9 +221,62 @@ function placeholder(height, color) {
   const radius = height * 0.22;
   const geo = new THREE.CapsuleGeometry(radius, height - radius * 2, 3, 8);
   geo.translate(0, height / 2, 0);
-  const mesh = new THREE.Mesh(geo, toonMaterial(color));
+  const mesh = new THREE.Mesh(geo, toonMaterial(color, CHAR_MAT));
+  mesh.layers.set(LAYERS.character);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
+  return mesh;
+}
+
+// ─── Sombra de contato: disco de 2 anéis (pixel crisp), escuro e semitransparente ───
+let blobTexture = null;
+function blobTex() {
+  if (blobTexture) return blobTexture;
+  const n = 16;
+  const c = document.createElement("canvas");
+  c.width = c.height = n;
+  const g = c.getContext("2d");
+  const ring = (r, a) => {
+    g.fillStyle = PALETTE.night;
+    g.globalAlpha = a;
+    g.beginPath();
+    g.arc(n / 2, n / 2, r, 0, Math.PI * 2);
+    g.fill();
+  };
+  g.imageSmoothingEnabled = false;
+  ring(7.5, 0.4); // anel externo
+  ring(4.5, 0.55); // miolo (soma ≈ 0.73)
+  // Sem meios-tons: alfa binário por anel (borda dura)
+  const img = g.getImageData(0, 0, n, n);
+  for (let i = 3; i < img.data.length; i += 4) {
+    const a = img.data[i];
+    img.data[i] = a > 150 ? 186 : a > 60 ? 102 : 0;
+  }
+  g.putImageData(img, 0, 0);
+  blobTexture = new THREE.CanvasTexture(c);
+  blobTexture.colorSpace = THREE.SRGBColorSpace;
+  blobTexture.magFilter = THREE.NearestFilter;
+  blobTexture.minFilter = THREE.NearestFilter;
+  blobTexture.generateMipmaps = false;
+  return blobTexture;
+}
+
+function createBlob(height) {
+  const mat = new THREE.MeshBasicMaterial({
+    map: blobTex(),
+    transparent: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
+    fog: false,
+  });
+  const size = height * SHADOW_BLOB.width * 2;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = SHADOW_BLOB.y;
+  mesh.layers.set(LAYERS.noOutline);
+  mesh.renderOrder = SHADOW_BLOB.renderOrder;
   return mesh;
 }
 
@@ -236,6 +296,7 @@ function createHero(group) {
     flash: 0,
   };
   hero.root.add(hero.stub);
+  hero.root.add(createBlob(WORLD.heroHeight));
   hero.root.rotation.y = Math.PI / 2 - YAW_TO_CAMERA; // olha para +X
   group.add(hero.root);
 
@@ -351,6 +412,7 @@ function createEnemyRecord(en, group, spawnAllowed) {
     root: new THREE.Group(),
     rig: null,
     stub: placeholder(enemyHeight(en), PALETTE.bone),
+    blob: createBlob(enemyHeight(en)),
     height: enemyHeight(en),
     baseZ: laneZ(en),
     z: laneZ(en),
@@ -366,6 +428,7 @@ function createEnemyRecord(en, group, spawnAllowed) {
     wantsSpawn: spawnAllowed && en.x < arena.width,
   };
   rec.root.add(rec.stub);
+  rec.root.add(rec.blob);
   rec.root.rotation.y = -Math.PI / 2 + YAW_TO_CAMERA; // olha para -X
   group.add(rec.root);
   return rec;
@@ -511,6 +574,7 @@ export function createCharacters(scene) {
       const rec = enemies.get(en);
       if (!rec || rec.gone) continue;
       const sinkY = -(rec.sink / SINK_TIME) * rec.height * 0.6;
+      rec.blob.material.opacity = SHADOW_BLOB.opacity * (1 - Math.min(1, rec.sink / SINK_TIME));
       rec.root.position.set(en.dead ? rec.x + rec.push : rec.wx, WORLD.groundY + sinkY, rec.z);
     }
     if (hero.rig) hero.rig.setFlash(hero.flash * 0.5);

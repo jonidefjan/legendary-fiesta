@@ -21,6 +21,10 @@ export const OUTLINE = {
   outlineDarken: 0.28, // multiplicador linear da cor no contorno (≈ 0.57 em sRGB)
   highlight: 1.55, // multiplicador linear no brilho de borda (≈ 1.2 em sRGB)
   coveredEps: 0.08, // algo sem contorno (grama) na frente: pula o efeito
+  // Silhueta de personagens (alfa 0.5 no alvo de normais): contorno quase preto
+  charDepthThreshold: 0.1, // diferença de profundidade bem menor: pega pés e pernas
+  charGroundEps: 0.12, // chão do mesmo nível (ou mais perto) ao lado do personagem também contorna
+  charColor: [0.009, 0.007, 0.018], // PALETTE.night em linear
 };
 
 const FULLSCREEN_VERT = /* glsl */ `
@@ -46,6 +50,9 @@ uniform float uDepthBias;
 uniform float uOutlineDarken;
 uniform float uHighlight;
 uniform float uCoveredEps;
+uniform float uCharDepth;
+uniform float uCharEps;
+uniform vec3 uCharColor;
 varying vec2 vUv;
 
 // texelFetch: leitura exata do texel, sem derivadas (seguro em laço/condição)
@@ -60,9 +67,14 @@ float linearDepth( sampler2D tex, ivec2 p ) {
 vec3 normalAt( ivec2 p ) {
   return normalize( texelFetch( tNormal, at( p ), 0 ).rgb * 2.0 - 1.0 );
 }
+// Alfa do alvo de normais: 0.5 = personagem, 1 = resto
+bool isChar( ivec2 p ) {
+  return texelFetch( tNormal, at( p ), 0 ).a < 0.75;
+}
 
-// Contribuição de um vizinho para o contorno (x) e para o brilho de borda (y)
-vec2 neighbor( ivec2 p, float depth, vec3 normal ) {
+// Contribuição de um vizinho para o contorno (x), o brilho de borda (y) e a
+// silhueta de personagem (z)
+vec3 neighbor( ivec2 p, float depth, vec3 normal, bool selfChar ) {
   float nDepth = linearDepth( tDepth, p );
   // Só o lado mais perto ganha contorno: linha de 1 px, sem duplicar
   float depthDiff = clamp( nDepth - depth, 0.0, 1.0 );
@@ -72,7 +84,14 @@ vec2 neighbor( ivec2 p, float depth, vec3 normal ) {
   float nd = dot( normal - nNormal, vec3( 1.0 ) );
   float sideIndicator = smoothstep( -0.01, 0.01, nd );
   float convex = step( -uDepthBias, nDepth - depth );
-  return vec2( depthDiff, ( 1.0 - dot( normal, nNormal ) ) * convex * sideIndicator );
+  // Silhueta: um lado é personagem e o outro não. O personagem contorna quando o
+  // vizinho está mais longe; o chão ao lado contorna quando não está atrás dele.
+  float edge = 0.0;
+  if ( selfChar != isChar( p ) ) {
+    float dd = nDepth - depth;
+    edge = selfChar ? step( uCharDepth, dd ) : step( -uCharEps, dd );
+  }
+  return vec3( depthDiff, ( 1.0 - dot( normal, nNormal ) ) * convex * sideIndicator, edge );
 }
 
 void main() {
@@ -83,13 +102,16 @@ void main() {
   float depth = linearDepth( tDepth, p );
   float sceneDepth = linearDepth( tSceneDepth, p );
   vec3 normal = normalAt( p );
-  vec2 sum = neighbor( p + ivec2( 0, 1 ), depth, normal )
-    + neighbor( p + ivec2( 0, -1 ), depth, normal )
-    + neighbor( p + ivec2( 1, 0 ), depth, normal )
-    + neighbor( p + ivec2( -1, 0 ), depth, normal );
+  bool selfChar = isChar( p );
+  vec3 sum = neighbor( p + ivec2( 0, 1 ), depth, normal, selfChar )
+    + neighbor( p + ivec2( 0, -1 ), depth, normal, selfChar )
+    + neighbor( p + ivec2( 1, 0 ), depth, normal, selfChar )
+    + neighbor( p + ivec2( -1, 0 ), depth, normal, selfChar );
   // Fundo (sem nada com contorno) ou grama/folhagem na frente: cor pura
   bool skip = raw >= 0.99999 || sceneDepth < depth - uCoveredEps;
-  if ( !skip && sum.x > uDepthThreshold ) {
+  if ( !skip && sum.z > 0.5 ) {
+    color.rgb = uCharColor;
+  } else if ( !skip && sum.x > uDepthThreshold ) {
     color.rgb *= uOutlineDarken;
   } else if ( !skip && sum.y > uNormalThreshold ) {
     color.rgb *= uHighlight;
@@ -160,6 +182,12 @@ export function createPipeline(canvas, fxCanvas) {
   const postA = makeTarget(w, h, { type: THREE.HalfFloatType });
   const postB = makeTarget(w, h, { type: THREE.HalfFloatType });
   const normalMaterial = new THREE.MeshNormalMaterial();
+  // Personagens: mesma normal, mas alfa 0.5 (sem mistura) marca a silhueta
+  const charNormalMaterial = new THREE.MeshNormalMaterial({
+    transparent: true,
+    opacity: 0.5,
+    blending: THREE.NoBlending,
+  });
   const normalClear = new THREE.Color().setRGB(0.5, 0.5, 1, THREE.LinearSRGBColorSpace);
 
   const fxTexture = new THREE.CanvasTexture(fxCanvas);
@@ -185,6 +213,9 @@ export function createPipeline(canvas, fxCanvas) {
       uOutlineDarken: { value: OUTLINE.outlineDarken },
       uHighlight: { value: OUTLINE.highlight },
       uCoveredEps: { value: OUTLINE.coveredEps },
+      uCharDepth: { value: OUTLINE.charDepthThreshold },
+      uCharEps: { value: OUTLINE.charGroundEps },
+      uCharColor: { value: new THREE.Vector3(...OUTLINE.charColor) },
     },
     depthTest: false,
     depthWrite: false,
@@ -239,12 +270,14 @@ export function createPipeline(canvas, fxCanvas) {
   function render(scene, camera, { fx = true } = {}) {
     // 1. cor (a sombra é atualizada só aqui)
     camera.layers.enable(LAYERS.noOutline);
+    camera.layers.enable(LAYERS.character);
     renderer.shadowMap.needsUpdate = true;
     renderer.setRenderTarget(sceneTarget);
     renderer.render(scene, camera);
 
     // 2. normais + profundidade sem a camada noOutline
     camera.layers.disable(LAYERS.noOutline);
+    camera.layers.disable(LAYERS.character);
     const background = scene.background;
     const prevClear = renderer.getClearColor(new THREE.Color());
     const prevAlpha = renderer.getClearAlpha();
@@ -253,10 +286,19 @@ export function createPipeline(canvas, fxCanvas) {
     renderer.setClearColor(normalClear, 1);
     renderer.setRenderTarget(normalTarget);
     renderer.render(scene, camera);
+    // 2b. personagens por cima (mesmo depth buffer, sem limpar), alfa 0.5
+    camera.layers.set(LAYERS.character);
+    scene.overrideMaterial = charNormalMaterial;
+    const prevAuto = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.render(scene, camera);
+    renderer.autoClear = prevAuto;
+    camera.layers.enable(LAYERS.default);
     scene.overrideMaterial = null;
     scene.background = background;
     renderer.setClearColor(prevClear, prevAlpha);
     camera.layers.enable(LAYERS.noOutline);
+    camera.layers.enable(LAYERS.character);
 
     // 3. contorno
     runQuad(outlineMaterial, postA);

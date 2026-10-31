@@ -19,14 +19,14 @@ import { emit, log, sound } from "./events.js";
 import { spawnEffect, spawnNumber } from "./fx.js";
 import { effectsOf, ownedEffects, isActivatable } from "./items.js";
 
-// Duração (ms) das poses de animação; o render.js usa o tempo restante para interpolar
+// Duração (ms) das poses de animação; o renderer 3D (three/characters.js) usa o tempo restante
 export const ANIM_MS = {
   playerAction: 320, // golpe ou uso de item (player.animTimer)
   enemyAttack: 320, // investida do inimigo (enemy.attackAnim)
   enemyDeath: 600, // queda do inimigo morto (enemy.deathAnim)
 };
 
-// Animações de ataque que o render.js sabe desenhar; as outras viram "slash"
+// Poses de ataque conhecidas (o renderer 3D escolhe a animação do modelo); as outras viram "slash"
 const PLAYER_ATTACK_ANIMS = new Set([
   "slash",
   "fire_slash",

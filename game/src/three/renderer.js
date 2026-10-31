@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-//  RENDERER 3D EM PIXEL ART (substitui render.js, mesma API)
+//  RENDERER 3D EM PIXEL ART (substituiu o render.js 2D, mesma API)
 // ═══════════════════════════════════════════
 // main.js chama: setupCanvas, getCanvas, setCamera, resizeCanvas,
 // drawRunningFrame(dt), drawPausedFrame(), drawDefeatFrame().
@@ -83,7 +83,7 @@ async function loadExtras() {
   }
 }
 
-// ─── API (mesma do render.js) ───
+// ─── API (a mesma que main.js usava no render.js 2D) ───
 export function setupCanvas(displayEl, overlayEl) {
   display = displayEl;
   overlay.setupOverlay(overlayEl);

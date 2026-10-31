@@ -1,6 +1,6 @@
 // Paleta Endesga 32 (Endesga, lospec.com/palette-list/endesga-32).
-// O shader de pixel art reduz a imagem a estas cores; partículas e arte
-// novas usam os nomes abaixo para combinar com o resultado final.
+// Cores dos materiais 3D, partículas e efeitos (sem quantização de tela: a luz toon
+// cria as faixas de sombra a partir destas cores base).
 export const ENDESGA_32 = [
   "#be4a2f",
   "#d77643",
