@@ -12,7 +12,13 @@ import {
   isMaxed,
   upgradeName,
   upgradeDesc,
+  MYTHIC_IDS,
+  MYTHIC_COST,
+  isMythicUnlocked,
+  unlockMythic,
 } from "./meta.js";
+import { findItem, RARITIES } from "./items.js";
+import { itemIconHTML } from "./sprites.js";
 import { t, getLang } from "./i18n.js";
 import * as save from "./save.js";
 import { sfx } from "./audio.js";
@@ -46,6 +52,27 @@ function shopCard(u) {
       <div class="shop-effect">${maxed ? `<b>${esc(t("shop.maxLevel"))}</b>` : `${esc(t("shop.next"))} <b>${esc(describeLevel(u.id, lvl + 1))}</b>`}</div>
       <button class="title-btn shop-buy" data-buy="${u.id}"${can && !maxed ? "" : " disabled"}>
         ${maxed ? esc(t("shop.maxButton")) : esc(t("shop.buy", { cost }))}
+      </button>
+    </div>`;
+}
+
+// Item mítico à venda: compra única; depois de liberado aparece na escolha inicial das runs
+function mythicCard(id) {
+  const item = findItem(id);
+  if (!item) return "";
+  const owned = isMythicUnlocked(id);
+  const can = state.fragments >= MYTHIC_COST;
+  return `
+    <div class="shop-card mythic${id === lastBought ? " bought" : ""}" data-id="${id}">
+      <div class="shop-head">
+        <span class="shop-icon">${itemIconHTML(item, { badge: false })}</span>
+        <span class="shop-name">${esc(item.name)}</span>
+        <span class="shop-level" style="color:${RARITIES.mythic.color}">${esc(RARITIES.mythic.label)}</span>
+      </div>
+      <div class="shop-desc">${esc(item.desc)}</div>
+      <div class="shop-effect">${esc(item.effect)}</div>
+      <button class="title-btn shop-buy" data-unlock="${id}"${owned || !can ? " disabled" : ""}>
+        ${owned ? esc(t("shop.unlocked")) : esc(t("shop.unlock", { cost: MYTHIC_COST }))}
       </button>
     </div>`;
 }
@@ -99,6 +126,9 @@ function render(keepLangFocus = false) {
         ${buttons}
         <h2 class="shop-title">${esc(t("shop.title"))}</h2>
         <div class="shop-grid">${UPGRADES.map(shopCard).join("")}</div>
+        <h2 class="shop-title">${esc(t("shop.mythicTitle"))}</h2>
+        <p class="shop-note">${esc(t("shop.mythicNote"))}</p>
+        <div class="shop-grid">${MYTHIC_IDS.map(mythicCard).join("")}</div>
       </div>
     </div>`;
   lastBought = null;
@@ -120,6 +150,19 @@ export function refreshTitle() {
 function onClick(e) {
   const btn = e.target.closest("button");
   if (!btn || btn.disabled || !current) return;
+  if (btn.dataset.unlock) {
+    if (unlockMythic(btn.dataset.unlock)) {
+      save.saveMeta();
+      try {
+        sfx.reward();
+      } catch {
+        // áudio é opcional
+      }
+      lastBought = btn.dataset.unlock;
+      render();
+    }
+    return;
+  }
   if (btn.dataset.buy) {
     if (buyUpgrade(btn.dataset.buy)) {
       save.saveMeta();

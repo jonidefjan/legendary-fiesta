@@ -68,51 +68,52 @@ function run(ids, enemies = [big()], levels = {}) {
 // ─── Tabela: valores de cada item no nível 1, 3 e 5 ───
 // [id, onde, chave, N1, N3, N5]; "item" lê do próprio item, o resto é o tipo do efeito
 const TABLE = [
-  ["rusted_sword", "item", "baseDmg", 8, 14, 20],
+  ["rusted_sword", "item", "baseDmg", 10, 16, 22],
+  ["ember_blade", "item", "baseDmg", 12, 18, 24],
   ["ember_blade", "dot", "stacks", 1, 3, 5],
-  ["shadow_dagger", "item", "baseDmg", 9, 13, 17],
-  ["thunder_staff", "item", "baseDmg", 22, 32, 42],
+  ["shadow_dagger", "item", "baseDmg", 12, 16, 20],
+  ["thunder_staff", "item", "baseDmg", 29, 39, 49],
   ["thunder_staff", "chain", "targets", 2, 4, 6],
   ["thunder_staff", "chain", "ratio", 0.5, 0.5, 1],
-  ["leather_vest", "stats", "armor", 12, 28, 44],
+  ["leather_vest", "stats", "armor", 16, 32, 48],
   ["iron_shield", "blockNext", "blocks", 1, 1, 2],
-  ["mage_robe", "stats", "elementalBoost", 0.1, 0.2, 0.3],
+  ["mage_robe", "stats", "elementalBoost", 0.13, 0.23, 0.33],
   ["dragonscale", "burnAttacker", "stacks", 1, 3, 5],
-  ["health_crystal", "heal", "amount", 8, 14, 20],
-  ["echo_stone", "echo", "ratio", 0.5, 0.7, 1],
+  ["health_crystal", "heal", "amount", 10, 16, 22],
+  ["echo_stone", "echo", "ratio", 0.65, 0.85, 1],
   ["echo_stone", "echo", "repeats", 1, 2, 2],
   ["berserker_totem", "frenzy", "duration", 3000, 4000, 5000],
-  ["phoenix_feather", "revive", "hpRatio", 0.4, 0.6, 0.8],
-  ["frost_bow", "item", "baseDmg", 17, 23, 29],
+  ["phoenix_feather", "revive", "hpRatio", 0.52, 0.72, 0.92],
+  ["frost_bow", "item", "baseDmg", 22, 28, 34],
   ["frost_bow", "cold", "freezeMs", 2000, 2000, 3000],
-  ["poison_blade", "item", "baseDmg", 10, 10, 10],
+  ["poison_blade", "item", "baseDmg", 13, 13, 13],
   ["poison_blade", "dot", "base", 1, 7, 13],
   ["poison_blade", "dot", "stacks", 1, 1, 2],
-  ["holy_mace", "item", "baseDmg", 18, 26, 34],
-  ["holy_mace", "heal", "amount", 5, 7, 9],
-  ["blood_scythe", "item", "baseDmg", 20, 30, 40],
-  ["blood_scythe", "lifesteal", "ratio", 0.3, 0.3, 0.5],
-  ["water_orb", "item", "baseDmg", 15, 21, 27],
+  ["holy_mace", "item", "baseDmg", 23, 31, 39],
+  ["holy_mace", "heal", "amount", 7, 9, 11],
+  ["blood_scythe", "item", "baseDmg", 26, 36, 46],
+  ["blood_scythe", "lifesteal", "ratio", 0.39, 0.39, 0.5],
+  ["water_orb", "item", "baseDmg", 20, 26, 32],
   ["water_orb", "cooldownOthers", "ms", 300, 400, 500],
-  ["chainmail", "stats", "armor", 18, 34, 50],
+  ["chainmail", "stats", "armor", 23, 39, 55],
   ["chainmail", "reflect", "chance", 0.15, 0.15, 0.3],
   ["chainmail", "reflect", "ratio", 0.5, 0.5, 1],
-  ["shadow_cloak", "stats", "evasion", 0.1, 0.18, 0.26],
+  ["shadow_cloak", "stats", "evasion", 0.13, 0.21, 0.29],
   ["crystal_armor", "coldAura", "radius", 100, 150, 200],
-  ["vampiric_amulet", "lifesteal", "ratio", 0.08, 0.12, 0.16],
-  ["speed_boots", "stats", "weaponSpeed", 0.15, 0.25, 0.35],
-  ["lucky_coin", "stats", "critChance", 0.15, 0.25, 0.35],
-  ["cursed_ring", "stats", "damageBoost", 0.3, 0.5, 0.7],
+  ["vampiric_amulet", "lifesteal", "ratio", 0.1, 0.14, 0.18],
+  ["speed_boots", "stats", "weaponSpeed", 0.1, 0.18, 0.26],
+  ["lucky_coin", "stats", "critChance", 0.2, 0.3, 0.4],
+  ["cursed_ring", "stats", "damageBoost", 0.4, 0.6, 0.8],
   ["cursed_ring", "stats", "maxHpMult", -0.2, -0.2, -0.1],
   ["cursed_ring", "pact", "max", 0.25, 0.25, 0.5],
-  ["seismic_hammer", "item", "baseDmg", 14, 22, 30],
+  ["seismic_hammer", "item", "baseDmg", 18, 26, 34],
   ["seismic_hammer", "splash", "ratio", 0.4, 0.6, 0.6],
   ["seismic_hammer", "splash", "radius", 90, 130, 130],
-  ["blast_core", "blast", "damage", 10, 20, 30],
+  ["blast_core", "blast", "damage", 13, 23, 33],
   ["blast_core", "blast", "radius", 220, 220, 440],
-  ["judgment_tome", "item", "baseDmg", 9, 15, 21],
-  ["thorn_mail", "thorns", "damage", 6, 12, 18],
-  ["thorn_mail", "stats", "armor", 8, 24, 40],
+  ["judgment_tome", "item", "baseDmg", 12, 18, 24],
+  ["thorn_mail", "thorns", "damage", 8, 14, 20],
+  ["thorn_mail", "stats", "armor", 10, 26, 42],
 ];
 
 test("tabela: valor de cada item no nível 1, 3 e 5 (e nada cresce sem declarar)", () => {
@@ -145,17 +146,17 @@ test("recarga: o Escudo de Ferro perde 1 s por nível; os outros itens não muda
 test("dano de cada arma no nível 1 e 5 (alvo único, sem crítico)", () => {
   // [id, N1, N5]: Adaga bate 2× no N1 e 3× no N5 (golpe extra do nível 3)
   const table = [
-    ["rusted_sword", 8, 20],
-    ["shadow_dagger", 18, 51],
-    ["thunder_staff", 22, 42],
-    ["frost_bow", 17, 29],
-    ["poison_blade", 10, 10],
-    ["holy_mace", 18, 34],
-    ["blood_scythe", 20, 40],
-    ["water_orb", 15, 27],
-    ["seismic_hammer", 14, 30],
-    ["judgment_tome", 9, 21],
-    ["ember_blade", 0, 0],
+    ["rusted_sword", 10, 22],
+    ["shadow_dagger", 24, 60],
+    ["thunder_staff", 29, 49],
+    ["frost_bow", 22, 34],
+    ["poison_blade", 13, 13],
+    ["holy_mace", 23, 39],
+    ["blood_scythe", 26, 46],
+    ["water_orb", 20, 32],
+    ["seismic_hammer", 18, 34],
+    ["judgment_tome", 12, 24],
+    ["ember_blade", 12, 24],
   ];
   for (const [id, n1, n5] of table) {
     for (const [level, expected] of [[1, n1], [5, n5]]) {
@@ -170,6 +171,7 @@ test("dano de cada arma no nível 1 e 5 (alvo único, sem crítico)", () => {
 // ─── Encantamentos: N3 e N5 ───
 test("todo item tem o encantamento no nível 3 e o extra no 5 (formas evoluídas: 10 e 15)", () => {
   for (const it of ITEMS) {
+    if (it.rarity === "mythic") continue; // míticos não têm nível nem encantamentos
     const evolved = !!it.evolvedFrom;
     const tiers = enchantTiers(it, 1);
     if (!it.evolution) assert.equal(tiers.length, evolved ? 2 : 2, `${it.id}: 2 encantamentos`);
@@ -235,6 +237,7 @@ test("quebram a imunidade no nível 5 (e só nele): fogo, gelo, veneno, sombra, 
     ember_blade: "fire",
     ember_heart: "fire",
     blast_core: "fire",
+    detonating_plague: "poison",
     frost_bow: "ice",
     crystal_armor: "ice",
     poison_blade: "poison",
@@ -261,7 +264,7 @@ test("quebram a imunidade no nível 5 (e só nele): fogo, gelo, veneno, sombra, 
 });
 
 // ─── Armas ───
-test("Lâmina de Brasa: 0 de dano, 1 stack por nível; labareda (N3) com 20+ stacks", () => {
+test("Lâmina de Brasa: 12 de dano, 1 stack por nível; labareda (N3) com 20+ stacks", () => {
   const main = big({ x: 150 });
   const side = big({ x: 200 });
   const far = big({ x: 500 });
@@ -280,7 +283,7 @@ test("Lâmina de Brasa: 0 de dano, 1 stack por nível; labareda (N3) com 20+ sta
   const few = big();
   state.enemies = [few];
   activateItem(item("ember_blade"));
-  assert.equal(lost(few), 0, "abaixo de 20 stacks não solta labareda");
+  assert.equal(lost(few), 12 + 3 * 2, "só o golpe direto (N3): abaixo de 20 stacks não solta labareda");
 });
 
 test("Adaga das Sombras: 3 golpes a partir do nível 3; recarga e imunidade só no 5", () => {
@@ -305,12 +308,12 @@ test("Cajado do Trovão: +1 salto por nível, Tempestade no N3, saltos sem perda
   const list = [big({ x: 150 }), ...[250, 300, 350, 400, 450, 500, 550].map((x) => big({ x }))];
   run(["thunder_staff"], list);
   activateItem(item("thunder_staff"));
-  assert.deepEqual(list.map(lost), [22, 11, 11, 0, 0, 0, 0, 0], "N1: 2 saltos a 50%");
+  assert.deepEqual(list.map(lost), [29, 15, 15, 0, 0, 0, 0, 0], "N1: 2 saltos a 50%");
 
   setLevel("thunder_staff", 5);
   list.forEach((e) => (e.hp = e.maxHp));
   activateItem(item("thunder_staff"));
-  assert.deepEqual(list.map(lost), [42, 42, 42, 42, 42, 42, 42, 0], "N5: 6 saltos sem perder dano");
+  assert.deepEqual(list.map(lost), [49, 49, 49, 49, 49, 49, 49, 0], "N5: 6 saltos sem perder dano");
 });
 
 test("Arco Gélido: atravessa no N3 (acerta e esfria o próximo); congelamento de 3 s no N5", () => {
@@ -321,7 +324,7 @@ test("Arco Gélido: atravessa no N3 (acerta e esfria o próximo); congelamento d
   assert.equal(lost(b), 0);
   setLevel("frost_bow", 3);
   activateItem(item("frost_bow"));
-  assert.equal(lost(b), 23);
+  assert.equal(lost(b), 28);
   assert.equal(coldStacks(b), 1);
   assert.equal(coldStacks(a), 2);
 
@@ -358,8 +361,8 @@ test("Maça Sagrada: raio de luz a cada 5 golpes no N5, 50% do dano em todos", (
   for (let i = 0; i < 4; i++) activateItem(item("holy_mace"));
   assert.equal(lost(other), 0);
   activateItem(item("holy_mace"));
-  assert.equal(lost(other), 17, "50% de 34");
-  assert.equal(lost(main), 34 * 5 + 17);
+  assert.equal(lost(other), 20, "50% de 39");
+  assert.equal(lost(main), 39 * 5 + 20);
 });
 
 test("Foice de Sangue: 2 alvos (N3), +1 de dano a cada 20 abates, 50% e vida máxima (N5)", () => {
@@ -370,7 +373,7 @@ test("Foice de Sangue: 2 alvos (N3), +1 de dano a cada 20 abates, 50% e vida má
   assert.equal(lost(b), 0, "N1 acerta só um alvo");
   setLevel("blood_scythe", 3);
   activateItem(item("blood_scythe"));
-  assert.equal(lost(b), 30);
+  assert.equal(lost(b), 36);
 
   // 20 abates: +1 de dano permanente
   state.kills = 19; // as almas contam todos os abates da run
@@ -379,7 +382,7 @@ test("Foice de Sangue: 2 alvos (N3), +1 de dano a cada 20 abates, 50% e vida má
   const t2 = big();
   state.enemies = [t2];
   activateItem(item("blood_scythe"));
-  assert.equal(lost(t2), 31);
+  assert.equal(lost(t2), 37);
 
   // N5: rouba 50% e cura acima da vida máxima vira vida máxima, até +50
   setLevel("blood_scythe", 5);
@@ -401,7 +404,7 @@ test("Foice de Sangue: 2 alvos (N3), +1 de dano a cada 20 abates, 50% e vida má
   const t4 = big();
   state.enemies = [t4];
   activateItem(item("blood_scythe"));
-  assert.equal(state.player.hp, 10 + Math.round(41 * 0.5), "50% de 41 (40 + 1 de almas)");
+  assert.equal(state.player.hp, 10 + Math.round(47 * 0.5), "50% de 47 (46 + 1 de almas)");
 });
 
 test("Orbe Aquático: com 5 de Maré (N5) o golpe vira onda de 50% em todos", () => {
@@ -412,9 +415,9 @@ test("Orbe Aquático: com 5 de Maré (N5) o golpe vira onda de 50% em todos", ()
   assert.equal(lost(b), 0);
   assert.equal(state.player.tide.stacks, 5);
   const before = lost(a);
-  activateItem(item("water_orb")); // 27 + 5×3 = 42
-  assert.equal(lost(a) - before, 42);
-  assert.equal(lost(b), 21, "onda: 50% do golpe");
+  activateItem(item("water_orb")); // 32 + 5×3 = 47
+  assert.equal(lost(a) - before, 47);
+  assert.equal(lost(b), 24, "onda: 50% do golpe (23,5 arredondado)");
   assert.equal(state.player.tide.stacks, 0, "a Maré recomeça");
 });
 
@@ -425,14 +428,14 @@ test("Martelo Sísmico: respingo de 60% e raio maior (N3); efeitos de golpe dos 
   state.player.hp = 50;
   activateItem(item("seismic_hammer"));
   assert.equal(lost(edge), 0);
-  setLevel("seismic_hammer", 3); // 22 de dano
+  setLevel("seismic_hammer", 3); // 26 de dano
   activateItem(item("seismic_hammer"));
-  assert.equal(lost(edge), Math.round(22 * 0.6));
+  assert.equal(lost(edge), Math.round(26 * 0.6));
   const hp = state.player.hp;
-  setLevel("seismic_hammer", 5); // 30
+  setLevel("seismic_hammer", 5); // 34
   activateItem(item("seismic_hammer"));
-  // roubo 8% (Amuleto N1): 30 no alvo e 18 no respingo = 2 + 1 (arredondado)
-  assert.equal(state.player.hp - hp, Math.round(30 * 0.08) + Math.round(18 * 0.08));
+  // roubo 10% (Amuleto N1): 34 no alvo e 20 no respingo = 3 + 2
+  assert.equal(state.player.hp - hp, Math.round(34 * 0.1) + Math.round(20 * 0.1));
 });
 
 test("Tomo do Julgamento: julgados recebem +15% (N3); chefes levam ×2 (N5)", () => {
@@ -450,14 +453,14 @@ test("Tomo do Julgamento: julgados recebem +15% (N3); chefes levam ×2 (N5)", ()
   const boss = big({ x: 150, isBoss: true });
   const adds = big({ x: 300 });
   run(["judgment_tome"], [boss, adds], { judgment_tome: 5 });
-  activateItem(item("judgment_tome")); // base 21
-  assert.equal(lost(boss), 42);
-  assert.equal(lost(adds), 21, "o ×2 é só para chefe; o julgamento vale nos golpes seguintes");
+  activateItem(item("judgment_tome")); // base 24
+  assert.equal(lost(boss), 48);
+  assert.equal(lost(adds), 24, "o ×2 é só para chefe; o julgamento vale nos golpes seguintes");
   const boss2 = big({ x: 300, isBoss: true });
   const first = big({ x: 150 });
   run(["judgment_tome"], [first, boss2], { judgment_tome: 5 });
   activateItem(item("judgment_tome"));
-  assert.equal(lost(boss2), 42, "o ×2 vale também nos outros alvos que são chefe");
+  assert.equal(lost(boss2), 48, "o ×2 vale também nos outros alvos que são chefe");
 });
 
 // ─── Armaduras ───
@@ -489,7 +492,7 @@ test("Cota de Espinhos: +1% por ponto de armadura (N3); dispara ao esquivar e bl
   const atk = big({ x: 150, dmg: 5 });
   run(["thorn_mail"], [atk], { thorn_mail: 3 });
   enemyAttack(atk);
-  assert.equal(lost(atk), Math.round(12 * (1 + 0.01 * 24)), "12 de dano e 24 de armadura");
+  assert.equal(lost(atk), Math.round(14 * (1 + 0.01 * 26)), "14 de dano e 26 de armadura");
 
   atk.hp = atk.maxHp;
   state.player.evasion = 1;
@@ -498,22 +501,22 @@ test("Cota de Espinhos: +1% por ponto de armadura (N3); dispara ao esquivar e bl
   setLevel("thorn_mail", 5);
   state.player.evasion = 1;
   assert.equal(enemyAttack(atk), "dodged");
-  assert.equal(lost(atk), Math.round(18 * 1.4));
+  assert.equal(lost(atk), Math.round(20 * 1.42));
   atk.hp = atk.maxHp;
   state.player.evasion = 0;
   state.player.blocksLeft = 1;
   assert.equal(enemyAttack(atk), "blocked");
-  assert.equal(lost(atk), Math.round(18 * 1.4));
+  assert.equal(lost(atk), Math.round(20 * 1.42));
 });
 
-test("Manto do Arcano: +10% (+5% por nível) só nas armas elementais; +1 stack (N3); alcance (N5)", () => {
+test("Manto do Arcano: +13% (+5% por nível) só nas armas elementais; +1 stack (N3); alcance (N5)", () => {
   const target = big();
   run(["rusted_sword", "frost_bow", "mage_robe"], [target]);
   activateItem(item("rusted_sword"));
-  assert.equal(lost(target), 8, "físico não muda");
+  assert.equal(lost(target), 10, "físico não muda");
   const before = lost(target);
   activateItem(item("frost_bow"));
-  assert.equal(lost(target) - before, Math.round(17 * 1.1));
+  assert.equal(lost(target) - before, Math.round(22 * 1.13));
 
   assert.equal(coldStacks(target), 1);
   setLevel("mage_robe", 3);
@@ -609,13 +612,15 @@ test("Cristal Vital: abaixo de 30% de vida a recarga cai pela metade (N5)", () =
   assert.equal(state.itemTimers.health_crystal.elapsed, 2000);
 });
 
-test("Botas da Velocidade: Sprint recarrega todos os itens no N5", () => {
-  run(["rusted_sword", "health_crystal", "speed_boots"], [big()], { speed_boots: 5 });
+test("Botas da Velocidade: Sprint recarrega todas as armas (só armas) no N5", () => {
+  run(["rusted_sword", "frost_bow", "health_crystal", "speed_boots"], [big()], { speed_boots: 5 });
+  state.itemTimers.frost_bow.elapsed = 0;
   state.itemTimers.health_crystal.elapsed = 0;
   state.player.counters.sprint = 4;
   activateItem(item("rusted_sword"));
   assert.equal(state.itemTimers.rusted_sword.elapsed, state.itemTimers.rusted_sword.cooldown);
-  assert.equal(state.itemTimers.health_crystal.elapsed, state.itemTimers.health_crystal.cooldown);
+  assert.equal(state.itemTimers.frost_bow.elapsed, state.itemTimers.frost_bow.cooldown, "as outras armas também");
+  assert.equal(state.itemTimers.health_crystal.elapsed, 0, "relíquia e armadura não");
 
   run(["rusted_sword", "health_crystal", "speed_boots"], [big()], { speed_boots: 3 });
   state.itemTimers.health_crystal.elapsed = 0;
@@ -631,10 +636,10 @@ test("Amuleto Vampírico: o roubo vale também para dano contínuo no N5", () =>
   state.player.hp = 50;
   processDots(1000);
   assert.equal(state.player.hp, 50, "N3 não rouba do dano contínuo");
-  setLevel("vampiric_amulet", 5); // 16%
+  setLevel("vampiric_amulet", 5); // 18%
   processDots(1000);
-  // 50 stacks perdem 5 no primeiro tick: o segundo tick causa 45 de dano, 16% = 7
-  assert.equal(state.player.hp, 50 + Math.round(45 * 0.16));
+  // a queimadura espera 3 s antes de perder stacks: o segundo tick ainda causa 50 de dano
+  assert.equal(state.player.hp, 50 + Math.round(50 * 0.18));
 });
 
 test("Totem Berserker: Frenesi automático (N3) e +20% de dano durante o frenesi (N5)", () => {
@@ -650,11 +655,11 @@ test("Totem Berserker: Frenesi automático (N3) e +20% de dano durante o frenesi
   state.player.berserkSpeed = 0.4;
   const start = lost(target);
   activateItem(item("rusted_sword"));
-  assert.equal(lost(target) - start, Math.round(8 * 1.2));
+  assert.equal(lost(target) - start, Math.round(10 * 1.2));
   state.player.berserking = false;
   const before = lost(target);
   activateItem(item("rusted_sword"));
-  assert.equal(lost(target) - before, 8);
+  assert.equal(lost(target) - before, 10);
 });
 
 test("Pena de Fênix (N5): ao reviver explode em fogo e aplica 20 stacks em todos", () => {
@@ -663,7 +668,7 @@ test("Pena de Fênix (N5): ao reviver explode em fogo e aplica 20 stacks em todo
   run(["phoenix_feather"], [a, b], { phoenix_feather: 5 });
   state.player.hp = 1;
   enemyAttack(enemy({ dmg: 100 }));
-  assert.equal(state.player.hp, 80);
+  assert.equal(state.player.hp, 92);
   assert.equal(burning(a).stacks, 20);
   assert.equal(burning(b).stacks, 20);
 });
@@ -674,7 +679,7 @@ test("Moeda da Fortuna: crítico ×2 no N5", () => {
   state.player.critChance = 1;
   activateItem(item("rusted_sword")); // sorteio 0,5: crítico garantido e sem ataque extra (25%)
   assert.equal(state.player.critMult, 2);
-  assert.equal(lost(target), 16, "8 × 2");
+  assert.equal(lost(target), 20, "10 × 2");
   setLevel("lucky_coin", 3);
   assert.equal(state.player.critMult, 1.5, "antes do nível 5 o crítico é ×1,5");
 });
@@ -696,7 +701,7 @@ test("Núcleo Explosivo (N5): raio dobra e quebra a imunidade a fogo", () => {
   setLevel("blast_core", 5);
   boss.x = 500; // 400 do herói: só o raio dobrado alcança
   assert.equal(activateItem(item("blast_core")), true);
-  assert.equal(lost(boss), 30);
+  assert.equal(lost(boss), 33);
   assert.equal(burning(boss).stacks, 15);
 });
 
@@ -719,44 +724,44 @@ test("Coração de Brasa: labareda de 1 por stack no alvo novo (N3)", () => {
 });
 
 // ─── Pedra de Eco ───
-test("Pedra de Eco: repete o último item ativado com 50% (+10% por nível)", () => {
+test("Pedra de Eco: repete o último item ativado com 65% (+10% por nível)", () => {
   const target = big();
   run(["rusted_sword", "echo_stone"], [target]);
   activateItem(item("rusted_sword"));
-  assert.equal(lost(target), 8);
+  assert.equal(lost(target), 10);
   assert.equal(state.player.lastActivated, "rusted_sword");
   const swordTimer = state.itemTimers.rusted_sword.elapsed;
   assert.equal(activateItem(item("echo_stone")), true);
-  assert.equal(lost(target), 8 + 4);
+  assert.equal(lost(target), 10 + 7);
   assert.equal(state.player.lastActivated, "rusted_sword", "o eco não vira o último item");
   assert.equal(state.itemTimers.rusted_sword.elapsed, swordTimer, "não mexe na recarga");
   assert.equal(state.runStats.itemUses.rusted_sword, 1, "nem nas estatísticas");
 });
 
-test("Pedra de Eco: 2 repetições a 70% no N3 e 2 a 100% no N5", () => {
+test("Pedra de Eco: 2 repetições a 85% no N3 e 2 a 100% no N5", () => {
   const target = big();
   run(["rusted_sword", "echo_stone"], [target], { echo_stone: 3 });
   activateItem(item("rusted_sword"));
   activateItem(item("echo_stone"));
-  assert.equal(lost(target), 8 + 6 + 6, "2 × 70% de 8 = 5,6 -> 6");
+  assert.equal(lost(target), 10 + 9 + 9, "2 × 85% de 10 = 8,5 -> 9");
 
   const t2 = big();
   run(["rusted_sword", "echo_stone"], [t2], { echo_stone: 5 });
   activateItem(item("rusted_sword"));
   activateItem(item("echo_stone"));
-  assert.equal(lost(t2), 8 * 3);
+  assert.equal(lost(t2), 10 * 3);
 });
 
-test("Pedra de Eco: repete relíquias (cura a 50%) mas não armaduras; sem nada para repetir não gasta", () => {
+test("Pedra de Eco: repete relíquias (cura a 65%) mas não armaduras; sem nada para repetir não gasta", () => {
   run(["health_crystal", "iron_shield", "echo_stone"], [big()]);
   const echo = item("echo_stone");
   assert.equal(activateItem(echo), false, "nada ativado ainda");
   assert.equal(state.itemTimers.echo_stone.elapsed, state.itemTimers.echo_stone.cooldown);
   state.player.hp = 50;
   activateItem(item("health_crystal"));
-  assert.equal(state.player.hp, 58);
+  assert.equal(state.player.hp, 60);
   activateItem(echo);
-  assert.equal(state.player.hp, 62, "50% de 8");
+  assert.equal(state.player.hp, 67, "65% de 10 = 6,5 -> 7");
   activateItem(item("iron_shield"));
   assert.equal(state.player.lastActivated, "health_crystal", "armadura não conta");
 });
@@ -769,7 +774,7 @@ test("Pedra de Eco dispara sozinha quando a recarga acaba (6 s)", () => {
   state.itemTimers.echo_stone.elapsed = 5999;
   state.itemTimers.rusted_sword.elapsed = 0;
   updateItemTimers(2);
-  assert.equal(lost(target), 8 + 4);
+  assert.equal(lost(target), 10 + 7);
 });
 
 // ─── Marcos das formas evoluídas ───
@@ -787,14 +792,14 @@ test("Lâmina do Veterano: +3 de dano por nível; golpe duplo no 5, crítico no 
   const t5 = big();
   evolved("veterans_blade", 5, [t5]);
   activateItem(blade);
-  assert.equal(lost(t5), 2 * 20, "2 golpes de 8 + 12");
+  assert.equal(lost(t5), 2 * 22, "2 golpes de 10 + 12");
   near(state.player.critChance, 0);
 
   const t10 = big();
   evolved("veterans_blade", 10, [t10]);
   near(state.player.critChance, 0.1);
   activateItem(blade);
-  assert.equal(lost(t10), 2 * 35);
+  assert.equal(lost(t10), 2 * 37);
 
   // Execução (15): inimigo comum com 20% de vida ou menos morre; chefe não
   const weak = enemy({ hp: 190, maxHp: 1000 });
@@ -848,7 +853,7 @@ test("Lâmina do Veterano depois do 15: a cada 5 níveis, +1 golpe (20, 30...) o
 
 test("Couraça de Batalha: +8 de armadura por nível; regeneração no 5, dano contínuo -50% no 10, imune no 15", () => {
   evolved("battle_cuirass", 5);
-  assert.equal(state.player.armor, 12 + 8 * 4);
+  assert.equal(state.player.armor, 16 + 8 * 4);
   assert.equal(state.player.regen, 1);
   state.player.hp = 50;
   updateRegen(999);
@@ -870,7 +875,7 @@ test("Couraça de Batalha: +8 de armadura por nível; regeneração no 5, dano c
   const atk = enemy({ dmg: 100 });
   const hp0 = state.player.hp;
   enemyAttack(atk);
-  const armor = 12 + 8 * 14;
+  const armor = 16 + 8 * 14;
   assert.equal(hp0 - state.player.hp, Math.round(100 * (1 - armor / (armor + 100)) * 0.85), "-15% além da armadura");
 });
 
@@ -886,7 +891,7 @@ test("Couraça de Batalha depois do 15: regeneração +1 (20, 30...) ou +25 de a
   for (const [level, regen, extra] of table) {
     evolved("battle_cuirass", level);
     assert.equal(state.player.regen, regen, `regen N${level}`);
-    assert.equal(state.player.armor, 12 + 8 * (level - 1) + extra, `armadura N${level}`);
+    assert.equal(state.player.armor, 16 + 8 * (level - 1) + extra, `armadura N${level}`);
   }
 });
 
@@ -916,7 +921,7 @@ test("Colete de Couro vira Couraça de Batalha no nível 5 e o armor muda na hor
   const vest = item("leather_vest");
   for (let i = 0; i < 4; i++) addItemOrLevel(vest);
   assert.deepEqual(state.items.map((i) => i.id), ["battle_cuirass"]);
-  assert.equal(state.player.armor, 12 + 8 * 4);
+  assert.equal(state.player.armor, 16 + 8 * 4);
   assert.equal(state.player.regen, 1);
 });
 
@@ -1090,7 +1095,7 @@ test("save: forma evoluída, nível e abates sobrevivem; save antigo com o item 
   assert.deepEqual(state.items.map((i) => i.id), ["veterans_blade", "battle_cuirass"]);
   assert.equal(state.itemLevels.battle_cuirass, 5);
   assert.equal(state.itemTimers.veterans_blade.elapsed, 5);
-  assert.equal(state.player.armor, 12 + 8 * 4);
+  assert.equal(state.player.armor, 16 + 8 * 4);
   save.setStorage(null);
 });
 
@@ -1158,10 +1163,11 @@ test("mana e barreira não existem mais: estado, efeitos, interface e textos", (
   }
 });
 
-test("o catálogo tem 31 itens: os 29 de antes (com a Pedra de Eco) e as 2 formas evoluídas", () => {
-  assert.equal(ITEMS.length, 31);
-  assert.equal(ITEMS.filter((i) => i.evolvedFrom).length, 2);
-  assert.equal(ITEMS.filter((i) => i.evolution).length, 2);
+test("o catálogo tem 45 itens: os 29 de antes (com a Pedra de Eco), 3 formas evoluídas e as novidades da 11c", () => {
+  // 29 + Lâmina e Couraça + 11 novos + Trevo de Ouro + 2 míticos
+  assert.equal(ITEMS.length, 45);
+  assert.equal(ITEMS.filter((i) => i.evolvedFrom).length, 3);
+  assert.equal(ITEMS.filter((i) => i.evolution).length, 3);
   assert.ok(!ITEMS.some((i) => i.id === "mana_stone"));
   assert.ok(ITEMS.some((i) => i.id === "echo_stone"));
 });
@@ -1227,17 +1233,17 @@ test("ataque extra mantém o ×2 contra chefe do Tomo (N5), mas não os bônus d
   const boss = big({ isBoss: true });
   run(["judgment_tome", "echo_stone"], [boss], { judgment_tome: 5 });
   activateItem(item("judgment_tome"));
-  assert.equal(lost(boss), 42);
-  activateItem(item("echo_stone")); // 50% de 21 ×2
-  assert.equal(lost(boss), 42 + 25, "50% de 21 ×2, e o chefe já está julgado (+15%)");
+  assert.equal(lost(boss), 48);
+  activateItem(item("echo_stone")); // 65% de 24 ×2
+  assert.equal(lost(boss), 48 + 37, "65% de 24 ×2, e o chefe já está julgado (+15%)");
   // Tempestade (uso único) não entra no extra
   const t = big();
   run(["thunder_staff", "echo_stone"], [t], { thunder_staff: 3 });
   state.player.counters.storm = 3;
   activateItem(item("thunder_staff")); // 4º uso: +50%
-  assert.equal(lost(t), 48);
+  assert.equal(lost(t), 59);
   activateItem(item("echo_stone"));
-  assert.equal(lost(t), 48 + 16, "50% de 32, sem a Tempestade");
+  assert.equal(lost(t), 59 + 25, "65% de 39, sem a Tempestade");
   assert.equal(state.player.counters.storm, 4, "o eco não conta como uso");
 });
 
@@ -1306,7 +1312,7 @@ test("Foice de Sangue: as almas contam todos os abates da run, mesmo antes de pe
   const t = big();
   state.enemies = [t];
   activateItem(item("blood_scythe"));
-  assert.equal(lost(t), 22);
+  assert.equal(lost(t), 28);
 });
 
 test("Escama: não avisa que o atacante pegou fogo quando nenhum stack entra", () => {

@@ -117,13 +117,16 @@ test("fogo: stacks sem limite, 1 de dano por stack, perde max(1, ⌊stacks ÷ 10
   applyDot(target, "burning", 1, 0, true, { stacks: 100 });
   processDots(1000);
   assert.equal(lost(target), 100, "100 stacks = 100 de dano");
+  assert.equal(burning(target).stacks, 100, "os stacks esperam 3 s");
+  processDots(1000);
+  processDots(1000); // 3 s sem stacks novos: começa a perder
   assert.equal(burning(target).stacks, 90, "100 → perde 10");
   processDots(1000);
   assert.equal(burning(target).stacks, 81, "90 → perde 9");
   const few = enemy({ hp: 1e6, maxHp: 1e6 });
   state.enemies = [few];
   applyDot(few, "burning", 1, 0, true, { stacks: 5 });
-  processDots(1000);
+  for (let i = 0; i < 3; i++) processDots(1000);
   assert.equal(burning(few).stacks, 4, "5 → perde 1");
   assert.equal(burnDecay(0), 1);
 });
@@ -132,19 +135,19 @@ test("fogo: não tem duração, só acaba quando os stacks acabam", () => {
   const target = enemy({ hp: 1e6, maxHp: 1e6 });
   setupRun([], [target]);
   applyDot(target, "burning", 1, 0, true, { stacks: 3 });
-  for (let i = 0; i < 2; i++) processDots(1000);
+  for (let i = 0; i < 4; i++) processDots(1000); // 3 s de espera, depois 3 → 2 → 1
   assert.equal(burning(target).stacks, 1);
   processDots(1000);
   assert.equal(target.dots.length, 0);
 });
 
-test("Lâmina de Brasa: 1 stack por nível do item por golpe, sem dano direto", () => {
+test("Lâmina de Brasa: 12 de dano de fogo (+3 por nível) e 1 stack por nível do item por golpe", () => {
   for (const level of [1, 3, 5]) {
     const target = enemy();
     setupRun(["ember_blade"], [target]);
     state.itemLevels.ember_blade = level;
     activateItem(item("ember_blade"));
-    assert.equal(target.hp, target.maxHp);
+    assert.equal(target.hp, target.maxHp - (12 + 3 * (level - 1)));
     assert.equal(burning(target).stacks, level);
   }
 });
@@ -420,7 +423,7 @@ test("passivos com valor por nível explícito (armadura)", () => {
   own(armor, 3);
   assert.equal(state.player.armor, 18);
   own(item("leather_vest"), 3);
-  assert.equal(state.player.armor, 12 + 8 * 2, "Colete: +8 de armadura por nível");
+  assert.equal(state.player.armor, 16 + 8 * 2, "Colete: +8 de armadura por nível");
 });
 
 test("minLevel: o efeito só vale a partir do nível", () => {

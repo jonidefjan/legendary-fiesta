@@ -31,7 +31,9 @@ import {
   generateRandomItems,
   rewardOffer,
   addItemOrLevel,
+  mythicOffer,
 } from "./items.js";
+import { resetClicks } from "./clicks.js";
 import { createWave } from "./waves.js";
 import {
   processDots,
@@ -40,6 +42,9 @@ import {
   updateRegen,
   updatePlayerAnim,
   updateEnemies,
+  updateClouds,
+  arenaClick,
+  beginFrame,
 } from "./combat.js";
 import * as boss from "./boss.js";
 import * as meta from "./meta.js";
@@ -128,14 +133,21 @@ on("enemyDied", ({ x, y }) => particles.emit("death", x, y - 20));
 on("crit", ({ x, y }) => particles.emit("crit", x, y - 25, { direction: 1 }));
 on("dodge", ({ x, y }) => particles.emit("dodge", x, y - 25, { direction: 1 }));
 on("freeze", ({ x, y }) => particles.emit("freeze", x, y - 25));
-on("explode", ({ x, y, kind }) =>
-  particles.emit(kind === "fire" ? "fireBurst" : "iceBurst", x, y - 30, { intensity: 1 }),
-);
-// Contágio: rastro de fogo do inimigo morto até cada alvo e brasas onde a queimadura pega
-on("spread", ({ from, to }) => {
+on("explode", ({ x, y, kind }) => {
+  if (kind === "poison") particles.emit("hit", x, y - 25, { element: "poison", intensity: 1 });
+  else particles.emit(kind === "fire" ? "fireBurst" : "iceBurst", x, y - 30, { intensity: 1 });
+});
+// Contágio: rastro do inimigo morto até cada alvo e o elemento (fogo, ou veneno) onde pega
+on("spread", ({ from, to, element = "fire" }) => {
   for (const dest of to) {
     particles.emit("trail", from.x, from.y - 25, { toX: dest.x, toY: dest.y - 25 });
-    particles.emit("hit", dest.x, dest.y - 25, { element: "fire", intensity: 0.4 });
+    particles.emit("hit", dest.x, dest.y - 25, { element, intensity: 0.4 });
+  }
+});
+// Nuvem de veneno do Cogumelo Pestilento: bolhas verdes ao longo do raio
+on("cloud", ({ x, y, radius }) => {
+  for (const dx of [0.25, 0.5, 0.75, 1]) {
+    particles.emit("hit", x + radius * dx, y - 10, { element: "poison", intensity: 0.5 });
   }
 });
 
@@ -228,6 +240,7 @@ function spawnWave(waveNum) {
     // Ninguém nasce fora da tela: o herói ataca o mais próximo, visível ou não
     maxX: render.visibleLogicRight(),
   };
+  state.arenaRight = render.visibleLogicRight(); // define a linha de trás (Besta, Arco Fantasma)
   state.enemies = boss.isBossWave(waveNum)
     ? boss.createBossWave(waveNum, arena)
     : createWave(waveNum, arena);
@@ -267,6 +280,7 @@ function startNextWave() {
   p.berserkRemaining = 0;
   p.lowHpUsed = {};
   p.dots = []; // queimadura do chefe não passa para a onda seguinte
+  state.clouds = []; // nuvens de veneno ficam na onda em que nasceram
   p.hp = Math.min(p.maxHp, p.hp + 20);
   spawnWave(state.wave);
   state.waveTransition = false;
@@ -282,7 +296,9 @@ function offerReward({ boss = false } = {}) {
   state.isPaused = true;
   // Itens novos ou que ainda podem subir de nível; chefe e 4 telas sem lendário garantem um
   // (3 ou 2 com Sorte lendária). 3 opções, ou 4 com Mais uma opção.
-  const offer = rewardOffer(meta.rewardOptionCount(), { boss });
+  // Na recompensa da onda 1 o mítico que o jogador liberou e não pegou volta como carta extra
+  const extra = state.wave === 1 && !boss ? mythicOffer() : null;
+  const offer = rewardOffer(meta.rewardOptionCount(), { boss, extra });
   const options = offer.options;
 
   if (options.length === 0) {
@@ -313,16 +329,19 @@ function pickReward(item) {
 
 function showStartingPick() {
   state.isPaused = true;
-  ui.showInitialPick(
-    generateRandomItems(STARTING_PICK.options, new Set(), {
-      type: STARTING_PICK.type,
-    }),
-    STARTING_PICK.max,
-    confirmStartingPick,
-  );
+  const options = generateRandomItems(STARTING_PICK.options, new Set(), {
+    type: STARTING_PICK.type,
+  });
+  // O mítico liberado na loja vira uma carta extra garantida (a escolha continua sendo uma só)
+  const mythic = mythicOffer();
+  ui.showInitialPick(mythic ? [...options, mythic] : options, STARTING_PICK.max, confirmStartingPick);
 }
 
 function confirmStartingPick(items) {
+  // Quem escolheu o mítico em vez de uma arma recebe a arma comum, para não começar desarmado
+  if (!items.some((i) => i.type === "weapon")) {
+    items = [...starterItems().filter((i) => i.type === "weapon"), ...items];
+  }
   state.items = [];
   state.itemLevels = {};
   state.itemTimers = {};
@@ -392,6 +411,7 @@ function prepareRun() {
   state.player.hp = state.player.maxHp;
   state.rerollsLeft = meta.rerollsPerRun();
   state.runStats.startTime = performance.now();
+  resetClicks();
   particles.clear();
   feel.reset();
 }
@@ -456,6 +476,7 @@ function gameLoop(timestamp) {
   const dt = realDt * state.gameSpeed;
   state.lastTime = timestamp;
   state.tick++;
+  beginFrame();
 
   if (!state.running) {
     render.setCamera(0, 0);
@@ -464,6 +485,7 @@ function gameLoop(timestamp) {
     // Redesenha a tela mas não atualiza o estado do jogo
     render.setCamera(0, 0);
     render.drawPausedFrame();
+    ui.updateClickCounter(performance.now()); // o ritmo continua caindo durante a pausa
   } else {
     const f = feel.update(realDt);
     render.setCamera(f.x, f.y);
@@ -477,6 +499,7 @@ function gameLoop(timestamp) {
     updateFrenzy(dt);
     updateRegen(dt);
     processDots(dt);
+    updateClouds(dt);
     updateEnemies(dt);
     boss.updateBosses(dt);
     updatePlayerAnim(dt);
@@ -529,6 +552,15 @@ function init() {
   const canvas = render.getCanvas();
   state.player.x = canvas.width * 0.22;
   state.player.y = canvas.height * 0.55;
+
+  // Itens míticos: clique ou toque em qualquer lugar da arena (menos nos botões)
+  document.getElementById("arena").addEventListener("pointerdown", (e) => {
+    if (e.button > 0 || e.target.closest("#game-controls, button, a")) return;
+    if (ui.itemPanelOpen()) return; // o toque que fecha o painel de item no celular não é um clique
+    const now = performance.now();
+    arenaClick(now);
+    ui.updateClickCounter(now);
+  });
 
   ui.setupControls({
     onPlay: resumeGame,

@@ -38,11 +38,11 @@ test("tick de queimadura é creditado à arma que aplicou, mesmo depois do golpe
   setupRun(["ember_blade"], [target]);
   fixedRandom(0);
   activateItem(item("ember_blade"));
-  assert.equal(dmg().ember_blade, undefined, "a lâmina não causa dano direto");
+  assert.equal(dmg().ember_blade, 12, "o golpe direto da lâmina");
   const hp = target.hp;
   processDots(1000);
-  assert.equal(dmg().ember_blade, hp - target.hp);
-  assert.ok(dmg().ember_blade > 0);
+  assert.equal(dmg().ember_blade, 12 + hp - target.hp);
+  assert.ok(hp - target.hp > 0, "o tick da queimadura também é dela");
 });
 
 test("queimadura espalhada pelo Coração de Brasa é creditada à arma original", () => {
@@ -59,7 +59,7 @@ test("queimadura espalhada pelo Coração de Brasa é creditada à arma original
   assert.equal(burn.sourceId, "ember_blade");
   const hp = near.hp;
   processDots(1000);
-  assert.equal(dmg().ember_blade, hp - near.hp);
+  assert.equal(dmg().ember_blade, 12 + hp - near.hp, "12 do golpe direto + o tick espalhado");
   assert.ok(hp - near.hp > 0);
   assert.equal(dmg().ember_heart, undefined, "o relicário não leva o crédito");
 });

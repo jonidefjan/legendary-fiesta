@@ -541,6 +541,10 @@ h3,
   background: var(--gold);
   box-shadow: 0 0 6px var(--gold);
 }
+.rarity-mythic {
+  background: #ff4d8d;
+  box-shadow: 0 0 6px #ff4d8d;
+}
 
 /* Tooltip */
 .tooltip {
@@ -1334,6 +1338,11 @@ canvas {
   background: rgba(201, 168, 76, 0.2);
   color: #c9a84c;
   border: 1px solid rgba(201, 168, 76, 0.4);
+}
+.rarity-mythic {
+  background: rgba(255, 77, 141, 0.2);
+  color: #ff4d8d;
+  border: 1px solid rgba(255, 77, 141, 0.5);
 }
 
 /* ═══════════════════════════════════════════
@@ -2242,4 +2251,38 @@ canvas {
 }
 .item-slot.evolved {
   border-color: var(--frame);
+}
+
+/* Fase 11c: itens míticos (clique na arena) */
+.item-slot.mythic {
+  border-color: var(--frame);
+  box-shadow: 0 0 8px rgba(255, 77, 141, 0.55);
+}
+.item-choice-card.mythic {
+  border-color: #ff4d8d;
+  box-shadow: 0 0 14px rgba(255, 77, 141, 0.45);
+}
+#arena {
+  touch-action: manipulation; /* toques rápidos não viram zoom de duplo toque */
+}
+.click-counter {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 5;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(10, 8, 6, 0.7);
+  border: 1px solid rgba(255, 77, 141, 0.5);
+  color: #ff4d8d;
+  font-size: 14px;
+  pointer-events: none;
+  user-select: none;
+}
+.click-counter[hidden] {
+  display: none;
+}
+.click-counter.at-limit {
+  color: #fff;
+  background: rgba(255, 77, 141, 0.6);
 }

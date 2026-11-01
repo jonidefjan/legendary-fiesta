@@ -163,6 +163,24 @@
   font-weight: normal;
 }
 
+.shop-note {
+  margin: -4px 0 12px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text2);
+}
+
+.shop-card.mythic {
+  border-color: #ff4d8d;
+  box-shadow: 0 0 12px rgba(255, 77, 141, 0.3);
+}
+
+.shop-icon .item-sprite {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
 .shop-buy {
   margin-top: auto;
   font-size: 1rem;

@@ -16,7 +16,8 @@
 //   "dodge"       herói esquivou de um ataque
 //   "freeze"      inimigo congelado por 5 stacks de frio (enemy.frozen = ms restantes)
 //   "explode"     explosão (Núcleo Explosivo, Pena de Fênix): kind "fire"
-//   "spread"      queimadura passou de um inimigo morto a outros: from {x,y}, to [{x,y}]
+//   "spread"      queimadura (ou veneno, element "poison") passou de um inimigo morto a outros: from {x,y}, to [{x,y}]
+//   "cloud"       nuvem de veneno do Cogumelo Pestilento: radius
 // Stacks (fogo, veneno, frio): cada elemento tem resistência; ela reduz o dano e também os
 // stacks aplicados (acumulador determinístico, sem sorteio). Imunidade bloqueia tudo.
 // Sons: sound(nome, detalhe) -> "hit" + elemento, "use" + tipo do efeito, "dot" + tipo,
@@ -37,7 +38,9 @@ import {
   findItem,
   applyPassives,
   addEvolutionKill,
+  LEVEL_UP_EFFECTS,
 } from "./items.js";
+import { tryClick } from "./clicks.js";
 
 // Armadura com retorno decrescente: 100 de armadura = 50% de redução, sem teto fixo
 export function armorReduction(armor) {
@@ -82,7 +85,10 @@ export const COLD_DECAY_MS = 2000;
 // O frio só começa a sumir 3s depois da ÚLTIMA aplicação (vale para todo gelo)
 export const COLD_GRACE_MS = 3000;
 
-// Fogo: 1 de dano por stack por segundo; a cada segundo perde max(1, ⌊stacks ÷ 10⌋) stacks
+// A queimadura só começa a perder stacks 3s depois do ÚLTIMO stack recebido (de qualquer fonte)
+export const BURN_GRACE_MS = 3000;
+
+// Fogo: 1 de dano por stack por segundo; depois da espera, perde max(1, ⌊stacks ÷ 10⌋) stacks por segundo
 export function burnDecay(stacks) {
   return Math.max(1, Math.floor(stacks / 10));
 }
@@ -232,7 +238,7 @@ export function applyDot(
   damage,
   duration,
   stackable = true,
-  { maxStacks = DEFAULT_MAX_STACKS, base = 0, sourceId = null, stacks = 1 } = {},
+  { maxStacks = DEFAULT_MAX_STACKS, base = 0, sourceId = null, stacks = 1, rawBase = null } = {},
 ) {
   if (!target.dots) target.dots = [];
   if (type === "burning") maxStacks = Infinity;
@@ -244,7 +250,12 @@ export function applyDot(
     existing.duration = duration;
     existing.fullDuration = duration;
     existing.damage = damage;
-    existing.base = base;
+    if (type === "burning") existing.idle = 0; // stack novo reinicia a espera de 3s
+    // Veneno de várias fontes: vale o maior dano base (um item fraco não derruba o forte)
+    existing.base = type === "poison" ? Math.max(existing.base || 0, base) : base;
+    // rawBase: o base sem o bônus permanente de dano (quem repassa veneno usa este, sem multiplicar de novo)
+    existing.rawBase =
+      type === "poison" ? Math.max(existing.rawBase ?? existing.base ?? 0, rawBase ?? base) : (rawBase ?? base);
     existing.maxStacks = maxStacks;
     if (sourceId) existing.sourceId = sourceId; // o último a empilhar leva o crédito
   } else if (existing) {
@@ -255,11 +266,13 @@ export function applyDot(
       type,
       damage,
       base,
+      rawBase: rawBase ?? base,
       duration,
       fullDuration: duration,
       maxStacks,
       stacks: Math.min(maxStacks, stacks),
       tickTimer: 0,
+      idle: 0, // queimadura: tempo sem stacks novos
       sourceId, // item que aplicou: os ticks creditam o dano a ele
     });
   }
@@ -305,8 +318,17 @@ export function coldStacks(en) {
 }
 
 // Fração da velocidade que sobra com o frio (1 = sem lentidão)
+// Frasco de Óleo e Frasco de Peçonha (N3) também atrasam quem está queimando ou envenenado
 export function slowFactor(en) {
-  return Math.max(0.1, 1 - COLD_SLOW * coldStacks(en));
+  let factor = 1 - COLD_SLOW * coldStacks(en);
+  if (state.items.length > 0) {
+    for (const { item, effect } of slowEffects()) {
+      if (effect.type === "slowDot" && en.dots?.some((d) => d.type === effect.dot && d.stacks > 0)) {
+        factor *= 1 - levelValue(item, effect, "factor");
+      }
+    }
+  }
+  return Math.max(0.1, factor);
 }
 
 // Força do tom gelado (0..1) para o renderer: congelado = 1; o frio sobe até 0.6
@@ -340,6 +362,7 @@ export function processDots(dt) {
         return dot.stacks > 0;
       }
       dot.tickTimer += dt;
+      if (dot.type === "burning") dot.idle = (dot.idle ?? 0) + dt;
 
       if (dot.tickTimer >= 1000) {
         dot.tickTimer = 0;
@@ -348,12 +371,14 @@ export function processDots(dt) {
           entity === state.player
             ? 1
             : 1 - Math.min(0, effectiveResist(entity, STACK_ELEMENT[dot.type] || "physical", dot.sourceId));
-        let dmg = Math.round(((dot.base || 0) + dot.damage * dot.stacks) * weak);
+        let dmg = Math.round(((dot.base || 0) + dotBaseBonus(entity, dot) + dot.damage * dot.stacks) * weak);
         // Couraça de Batalha corta o dano contínuo do herói; nos inimigos valem Corrosão etc.
         dmg =
           entity === state.player
             ? Math.max(1, Math.round(dmg * (1 - (entity.dotReduction || 0))))
             : Math.round(dmg * damageTakenMult(entity));
+        // Praga Detonante: o tick que mataria o inimigo o faz explodir nos vizinhos
+        if (dot.type === "poison" && entity !== state.player) detonatePoison(entity, dmg);
         entity.hp -= dmg;
         entity.hurtTimer = 8;
         entity.lastHitCrit = false; // abate por dano contínuo não conta como crítico
@@ -380,7 +405,8 @@ export function processDots(dt) {
         // Queimadura perde stacks a cada tick (menos no que morreu: o Coração de Brasa
         // lê os stacks no abate). Veneno nunca expira; só outros dots (sangue) têm duração
         if (dot.type === "burning") {
-          if (entity.hp > 0) dot.stacks -= burnDecay(dot.stacks);
+          // Só perde stacks depois de BURN_GRACE_MS sem receber novos
+          if (entity.hp > 0 && (dot.idle ?? 0) >= BURN_GRACE_MS) dot.stacks -= burnLoss(dot, entity);
         } else if (dot.type !== "poison") {
           dot.duration--;
         }
@@ -413,6 +439,19 @@ function enemiesWithin(x, radius, except = null) {
 
 // Pedra de Eco: ao repetir um item, dano, stacks, cura e duração valem esta fração
 let echoScale = 1;
+
+// Efeitos de lentidão em cache por quadro (slowFactor roda várias vezes por inimigo a cada quadro).
+// Fora do loop principal (testes) não há cache.
+let frameSlow = null;
+let frameActive = false;
+export function beginFrame() {
+  frameActive = true;
+  frameSlow = null;
+}
+function slowEffects() {
+  if (!frameActive) return ownedEffects("slow");
+  return (frameSlow ||= ownedEffects("slow"));
+}
 // Dentro de uma repetição do Eco: não conta carga do Cristal Vital nem contadores de golpe
 let echoing = false;
 
@@ -445,6 +484,119 @@ function poisonStacks(en) {
   return (en.dots || []).find((d) => d.type === "poison")?.stacks || 0;
 }
 
+// Queimadura nos inimigos: stacks que entram (resistência já aplicada) com o crédito ao item
+function addBurn(en, wanted, item) {
+  const landed = landStacks(en, "fire", wanted, item.id);
+  if (landed > 0) applyDot(en, "burning", permanentDamage(), 0, true, { stacks: landed, sourceId: item.id });
+  return landed;
+}
+
+// Veneno: dano base 1 (o maior entre as fontes vale) e 1 por stack, sem limite de stacks.
+// base: valor sem o bônus permanente (quem repassa o veneno passa dot.rawBase)
+function addPoison(en, wanted, item, base = 1) {
+  const landed = landStacks(en, "poison", wanted, item.id);
+  if (landed > 0) {
+    applyDot(en, "poison", permanentDamage(), 0, true, {
+      maxStacks: Infinity,
+      base: base * permanentDamage(),
+      rawBase: base,
+      sourceId: item.id,
+      stacks: landed,
+    });
+  }
+  return landed;
+}
+
+// Os `count` inimigos vivos mais perto de `from`, sem ele; quem é imune ao elemento não gasta vaga
+function nearestLiving(from, count, element, itemId) {
+  return livingEnemies()
+    .filter((e) => e !== from && effectiveResist(e, element, itemId) < 1)
+    .map((e) => ({ e, dist: Math.hypot(e.x - from.x, e.y - from.y) }))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, count)
+    .map((o) => o.e);
+}
+
+// Linha de trás: quem ainda não chegou perto do herói (Besta Longa N5, Arco do Caçador Fantasma)
+// É relativa à arena: atrás de uma fração da distância entre o herói e a borda direita visível
+// (no celular a arena é estreita; 200 px fixos quase nunca deixariam alguém "atrás")
+export const NEAR_RANGE = 200; // sem arena medida (testes): equivale a esta distância
+export const REAR_FRACTION = 0.35;
+
+// Distância do herói a partir da qual um inimigo está na linha de trás
+export function rearDistance(playerX, rightX) {
+  return Math.max(0, rightX - playerX) * REAR_FRACTION;
+}
+
+export function isRearAt(x, playerX, rightX) {
+  return Math.abs(x - playerX) > rearDistance(playerX, rightX);
+}
+
+function isRear(en) {
+  const p = state.player;
+  return isRearAt(en.x, p.x, state.arenaRight ?? p.x + NEAR_RANGE / REAR_FRACTION);
+}
+
+// Veneno: dano base extra por tick (Frasco de Peçonha N5); só nos inimigos
+function dotBaseBonus(entity, dot) {
+  if (dot.type !== "poison" || entity === state.player) return 0;
+  let sum = 0;
+  for (const { item, effect } of ownedEffects("dotBase")) {
+    if (effect.type === "poisonBase") sum += levelValue(item, effect, "amount");
+  }
+  return sum * permanentDamage();
+}
+
+// Perda de stacks de queimadura por tick. Frasco de Óleo N5 corta pela metade: a fração
+// que sobra acumula no próprio dot (decayAcc) até virar um stack inteiro.
+function burnLoss(dot, entity) {
+  let loss = burnDecay(dot.stacks);
+  if (entity !== state.player) {
+    for (const { effect } of ownedEffects("burnDecay")) {
+      if (effect.type === "halveBurnDecay") loss *= effect.factor;
+    }
+  }
+  const acc = (dot.decayAcc || 0) + loss;
+  const whole = Math.floor(acc + 1e-9);
+  dot.decayAcc = acc - whole;
+  return whole;
+}
+
+// Praga Detonante: se o próximo tick de veneno acaba com o inimigo, ele explode e causa esse
+// dano de veneno nos vizinhos (tantos quanto o nível do item)
+const POISON_TICK_EFFECTS = {
+  detonate(effect, item, ctx) {
+    const near = nearestLiving(ctx.entity, itemLevel(item.id) + state.player.reach, "poison", item.id);
+    // Aproximação do veneno que ainda restava: o tick letal vezes 3
+    const damage = Math.round(ctx.damage * (effect.multiplier ?? 1));
+    for (const en of near) applyElementalDamage(en, damage, "poison", "player", false, item.id);
+    if (near.length === 0) return;
+    sound("explode");
+    emit("explode", { x: ctx.entity.x, y: ctx.entity.y, kind: "poison" });
+    log(t("log.detonate", { icon: item.icon, item: item.name, count: near.length, damage }), "item");
+  },
+};
+
+function detonatePoison(entity, damage) {
+  if (entity.detonated || damage < entity.hp) return;
+  entity.detonated = true;
+  for (const { item, effect } of ownedEffects("poisonTick")) {
+    POISON_TICK_EFFECTS[effect.type]?.(effect, item, { entity, damage });
+  }
+}
+
+// Dano que o inimigo causa ao herói, com os enfraquecimentos dos itens (Manto de Cinzas
+// e Couro de Basilisco: -X% por stack do efeito no atacante, até o teto)
+function enemyDamageMult(en) {
+  let mult = 1;
+  for (const { item, effect } of ownedEffects("enemyDamage")) {
+    if (effect.type !== "weaken") continue;
+    const stacks = en.dots?.find((d) => d.type === effect.dot)?.stacks || 0;
+    mult -= Math.min(levelValue(item, effect, "max"), stacks * effect.perStack);
+  }
+  return Math.max(0, mult);
+}
+
 // Aplica os stacks de um efeito "dot" de golpe (veneno, queimadura) em `target`. O nível não
 // aumenta o dano por stack (fixo por item): aumenta os stacks por golpe e o dano base.
 // A resistência do alvo reduz os stacks que entram (imune: nenhum).
@@ -463,6 +615,7 @@ function applyDotEffect(effect, item, target) {
   applyDot(target, effect.dot, damage, effect.duration, true, {
     maxStacks,
     base,
+    rawBase: levelValue(item, effect, "base", effect.base || 0),
     sourceId: item.id,
     stacks,
   });
@@ -568,6 +721,36 @@ const HIT_EFFECTS = {
     }
     log(t("log.splash", { icon: item.icon, item: item.name, count: near.length, damage }), "dmg");
   },
+  // Martelo da Forja: o golpe consome os stacks de queimadura do alvo (todos; metade no N3) e
+  // causa 3 de dano de fogo por stack consumido; no N5 o estouro atinge os vizinhos. Depois
+  // do estouro o martelo reacende o alvo com alguns stacks.
+  forgeBurst(effect, item, ctx) {
+    const target = ctx.target;
+    const burn = target.dots?.find((d) => d.type === "burning");
+    // Alvo que o próprio golpe matou: os stacks ficam (o Coração de Brasa os lê no abate) e só
+    // o estouro nos vizinhos (N5) os aproveita
+    const dying = target.hp <= 0 || target.dead;
+    if (burn && burn.stacks > 0) {
+      const consumed = Math.max(1, Math.ceil(burn.stacks * levelValue(item, effect, "consume")));
+      if (!dying) {
+        burn.stacks -= consumed;
+        if (burn.stacks <= 0) target.dots = target.dots.filter((d) => d !== burn);
+      }
+      const damage = scaled(Math.round(effect.ratio * consumed * permanentDamage()));
+      if (!dying) applyElementalDamage(target, damage, "fire", "player", false, item.id);
+      let hitCount = dying ? 0 : 1;
+      if (itemLevel(item.id) >= (effect.neighborLevel ?? Infinity)) {
+        const near = enemiesWithin(target.x, NEIGHBOR_RADIUS + state.player.reach * REACH_RADIUS, target);
+        for (const en of near) applyElementalDamage(en, damage, "fire", "player", false, item.id);
+        hitCount += near.length;
+      }
+      spawnEffect("dragon_roar", target.x, target.y - 30, { life: 30 });
+      log(t("log.forgeBurst", { icon: item.icon, item: item.name, stacks: consumed, damage, count: hitCount }), "dmg");
+    }
+    if (effect.ignite && target.hp > 0 && !target.dead) {
+      addBurn(target, plusStacks(scaled(effect.ignite)), item);
+    }
+  },
   // Alvo com muitos stacks de queimadura solta uma labareda nos vizinhos
   flare(effect, item, ctx) {
     const stacks = burnStacks(ctx.target);
@@ -598,6 +781,25 @@ const HIT_EFFECTS = {
     log(t("log.ray", { icon: item.icon, item: item.name, count: all.length, damage }), "item");
   },
 };
+
+// trigger "weaponHit": a cada golpe de arma (mesmo sem dano próprio, como o da Lâmina de Brasa),
+// de qualquer item possuído, depois dos efeitos da própria arma. ctx.target é o alvo do golpe.
+const WEAPON_HIT_EFFECTS = {
+  // Frascos: golpe em alvo que já tem o efeito (queimadura ou veneno) soma stacks
+  fuel(effect, item, ctx) {
+    const target = ctx.target;
+    if (target.dead || target.hp <= 0 || !target.dots?.some((d) => d.type === effect.dot && d.stacks > 0)) return;
+    const wanted = plusStacks(scaled(Math.round(levelValue(item, effect, "stacks"))));
+    if (effect.dot === "burning") addBurn(target, wanted, item);
+    else addPoison(target, wanted, item);
+  },
+};
+
+function runWeaponHit(ctx) {
+  for (const { item, effect } of ownedEffects("weaponHit")) {
+    WEAPON_HIT_EFFECTS[effect.type]?.(effect, item, ctx);
+  }
+}
 
 // trigger "anyHit": a cada golpe de arma, de qualquer item possuído
 const ANY_HIT_EFFECTS = {
@@ -638,7 +840,7 @@ const ANY_ATTACK_EFFECTS = {
     if (itemLevel(item.id) >= (effect.allLevel ?? Infinity)) {
       for (const other of state.items) {
         const timer = state.itemTimers[other.id];
-        if (timer && !other.fixedRate) timer.elapsed = timer.cooldown;
+        if (timer && !other.fixedRate && other.type === "weapon") timer.elapsed = timer.cooldown; // só armas
       }
     }
     log(t("log.sprint", { icon: item.icon, item: item.name, weapon: ctx.weapon.name }), "item");
@@ -672,6 +874,31 @@ const KILL_EFFECTS = {
   // morte do updateEnemies, que chama este gatilho; por isso o contágio pega todos.
   spread(effect, item, en) {
     spreadBurn(en, itemLevel(item.id) + state.player.reach, item, effect);
+  },
+  // Ferradura da Sorte e Trevo de Ouro: a cada N abates da run, fragmentos (cresce com o nível)
+  fragmentBounty(effect, item) {
+    if (state.kills % effect.kills !== 0) return;
+    const amount = Math.round(levelValue(item, effect, "amount") * effectCount(item, effect));
+    state.fragments += amount;
+    spawnNumber(state.player.x, state.player.y - 90, `⚡+${amount}`, "#ffdd44", 2);
+    log(t("log.luckFragments", { icon: item.icon, item: item.name, count: amount }), "item");
+  },
+  // Praga Detonante: o inimigo que morre envenenado passa parte dos stacks (metade; todos no
+  // N5) aos vizinhos, tantos quanto o nível do item
+  plagueDeath(effect, item, en) {
+    const poison = en.dots?.find((d) => d.type === "poison");
+    if (!poison || poison.stacks <= 0) return;
+    const stacks = Math.max(1, Math.floor(poison.stacks * levelValue(item, effect, "ratio")));
+    const near = nearestLiving(en, itemLevel(item.id) + state.player.reach, "poison", item.id);
+    const reached = near.filter((target) => addPoison(target, plusStacks(stacks), item, poison.rawBase ?? poison.base) > 0);
+    if (reached.length === 0) return;
+    sound("spread");
+    emit("spread", {
+      from: { x: en.x, y: en.y },
+      to: reached.map((e) => ({ x: e.x, y: e.y })),
+      element: "poison",
+    });
+    log(t("log.plagueDeath", { icon: item.icon, item: item.name, count: reached.length, stacks }), "item");
   },
   critFragment(effect, item, en) {
     if (!en.lastHitCrit) return;
@@ -734,7 +961,7 @@ const ATTACK_EFFECTS = {
   pierce(effect, item, ctx) {
     const next = othersByDistance(ctx.target).slice(0, effect.targets ?? 1);
     for (const en of next) {
-      applyElementalDamage(en, ctx.damage, item.dmgType || "physical", "player", false, item.id);
+      applyElementalDamage(en, Math.round(ctx.damage * rearFactor(ctx, en)), item.dmgType || "physical", "player", false, item.id);
       for (const hit of effectsOf(item, "hit")) {
         if (hit.type === "cold") applyColdEffect(hit, item, en);
         else if (hit.type === "dot") applyDotEffect(hit, item, en);
@@ -790,6 +1017,14 @@ const ATTACK_MODS = {
   bossBonus(effect, item, ctx) {
     ctx.bossMult = effect.mult;
   },
+  // Besta Longa N5: alvos da linha de trás recebem mais dano
+  rearBonus(effect, item, ctx) {
+    ctx.rearMult = effect.mult;
+  },
+  // Adaga Serpente N3: dano direto +3% por stack de veneno do alvo
+  venomEdge(effect, item, ctx) {
+    ctx.mult *= 1 + effect.bonus * Math.min(effect.cap ?? Infinity, poisonStacks(ctx.target));
+  },
 };
 
 const ONE_SHOT_MODS = new Set(["storm", "tide"]);
@@ -827,6 +1062,34 @@ function spreadBurn(dead, count, item, effect = {}) {
     t("log.spread", { icon: item.icon, item: item.name, count: reached.length, stacks: burn.stacks }),
     "item",
   );
+}
+
+// Nuvem de veneno: stacks nos inimigos dados; já envenenados recebem o dobro com doubled
+// (Cogumelo Pestilento N5). scale: repetição do Eco reduz os stacks.
+function cloudApply(targets, stacks, doubled, item, scale = false) {
+  for (const en of targets) {
+    let n = doubled && poisonStacks(en) > 0 ? stacks * 2 : stacks;
+    if (scale) n = scaled(n);
+    addPoison(en, plusStacks(n), item);
+  }
+}
+
+// Nuvens no chão: a cada segundo envenenam de novo quem está dentro, até acabar o tempo
+export function updateClouds(dt) {
+  if (!state.clouds?.length) return;
+  for (const cloud of state.clouds) {
+    cloud.ms -= dt;
+    cloud.tick += dt;
+    while (cloud.tick >= 1000) {
+      cloud.tick -= 1000;
+      const item = findItem(cloud.itemId);
+      if (!item) continue;
+      const near = enemiesWithin(cloud.x, cloud.radius);
+      cloudApply(near, cloud.stacks, cloud.doubled, item);
+      if (near.length > 0) emit("cloud", { x: cloud.x, y: state.player.y, radius: cloud.radius });
+    }
+  }
+  state.clouds = state.clouds.filter((c) => c.ms > 0);
 }
 
 // trigger "use": itens que não são armas, quando a recarga fica pronta
@@ -911,6 +1174,52 @@ const USE_EFFECTS = {
     spawnEffect("dragon_roar", p.x, p.y - 30, { life: 25 });
     log(t("log.emberSkin", { icon: item.icon, item: item.name, count: near.length }), "item");
   },
+  // Praga Detonante: cada inimigo envenenado passa stacks aos vizinhos (tantos quanto o nível)
+  plagueSpread(effect, item, p) {
+    const poisoned = livingEnemies().filter((e) => poisonStacks(e) > 0);
+    if (poisoned.length === 0) return false;
+    const count = itemLevel(item.id) + p.reach;
+    const stacks = plusStacks(scaled(Math.round(levelValue(item, effect, "stacks"))));
+    // Primeiro escolhe todos os destinos, depois aplica (um vizinho recém-infectado não passa adiante)
+    const pairs = poisoned.flatMap((src) =>
+      nearestLiving(src, count, "poison", item.id).map((dst) => ({ src, dst })),
+    );
+    let reached = 0;
+    const bySource = new Map();
+    for (const { src, dst } of pairs) {
+      const poison = src.dots.find((d) => d.type === "poison");
+      if (addPoison(dst, stacks, item, poison.rawBase ?? poison.base) > 0) {
+        reached++;
+        if (!bySource.has(src)) bySource.set(src, []);
+        bySource.get(src).push({ x: dst.x, y: dst.y });
+      }
+    }
+    if (reached === 0) return false;
+    for (const [src, to] of bySource) emit("spread", { from: { x: src.x, y: src.y }, to, element: "poison" });
+    log(t("log.plagueSpread", { icon: item.icon, item: item.name, count: reached }), "item");
+  },
+  // Cogumelo Pestilento: nuvem que envenena todos perto do herói; no N3 ela fica no chão
+  poisonCloud(effect, item, p) {
+    const radius = effect.radius + p.reach * REACH_RADIUS;
+    const near = enemiesWithin(p.x, radius);
+    if (near.length === 0) return false;
+    const level = itemLevel(item.id);
+    const doubled = level >= (effect.doubleLevel ?? Infinity);
+    cloudApply(near, Math.round(levelValue(item, effect, "stacks")), doubled, item, true);
+    if (level >= (effect.cloudLevel ?? Infinity)) {
+      // No chão a nuvem aplica 1 stack por nível a cada segundo
+      // O Eco repete a nuvem com a escala dele também no chão
+      state.clouds.push({ x: p.x, radius, ms: effect.cloudMs, tick: 0, stacks: scaled(level), doubled, itemId: item.id });
+    }
+    emit("cloud", { x: p.x, y: p.y, radius });
+    log(t("log.poisonCloud", { icon: item.icon, item: item.name, count: near.length }), "item");
+  },
+  // Couro de Basilisco N5: cura 1 HP por inimigo envenenado
+  poisonHeal(effect, item) {
+    const count = livingEnemies().filter((e) => poisonStacks(e) > 0).length;
+    if (count === 0) return false;
+    healPlayer(scaled(Math.round(levelValue(item, effect, "amount")) * count), item);
+  },
   // Eco: repete o último item ativado (arma ou relíquia) com parte do efeito
   echo(effect, item, p) {
     const last = state.items.find((i) => i.id === p.lastActivated);
@@ -969,8 +1278,9 @@ const DODGE_EFFECTS = {
       const timer = state.itemTimers[w.id];
       return timer ? timer.elapsed / timer.cooldown : 0;
     };
+    // O Arco Fantasma só atira na linha de trás: não serve de contra-ataque
     const weapon = state.items
-      .filter((i) => i.type === "weapon")
+      .filter((i) => i.type === "weapon" && i.targeting !== "rear")
       .sort((a, b) => ready(b) - ready(a))[0];
     if (!weapon || ctx.enemy.dead || ctx.enemy.hp <= 0) return;
     log(t("log.counter", { icon: item.icon, item: item.name, weapon: weapon.name }), "item");
@@ -1008,7 +1318,14 @@ const HURT_EFFECTS = {
       "item",
     );
   },
-  // Escama Dracônica: quem bate no herói pega fogo
+  // Couro de Basilisco: quem bate no herói fica envenenado
+  poisonAttacker(effect, item, ctx) {
+    const landed = addPoison(ctx.enemy, plusStacks(Math.round(levelValue(item, effect, "stacks"))), item);
+    if (landed > 0) {
+      log(t("log.poisonAttacker", { icon: item.icon, item: item.name, enemy: enemyName(ctx.enemy) }), "item");
+    }
+  },
+  // Escama Dracônica e Manto de Cinzas: quem bate no herói pega fogo
   burnAttacker(effect, item, ctx) {
     const landed = igniteWith(item, effect, ctx.enemy, Math.round(levelValue(item, effect, "stacks")));
     if (landed > 0) {
@@ -1070,6 +1387,49 @@ function freezeEnemy(en, ms, quiet = false) {
   for (const { item, effect } of ownedEffects("freeze")) FREEZE_EFFECTS[effect.type]?.(effect, item, en);
 }
 
+// trigger "click": itens míticos, a cada clique na arena que passou pelo limitador
+const CLICK_EFFECTS = {
+  // Clique Elemental: 1 stack de fogo, veneno ou frio (sorteado) num inimigo aleatório;
+  // a resistência e a imunidade do alvo valem como nos outros itens
+  randomStack(effect, item) {
+    const targets = livingEnemies();
+    if (targets.length === 0) return false;
+    const en = targets[Math.floor(random() * targets.length)];
+    const element = effect.elements[Math.floor(random() * effect.elements.length)];
+    const stacks = plusStacks(effect.stacks);
+    if (element === "fire") addBurn(en, stacks, item);
+    else if (element === "poison") addPoison(en, stacks, item);
+    else applyCold(en, stacks, { itemId: item.id });
+  },
+  // Dedo Sísmico: dano físico em todos os inimigos vivos
+  hitAll(effect, item) {
+    const targets = livingEnemies();
+    if (targets.length === 0) return false;
+    const damage = Math.round(effect.damage * permanentDamage());
+    for (const en of targets) applyElementalDamage(en, damage, "physical", "player", false, item.id);
+  },
+};
+
+// Clique ou toque na arena: ativa os itens míticos, no máximo MAX_CLICKS_PER_SECOND por
+// segundo (clicks.js). Só com a run rodando e sem pausa. now: relógio em ms (tempo real).
+export function arenaClick(now = performance.now()) {
+  if (!state.running || state.isPaused) return false;
+  const owned = state.items.filter((i) => effectsOf(i, "click").length > 0);
+  if (owned.length === 0 || !tryClick(now)) return false;
+  let any = false;
+  for (const item of owned) {
+    let used = false;
+    for (const effect of effectsOf(item, "click")) {
+      if (CLICK_EFFECTS[effect.type]?.(effect, item) !== false) used = true;
+    }
+    if (!used) continue;
+    any = true;
+    state.runStats.itemUses[item.id] = (state.runStats.itemUses[item.id] || 0) + 1;
+    emit("itemUsed", item.id);
+  }
+  return any;
+}
+
 // Tipos que o jogo sabe executar, por gatilho (os testes conferem o items.json contra isto)
 export const KNOWN_EFFECTS = {
   hit: Object.keys(HIT_EFFECTS),
@@ -1081,7 +1441,15 @@ export const KNOWN_EFFECTS = {
   dodge: Object.keys(DODGE_EFFECTS),
   use: Object.keys(USE_EFFECTS),
   freeze: Object.keys(FREEZE_EFFECTS),
-  passive: ["stats", "strikes", "lowHpHaste"],
+  passive: ["stats", "strikes", "lowHpHaste", "doubleStrike", "extraArrows", "rearRefund", "immunity", "luck"],
+  weaponHit: Object.keys(WEAPON_HIT_EFFECTS),
+  slow: ["slowDot"],
+  burnDecay: ["halveBurnDecay"],
+  dotBase: ["poisonBase"],
+  poisonTick: Object.keys(POISON_TICK_EFFECTS),
+  enemyDamage: ["weaken"],
+  click: Object.keys(CLICK_EFFECTS),
+  levelUp: Object.keys(LEVEL_UP_EFFECTS),
   damage: ["frenzyBoost"],
   vulnerable: ["corrosion", "frozenVuln"],
   block: ["reflect"],
@@ -1101,10 +1469,20 @@ function soulBonus(item) {
 }
 
 // Golpes por ataque: os do item mais os "strikes" liberados por nível (marcos da Lâmina)
-function strikeCount(item) {
-  return effectsOf(item, "passive")
+function strikeCount(item, target = null) {
+  const hits = effectsOf(item, "passive")
     .filter((e) => e.type === "strikes")
     .reduce((n, e) => n + e.hits * effectCount(item, e), item.hits || 1);
+  // Adaga Serpente N5: alvo com muitos stacks de veneno leva golpe duplo
+  const double =
+    target &&
+    effectsOf(item, "passive").some((e) => e.type === "doubleStrike" && poisonStacks(target) >= e.threshold);
+  return double ? hits * 2 : hits;
+}
+
+// Besta Longa N5: fator de dano contra a linha de trás
+function rearFactor(ctx, en) {
+  return ctx.rearMult > 1 && isRear(en) ? ctx.rearMult : 1;
 }
 
 // Dano de um golpe. Ordem: base × nível × (bônus de dano), elemental, modificadores do
@@ -1131,6 +1509,7 @@ function attackDamage(item, ctx) {
   const crit = random() < (p.critChance || 0);
   const base = dmg; // sem chefe e sem crítico: é o que o Relâmpago em cadeia repassa
   if (ctx.bossMult > 1 && ctx.target.isBoss) dmg = Math.round(dmg * ctx.bossMult);
+  dmg = Math.round(dmg * rearFactor(ctx, ctx.target));
   if (crit) dmg = Math.round(dmg * (p.critMult || CRIT_MULT));
   return { dmg, crit, base };
 }
@@ -1149,6 +1528,7 @@ function attackModifiers(item, target, extra) {
     mult: 1,
     flat: 0,
     bossMult: 1,
+    rearMult: 1,
     tideFull: false,
     wantExtra: false,
   };
@@ -1183,7 +1563,7 @@ function attackModifiers(item, target, extra) {
 // Sprint nem gerar outro extra
 function weaponAttack(item, target, extra = null) {
   const p = state.player;
-  const hits = strikeCount(item);
+  const hits = strikeCount(item, target);
   const ctx = attackModifiers(item, target, extra);
   let totalDmg = 0;
   // Arma sem dano próprio (ex.: Lâmina de Brasa só aplica queimadura): o golpe não
@@ -1221,6 +1601,7 @@ function weaponAttack(item, target, extra = null) {
     }
     // Roubo de vida e afins dependem do dano do golpe: sem dano, não há o que roubar
     if (!appliesOnly) runAnyHit(ctx);
+    runWeaponHit(ctx);
     if (h === 0) {
       for (const effect of effectsOf(item, "attack")) {
         ATTACK_EFFECTS[effect.type]?.(effect, item, ctx);
@@ -1260,6 +1641,31 @@ function weaponAttack(item, target, extra = null) {
   return ctx.refund;
 }
 
+// Arco do Caçador Fantasma: uma flecha em cada inimigo da linha de trás (duas por alvo a partir
+// do N3). A primeira é o ataque da arma; as outras saem como ataques extras. No N5 cada abate
+// na linha de trás devolve 1 s de recarga. Devolve a recarga devolvida, ou null sem alvos.
+function rearVolley(item, echo) {
+  const p = state.player;
+  const rear = livingEnemies()
+    .filter(isRear)
+    .sort((a, b) => Math.abs(b.x - p.x) - Math.abs(a.x - p.x));
+  if (rear.length === 0) return null;
+  const arrows = effectsOf(item, "passive")
+    .filter((e) => e.type === "extraArrows")
+    .reduce((n, e) => n + e.arrows * effectCount(item, e), 1);
+  const refundMs = effectsOf(item, "passive").find((e) => e.type === "rearRefund")?.ms || 0;
+  let refund = 0;
+  let first = true;
+  for (const en of rear) {
+    for (let a = 0; a < arrows && en.hp > 0; a++) {
+      refund += weaponAttack(item, en, first && !echo ? null : { extra: true });
+      first = false;
+    }
+    if (refundMs && en.hp <= 0) refund += refundMs;
+  }
+  return refund;
+}
+
 // echo: repetição da Pedra de Eco. Não mexe na recarga do item, nas estatísticas de uso nem
 // no "último item ativado"; o ataque de arma sai como ataque extra.
 export function activateItem(item, { echo = false } = {}) {
@@ -1267,16 +1673,24 @@ export function activateItem(item, { echo = false } = {}) {
   // Inimigo com vida 0 ainda não foi marcado como morto (isso é no updateEnemies)
   const enemies = state.enemies.filter((e) => !e.dead && e.hp > 0);
   if (enemies.length === 0) return false;
-  // Alvo: inimigo mais próximo do jogador
-  const target = enemies.reduce((closest, en) =>
-    Math.abs(en.x - p.x) < Math.abs(closest.x - p.x) ? en : closest,
+  // Alvo: inimigo mais próximo do jogador (a Besta Longa mira o mais distante)
+  const far = item.targeting === "farthest";
+  const dist = (e) => Math.abs(e.x - p.x);
+  const target = enemies.reduce((best, en) =>
+    (far ? dist(en) > dist(best) : dist(en) < dist(best)) ? en : best,
   );
 
   let activated = false;
   // Recarga devolvida por encantamentos; aplicada depois de zerar o timer
   let cooldownRefund = 0;
 
-  if (item.type === "weapon") {
+  if (item.type === "weapon" && item.targeting === "rear") {
+    // Arco do Caçador Fantasma: dispara em toda a linha de trás; sem ninguém lá, não gasta a recarga
+    const refund = rearVolley(item, echo);
+    if (refund === null) return false;
+    cooldownRefund = refund;
+    activated = true;
+  } else if (item.type === "weapon") {
     cooldownRefund = weaponAttack(item, target, echo ? { extra: true } : null);
     activated = true;
   } else {
@@ -1386,7 +1800,7 @@ export function updatePlayerAnim(dt) {
 // Devolve o resultado: "dodged" | "blocked" | "hit" (dano em HP)
 export function enemyAttack(en) {
   const p = state.player;
-  let dmg = en.dmg;
+  let dmg = Math.round(en.dmg * enemyDamageMult(en));
   en.attackAnim = ANIM_MS.enemyAttack;
 
   // Esquiva (antes do bloqueio): sem dano e sem gastar o escudo

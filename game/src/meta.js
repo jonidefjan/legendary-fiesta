@@ -30,6 +30,22 @@ export const UPGRADES = [
   { id: "luck", icon: "🍀", perLevel: { pityReduction: 1 }, maxLevel: 2, costs: [200, 600] },
 ];
 
+// Itens míticos: compra única na loja do menu (não são melhorias com nível)
+export const MYTHIC_COST = 1000;
+export const MYTHIC_IDS = ["elemental_click", "seismic_finger"];
+
+export function isMythicUnlocked(id) {
+  return (state.meta.unlockedItems || []).includes(id);
+}
+
+// Gasta os fragmentos e libera o item; devolve true se comprou
+export function unlockMythic(id) {
+  if (!MYTHIC_IDS.includes(id) || isMythicUnlocked(id) || state.fragments < MYTHIC_COST) return false;
+  state.fragments -= MYTHIC_COST;
+  (state.meta.unlockedItems ||= []).push(id);
+  return true;
+}
+
 export const upgradeName = (id) => t(`upgrades.${id}.name`);
 export const upgradeDesc = (id) => t(`upgrades.${id}.desc`);
 
@@ -107,6 +123,6 @@ export function describeLevel(id, level = upgradeLevel(id)) {
   if (p.critChance) return t("upgrades.effect.crit", { n: pct(p.critChance * level) });
   if (p.extraOptions) return t("upgrades.effect.options", { n: BASE_REWARD_OPTIONS + p.extraOptions * level });
   if (p.rerolls) return t("upgrades.effect.rerolls", { n: p.rerolls * level });
-  if (p.pityReduction) return t("upgrades.effect.luck", { n: pityScreens(level) });
+  if (p.pityReduction) return t("upgrades.effect.luck", { n: pityScreens(level, false) });
   return "";
 }

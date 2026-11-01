@@ -171,6 +171,8 @@ function fireNova(boss) {
   log(t("log.bossNova", { boss: enemyName(boss) }), "dmg");
   // O próprio chefe ataca (com dano temporário), para o Parry e o reflexo da
   // barreira acertarem ele e não uma cópia
+  // Manto de Cinzas N5: o herói é imune ao fogo dos chefes; a nova não causa dano nem queimadura
+  if (p.fireImmune) return;
   const dmg = boss.dmg;
   boss.dmg = Math.round(dmg * 1.5);
   const outcome = enemyAttack(boss);

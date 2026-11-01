@@ -61,8 +61,9 @@ test("queimadura: 1 de dano por stack por segundo e o bônus permanente vale no 
   setupRun(["ember_blade", "cursed_ring"], [ringed]);
   setLevel("ember_blade", 2);
   activateItem(item("ember_blade"));
+  const afterHit = ringed.hp; // o golpe direto da lâmina já saiu
   processDots(1000);
-  assert.equal(1000 - ringed.hp, Math.round(2 * 1.5));
+  assert.equal(afterHit - ringed.hp, Math.round(2 * 1.4));
 });
 
 test("queimadura: perde max(1, ⌊stacks ÷ 10⌋) stacks por segundo e some em 0", () => {
@@ -74,11 +75,13 @@ test("queimadura: perde max(1, ⌊stacks ÷ 10⌋) stacks por segundo e some em 
   setupRun([]);
   const target = burningEnemy(30, { hp: 100000 });
   state.enemies = [target];
+  for (let i = 0; i < 2; i++) processDots(1000);
+  assert.equal(burning(target).stacks, 30, "nos 3 primeiros segundos não perde");
   processDots(1000);
   assert.equal(burning(target).stacks, 27, "30 → 3 por segundo");
   const small = burningEnemy(3, { hp: 100000 });
   state.enemies = [small];
-  for (let i = 0; i < 2; i++) processDots(1000);
+  for (let i = 0; i < 4; i++) processDots(1000);
   assert.equal(burning(small).stacks, 1);
   processDots(1000);
   assert.equal(small.dots.length, 0, "sem duração: acaba quando os stacks acabam");
@@ -96,9 +99,9 @@ test("queimadura do chefe no herói acumula e perde stacks como a dos inimigos",
   setupRun([]);
   state.player.hp = 100;
   applyDot(state.player, "burning", 1, 0, true, { stacks: 6 });
-  processDots(1000);
-  assert.equal(state.player.hp, 94);
-  assert.equal(state.player.dots[0].stacks, 5);
+  for (let i = 0; i < 3; i++) processDots(1000);
+  assert.equal(state.player.hp, 82, "6 de dano por segundo");
+  assert.equal(state.player.dots[0].stacks, 5, "perde 1 depois da espera de 3 s");
 });
 
 // ─── Veneno ───
@@ -130,7 +133,7 @@ test("veneno não tem teto de stacks e o Anel multiplica o tick inteiro", () => 
   assert.equal(poison(target).stacks, 12);
   const hp = target.hp;
   processDots(1000);
-  assert.equal(hp - target.hp, Math.round((1 + 12) * 1.3));
+  assert.equal(hp - target.hp, Math.round((1 + 12) * 1.4));
 });
 
 // ─── Contágio (Coração de Brasa) ───
@@ -314,9 +317,9 @@ test("Martelo Sísmico: 40% do dano nos vivos dentro de 90 px do alvo", () => {
   const zero = enemy({ x: 160, hp: 0 });
   setupRun(["seismic_hammer"], [target, near, edge, far, dead, zero]);
   activateItem(item("seismic_hammer"));
-  assert.equal(target.hp, 1000 - 14);
-  assert.equal(near.hp, 1000 - Math.round(14 * 0.4));
-  assert.equal(edge.hp, 1000 - Math.round(14 * 0.4));
+  assert.equal(target.hp, 1000 - 18);
+  assert.equal(near.hp, 1000 - Math.round(18 * 0.4));
+  assert.equal(edge.hp, 1000 - Math.round(18 * 0.4));
   assert.equal(far.hp, 1000);
   assert.equal(dead.hp, 1000, "morto não recebe");
   assert.equal(zero.hp, 0);
@@ -329,14 +332,14 @@ test("Martelo Sísmico: respingo não causa crítico nem efeitos de golpe, mas o
   setupRun(["seismic_hammer", "blood_scythe", "vampiric_amulet"], [target, weak, spare]);
   setLevel("blood_scythe", 3); // a Colheita (contador de abates) liberou no nível 3
   state.player.critChance = 1;
-  state.player.hp = 50; // 50% da vida: o Amuleto rouba 8% (não os 15% de vida baixa)
+  state.player.hp = 50; // 50% da vida: o Amuleto rouba 10% (não o dobro da vida baixa)
   const events = captureEvents();
   activateItem(item("seismic_hammer"));
-  assert.equal(weak.hp, 3 - 6, "6 = 40% de 14 arredondado (sem crítico)");
+  assert.equal(weak.hp, 3 - 7, "7 = 40% de 18 arredondado (sem crítico)");
   assert.equal(weak.lastHitCrit, false);
   assert.equal(events.filter((e) => e.type === "sfx" && e.payload.name === "crit").length, 1, "só o alvo crita");
-  // Roubo de vida só do golpe principal (21 com crítico × 8%); vizinhos não somam
-  assert.equal(state.player.hp, 52);
+  // Roubo de vida só do golpe principal (27 com crítico × 10%); vizinhos não somam
+  assert.equal(state.player.hp, 53);
   updateEnemies(16);
   assert.ok(weak.dead);
   assert.equal(state.player.counters.harvest, 1, "abate por respingo conta para a Colheita");
@@ -351,8 +354,8 @@ test("Núcleo Explosivo: dano fixo em todos num raio de 220 px, só vivos", () =
   const booms = [];
   on("explode", (e) => booms.push(e));
   activateItem(item("blast_core"));
-  assert.equal(inside.hp, 990);
-  assert.equal(edge.hp, 990);
+  assert.equal(inside.hp, 987);
+  assert.equal(edge.hp, 987);
   assert.equal(outside.hp, 1000);
   assert.equal(dead.hp, 1000);
   assert.equal(booms.length, 1);
@@ -366,23 +369,23 @@ test("Núcleo Explosivo: +5 de dano por nível, recarga de 6 s; fogo no nível 3
   assert.equal(item("blast_core").cooldown, 6000);
   setLevel("blast_core", 2);
   activateItem(item("blast_core"));
-  assert.equal(target.hp, 1000 - 15);
+  assert.equal(target.hp, 1000 - 18);
   assert.equal(burning(target), undefined, "sem fogo antes do nível 3");
 
   setLevel("blast_core", 3);
   activateItem(item("blast_core"));
-  assert.equal(target.hp, 1000 - 15 - 20);
+  assert.equal(target.hp, 1000 - 18 - 23);
   assert.equal(burning(target).stacks, 9, "3 stacks por nível do item");
 });
 
-test("Tomo do Julgamento: 9 de dano em todos os vivos, sem crítico nos outros", () => {
+test("Tomo do Julgamento: 12 de dano em todos os vivos, sem crítico nos outros", () => {
   const first = enemy({ x: 150 });
   const far = enemy({ x: 900 });
   const dead = enemy({ x: 300, dead: true });
   setupRun(["judgment_tome"], [first, far, dead]);
   state.player.critChance = 1;
   activateItem(item("judgment_tome"));
-  assert.equal(far.hp, 1000 - 9);
+  assert.equal(far.hp, 1000 - 12);
   assert.equal(far.lastHitCrit, false);
   assert.equal(dead.hp, 1000);
   assert.ok(first.hp < 1000);
@@ -396,8 +399,8 @@ test("Cota de Espinhos: golpe que tira HP fere todos os vivos a 120 px do herói
   const dead = enemy({ x: 150, dead: true });
   setupRun(["thorn_mail"], [attacker, edge, outside, dead]);
   assert.equal(enemyAttack(attacker), "hit");
-  assert.equal(attacker.hp, 994);
-  assert.equal(edge.hp, 994);
+  assert.equal(attacker.hp, 992);
+  assert.equal(edge.hp, 992);
   assert.equal(outside.hp, 1000);
   assert.equal(dead.hp, 1000);
 });
@@ -407,7 +410,7 @@ test("Cota de Espinhos: +3 de dano por nível e não age em esquiva nem bloqueio
   setupRun(["thorn_mail"], [a]);
   setLevel("thorn_mail", 2);
   enemyAttack(a);
-  assert.equal(a.hp, 1000 - 9);
+  assert.equal(a.hp, 1000 - 11);
 
   a.hp = 1000;
   state.player.evasion = 1;
