@@ -146,7 +146,7 @@ export const sfx = (() => {
       tone(a, 1100, 0.14, "triangle", 0.05, 900);
       tone(a, 3300, 0.05, "sine", 0.02);
     },
-    barrier: (a) => {
+    coldAura: (a) => {
       [392, 494, 587, 784].forEach((f, i) => {
         tone(a, f, 0.35, "sine", 0.03, 0, i * 0.05);
         tone(a, f * 1.005, 0.35, "triangle", 0.012, 0, i * 0.05);
@@ -157,11 +157,12 @@ export const sfx = (() => {
       tone(a, 660, 0.12, "sine", 0.035, 990, 0.08);
       tone(a, 880, 0.18, "sine", 0.03, 0, 0.16);
     },
-    mana: (a) => {
+    echo: (a) => {
       tone(a, 1568, 0.09, "sine", 0.025);
       tone(a, 2093, 0.09, "sine", 0.02, 0, 0.05);
       tone(a, 2637, 0.12, "sine", 0.015, 0, 0.1);
     },
+    emberSkin: (a) => noise(a, 0.12, 0.02, "bandpass", 2500, 1200, 1.2),
     frenzy: (a) => {
       tone(a, 110, 0.28, "sawtooth", 0.045, 330, 0, 0.02);
       tone(a, 112, 0.28, "sawtooth", 0.03, 340);

@@ -221,12 +221,12 @@ test("localizeItems troca nome, descrição, efeito e encantamento no mesmo obje
   localizeItems();
   assert.equal(findItem("ember_blade"), ember, "mesmo objeto do catálogo");
   assert.equal(ember.name, "Ember Blade");
-  assert.match(ember.enchant, /Ignition/);
+  assert.match(ember.enchant, /Flare/);
   assert.equal(rusty.enchant, null, "item sem encantamento");
   setLangQuiet("pt-BR");
   localizeItems();
   assert.equal(ember.name, "Lâmina de Brasa");
-  assert.match(ember.enchant, /Ignição/);
+  assert.match(ember.enchant, /Labareda/);
 });
 
 test("enemyName segue o idioma e entende o invocado", () => {

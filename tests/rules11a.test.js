@@ -189,7 +189,8 @@ test("veneno: base 1 + 3×(nível−1), +1 por stack, sem limite", () => {
   assert.equal(dot.base, 7);
   const hp = target.hp;
   processDots(1000);
-  assert.equal(hp - target.hp, 7 + 20);
+  // Corrosão (nível 3): +1% de dano por stack de veneno, até +25%: 20 stacks = +20%
+  assert.equal(hp - target.hp, Math.round((7 + 20) * 1.2));
 });
 
 test("veneno: não se espalha sem item (nem o Coração de Brasa)", () => {
@@ -250,16 +251,6 @@ test("Arco Gélido soma 1 stack de frio por golpe, em vez de 20% de congelar", (
   assert.ok(!item("frost_bow").effects.some((e) => e.type === "freeze"));
 });
 
-test("Armadura Cristalina: a explosão aplica 2 stacks de frio em todos os atingidos", () => {
-  const a = enemy({ x: 200 });
-  const b = enemy({ x: 700 });
-  setupRun(["crystal_armor"], [a, b]);
-  state.player.barrier = 1;
-  state.player.barrierSource = "crystal_armor";
-  enemyAttack(enemy({ dmg: 5 }));
-  assert.equal(coldStacks(a), 2);
-  assert.equal(coldStacks(b), 2);
-});
 
 test("frio: o tom gelado do renderer sobe com os stacks e congelado vale 1", () => {
   const target = enemy();
@@ -408,16 +399,15 @@ test("dados por nível: campo + campoPerLevel e o mapa perLevel", () => {
   assert.equal(lost(state.enemies[0]), 16);
 });
 
-test("sem dados por nível vale a regra genérica: +20% no efeito e -5% de recarga", () => {
+test("sem dados por nível o valor é fixo: nada de +20% nem -5% de recarga", () => {
   const it = custom();
   own(it, 3);
   assert.equal(perLevelOf(it, "baseDmg"), null);
-  assert.equal(levelValue(it, it, "baseDmg"), 10 * 1.4);
-  assert.equal(levelValue(it, it, "baseDmg", 10, { legacy: false }), 10);
-  assert.equal(effectiveCooldown(it), Math.round(2000 * 0.9));
+  assert.equal(levelValue(it, it, "baseDmg"), 10);
+  assert.equal(effectiveCooldown(it), 2000);
   state.enemies = [enemy()];
   activateItem(it);
-  assert.equal(lost(state.enemies[0]), 14);
+  assert.equal(lost(state.enemies[0]), 10);
 });
 
 test("passivos com valor por nível explícito (armadura)", () => {
@@ -430,7 +420,7 @@ test("passivos com valor por nível explícito (armadura)", () => {
   own(armor, 3);
   assert.equal(state.player.armor, 18);
   own(item("leather_vest"), 3);
-  assert.equal(state.player.armor, Math.round(12 * 1.4), "item sem dados segue a regra genérica");
+  assert.equal(state.player.armor, 12 + 8 * 2, "Colete: +8 de armadura por nível");
 });
 
 test("minLevel: o efeito só vale a partir do nível", () => {
@@ -459,9 +449,10 @@ test("encantamentos: texto base libera no nível 1 (ou enchantLevel) e o extra n
   ]);
   assert.deepEqual(enchantTiers(it, 3).map((x) => x.unlocked), [true, false]);
   assert.deepEqual(enchantTiers(it, 5).map((x) => x.unlocked), [true, true]);
-  // item atual do catálogo: o encantamento vale desde o nível 1
+  // item do catálogo: o encantamento libera no nível 3 e o extra no 5
   const bow = item("frost_bow");
-  assert.deepEqual(enchantTiers(bow, 1).map((x) => x.unlocked), [true]);
+  assert.deepEqual(enchantTiers(bow, 1).map((x) => x.unlocked), [false, false]);
+  assert.deepEqual(enchantTiers(bow, 3).map((x) => x.unlocked), [true, false]);
   assert.equal(enchantTiers(item("rusted_sword")).length, 0);
 });
 
@@ -671,17 +662,19 @@ test("frio: sem frio novo perde 1 stack a cada 2s; frio novo reinicia a contagem
   const target = enemy({ hp: 1e6, maxHp: 1e6 });
   setupRun([], [target]);
   applyCold(target, 3);
-  processDots(1999);
-  assert.equal(coldStacks(target), 3);
+  processDots(2999);
+  assert.equal(coldStacks(target), 3, "3s de espera depois da última aplicação");
   processDots(1);
+  assert.equal(coldStacks(target), 2, "aos 3s perde o primeiro stack");
+  processDots(1999);
   assert.equal(coldStacks(target), 2);
-  processDots(1500);
+  processDots(1);
+  assert.equal(coldStacks(target), 1, "daí em diante, 1 a cada 2s");
   applyCold(target, 1);
-  processDots(1500);
-  assert.equal(coldStacks(target), 3, "o frio novo reiniciou o relógio");
-  processDots(500);
-  assert.equal(coldStacks(target), 2);
-  processDots(2000);
+  processDots(2999);
+  assert.equal(coldStacks(target), 2, "o frio novo reiniciou a espera");
+  processDots(1);
+  assert.equal(coldStacks(target), 1);
   processDots(2000);
   assert.equal(target.dots.length, 0);
 });
@@ -705,16 +698,14 @@ test("fraqueza aumenta o tick de dano contínuo (e a resistência não corta dua
   assert.equal(lost(weak), 15 + 10, "fogo ×1,5; veneno resistido não é cortado de novo");
 });
 
-test("explosão da Armadura Cristalina congela vários e avisa uma vez só", () => {
-  const list = [enemy({ x: 200 }), enemy({ x: 300 }), enemy({ x: 400 })];
+test("aura da Armadura Cristalina congela vários e avisa uma vez só", () => {
+  const list = [enemy({ x: 150 }), enemy({ x: 160 }), enemy({ x: 170 })];
   setupRun(["crystal_armor"], list);
-  for (const en of list) applyCold(en, 3);
+  for (const en of list) applyCold(en, 4);
   const freezes = [];
   on("freeze", (e) => freezes.push(e));
   const logs = captureEvents();
-  state.player.barrier = 1;
-  state.player.barrierSource = "crystal_armor";
-  enemyAttack(enemy({ dmg: 5 }));
+  activateItem(item("crystal_armor"));
   assert.ok(list.every((en) => en.frozen === FREEZE_MS));
   assert.equal(freezes.length, 1);
   assert.equal(logs.filter((e) => e.type === "sfx" && e.payload.name === "freeze").length, 1);

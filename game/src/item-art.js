@@ -214,7 +214,7 @@ export const ITEM_ART = {
     "................",
   ],
   // Gema lapidada azul: losango, para não confundir com o orbe de água
-  mana_stone: [
+  echo_stone: [
     ".....kkkkkk.....",
     "....kjwwjiik..w.",
     "...kjwwjjiiBk...",

@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #16 (commit `7929768`).
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #17 (commit `05b14ac`).
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -8,7 +8,7 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Tem i18n EN (padrão) e pt-BR, com a chave `lang` no localStorage, e tema claro/escuro.
 - **Reliquary** (`game/`): auto-battler em JS puro, sem build.
   - 3D pixel art com Three.js 0.170, vendorizado em `game/vendor/three`.
-  - Testes: `npm test` na raiz (**241** passando).
+  - Testes: `npm test` na raiz (**292** passando).
 
 ## Estado
 - **Fases concluídas:** 0 a 10, 13 e 14 (PRs #2 a #16).
@@ -54,9 +54,10 @@ Plano de melhorias, pedido pelo usuário em 2026-10-31. A ordem foi escolhida po
 - **11 – Revisão dos efeitos (em andamento):**
   - Grill-me concluído. As decisões vão para `docs/design/effects-v2.md` (cópia de trabalho em `scratchpad/phase11-decisions.md`).
   - Implementação em 3 PRs:
-    - **11a:** regras globais (níveis por item, armadura decrescente, fogo e veneno novos, frio unificado, resistências de chefe por sorteio, stacks abaixo da barra do chefe, loja nova).
+    - **11a (feita, PR #17):** regras globais (níveis por item, armadura decrescente, fogo e veneno novos, frio unificado, resistências de chefe por sorteio, stacks abaixo da barra do chefe, loja nova).
     - **11b:** os 29 itens com N1/N3/N5, a evolução dos comuns, e a saída da mana e da barreira.
-    - **11c:** os 11 itens novos e os 14 ícones de pixel art.
+    - **11c:** os 11 itens novos, 2 itens míticos de clique (Clique Elemental e Dedo Sísmico, desbloqueados na loja por 1000, um por run) e os ícones de pixel art.
+  - Formato por nível: `<chave>PerLevel` ou `perLevel`, e `minLevel: 3|5` nos efeitos (helpers `levelValue` e `perLevelOf` em `items.js`). O encantamento N5 do item vai em `items.<id>.enchantExtra`.
   - Ao terminar, regerar `docs/items.md`.
 - **12 – Inimigo que ataca de longe:**
   - Projétil e posição de parada mais distante.

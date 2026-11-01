@@ -110,7 +110,7 @@ function drawEffect(ef, a, minW) {
       ctx.fillRect(ef.x - 10 * a, ef.y - r - 3, 20 * a, 6);
       break;
     }
-    case "mana_orb": {
+    case "echo": {
       ctx.fillStyle = "#b55088";
       dot(ef.x, ef.y - (1 - a) * 20, 8 * a);
       break;

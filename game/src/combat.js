@@ -15,13 +15,13 @@
 //   "crit"        golpe crítico do herói: damage
 //   "dodge"       herói esquivou de um ataque
 //   "freeze"      inimigo congelado por 5 stacks de frio (enemy.frozen = ms restantes)
-//   "explode"     explosão (Armadura Cristalina, Núcleo Explosivo): kind "ice" | "fire"
+//   "explode"     explosão (Núcleo Explosivo, Pena de Fênix): kind "fire"
 //   "spread"      queimadura passou de um inimigo morto a outros: from {x,y}, to [{x,y}]
 // Stacks (fogo, veneno, frio): cada elemento tem resistência; ela reduz o dano e também os
 // stacks aplicados (acumulador determinístico, sem sorteio). Imunidade bloqueia tudo.
 // Sons: sound(nome, detalhe) -> "hit" + elemento, "use" + tipo do efeito, "dot" + tipo,
 // além de "crit", "dodge", "freeze" e "explode".
-import { state } from "./state.js";
+import { state, PLAYER_BASE } from "./state.js";
 import { random } from "./random.js";
 import { emit, log, sound } from "./events.js";
 import { spawnEffect, spawnNumber } from "./fx.js";
@@ -29,11 +29,14 @@ import { t, formatNumber } from "./i18n.js";
 import { enemyName } from "./waves.js";
 import {
   effectsOf,
+  effectCount,
   ownedEffects,
   isActivatable,
   levelValue,
   itemLevel,
   findItem,
+  applyPassives,
+  addEvolutionKill,
 } from "./items.js";
 
 // Armadura com retorno decrescente: 100 de armadura = 50% de redução, sem teto fixo
@@ -43,7 +46,7 @@ export function armorReduction(armor) {
 }
 
 // Golpe crítico: a chance base está em PLAYER_BASE.critChance
-export const CRIT_MULT = 1.5;
+export const CRIT_MULT = PLAYER_BASE.critMult;
 
 // Duração (ms) das poses de animação; o renderer 3D (three/characters.js) usa o tempo restante
 export const ANIM_MS = {
@@ -76,6 +79,8 @@ export const COLD_FREEZE_STACKS = 5;
 export const FREEZE_MS = 2000;
 // Sem frio novo, o inimigo perde 1 stack a cada 2s
 export const COLD_DECAY_MS = 2000;
+// O frio só começa a sumir 3s depois da ÚLTIMA aplicação (vale para todo gelo)
+export const COLD_GRACE_MS = 3000;
 
 // Fogo: 1 de dano por stack por segundo; a cada segundo perde max(1, ⌊stacks ÷ 10⌋) stacks
 export function burnDecay(stacks) {
@@ -139,6 +144,22 @@ export function landStacks(target, element, stacks, itemId = null) {
   return landed;
 }
 
+// Multiplicador do dano que o inimigo recebe: Corrosão (veneno), congelado (Armadura
+// Cristalina) e julgado (Tomo do Julgamento) somam bônus. O herói não passa por aqui.
+export function damageTakenMult(target) {
+  if (target === state.player) return 1;
+  let mult = 1;
+  for (const { item, effect } of ownedEffects("vulnerable")) {
+    if (effect.type === "corrosion") {
+      mult += Math.min(levelValue(item, effect, "max"), poisonStacks(target) * effect.bonus);
+    } else if (effect.type === "frozenVuln" && target.frozen > 0) {
+      mult += levelValue(item, effect, "bonus");
+    }
+  }
+  if (target.judged) mult += target.judged.bonus;
+  return mult;
+}
+
 // itemId: item do jogador que causou o dano (crédito); sem ele, só source "player" soma ao total
 export function applyElementalDamage(target, baseDmg, element, source, crit = false, itemId = null) {
   if (!target.resist) target.resist = {};
@@ -150,7 +171,7 @@ export function applyElementalDamage(target, baseDmg, element, source, crit = fa
     spawnEffect("text", target.x, target.y - 60, { life: 30, text: t("float.immune"), color: "#888888" });
     return 0;
   }
-  const finalDmg = Math.max(1, Math.round(baseDmg * (1 - resist)));
+  const finalDmg = Math.max(1, Math.round(baseDmg * (1 - resist) * damageTakenMult(target)));
 
   target.hp -= finalDmg;
   target.hurtTimer = 15;
@@ -256,16 +277,19 @@ export function applyDot(
 // quiet: quem aplica em área avisa o congelamento uma vez só (evento, som e log)
 export function applyCold(target, stacks = 1, { itemId = null, freezeMs = FREEZE_MS, quiet = false } = {}) {
   if (target.dead || target.hp <= 0 || target.frozen > 0) return 0;
+
   const landed = landStacks(target, "ice", stacks, itemId);
   if (landed <= 0) return 0;
   if (!target.dots) target.dots = [];
   let cold = target.dots.find((d) => d.type === "cold");
   if (!cold) {
-    cold = { type: "cold", damage: 0, base: 0, duration: 0, stacks: 0, tickTimer: 0, sourceId: itemId };
+    cold = { type: "cold", damage: 0, base: 0, duration: 0, stacks: 0, tickTimer: 0, idle: 0, sourceId: itemId };
     target.dots.push(cold);
   }
   cold.stacks += landed;
-  cold.tickTimer = 0; // frio novo reinicia a contagem do decaimento
+  cold.tickTimer = 0; // frio novo reinicia a espera e o decaimento
+  cold.idle = 0;
+  cold.decaying = false;
   if (cold.stacks >= COLD_FREEZE_STACKS) {
     target.dots = target.dots.filter((d) => d !== cold);
     freezeEnemy(target, freezeMs, quiet);
@@ -297,11 +321,21 @@ export function processDots(dt) {
 
     entity.dots = entity.dots.filter((dot) => {
       if (dot.type === "cold") {
-        // Frio não causa dano: só desacelera, e some aos poucos sem frio novo
-        dot.tickTimer += dt;
-        if (dot.tickTimer >= COLD_DECAY_MS) {
-          dot.tickTimer = 0;
-          dot.stacks--;
+        // Frio não causa dano: só desacelera. 3s depois da última aplicação perde 1 stack
+        // e, daí em diante, 1 a cada 2s
+        dot.idle = (dot.idle ?? 0) + dt;
+        if (dot.idle >= COLD_GRACE_MS) {
+          if (!dot.decaying) {
+            dot.decaying = true;
+            dot.tickTimer = 0;
+            dot.stacks--;
+          } else {
+            dot.tickTimer += dt;
+            if (dot.tickTimer >= COLD_DECAY_MS) {
+              dot.tickTimer = 0;
+              dot.stacks--;
+            }
+          }
         }
         return dot.stacks > 0;
       }
@@ -314,11 +348,19 @@ export function processDots(dt) {
           entity === state.player
             ? 1
             : 1 - Math.min(0, effectiveResist(entity, STACK_ELEMENT[dot.type] || "physical", dot.sourceId));
-        const dmg = Math.round(((dot.base || 0) + dot.damage * dot.stacks) * weak);
+        let dmg = Math.round(((dot.base || 0) + dot.damage * dot.stacks) * weak);
+        // Couraça de Batalha corta o dano contínuo do herói; nos inimigos valem Corrosão etc.
+        dmg =
+          entity === state.player
+            ? Math.max(1, Math.round(dmg * (1 - (entity.dotReduction || 0))))
+            : Math.round(dmg * damageTakenMult(entity));
         entity.hp -= dmg;
         entity.hurtTimer = 8;
         entity.lastHitCrit = false; // abate por dano contínuo não conta como crítico
-        if (entity !== state.player) creditDamage(dot.sourceId, dmg);
+        if (entity !== state.player) {
+          creditDamage(dot.sourceId, dmg);
+          dotLifesteal(dmg);
+        }
         spawnNumber(
           entity.x,
           entity.y - 30,
@@ -369,96 +411,236 @@ function enemiesWithin(x, radius, except = null) {
   return livingEnemies().filter((e) => e !== except && Math.abs(e.x - x) <= radius);
 }
 
+// Pedra de Eco: ao repetir um item, dano, stacks, cura e duração valem esta fração
+let echoScale = 1;
+// Dentro de uma repetição do Eco: não conta carga do Cristal Vital nem contadores de golpe
+let echoing = false;
+
+// Efeitos elementais do Manto do Arcano (N3) somam +1 stack em QUALQUER fonte de stacks
+function plusStacks(n) {
+  return n + state.player.extraStacks;
+}
+function scaled(n) {
+  return echoScale === 1 || n <= 0 ? n : Math.max(1, Math.round(n * echoScale));
+}
+
+// Raio extra por ponto de alcance do Manto do Arcano (respingos); nos saltos é +1 alvo
+const REACH_RADIUS = 30;
+// Vizinhos de um inimigo (labaredas, estilhaços): quem está até esta distância dele
+const NEIGHBOR_RADIUS = 120;
+
+// Os outros inimigos vivos, do mais perto do herói ao mais longe (a fila de ataque)
+function othersByDistance(target) {
+  const px = state.player.x;
+  return livingEnemies()
+    .filter((e) => e !== target)
+    .sort((a, b) => Math.abs(a.x - px) - Math.abs(b.x - px));
+}
+
+function burnStacks(en) {
+  return (en.dots || []).find((d) => d.type === "burning")?.stacks || 0;
+}
+
+function poisonStacks(en) {
+  return (en.dots || []).find((d) => d.type === "poison")?.stacks || 0;
+}
+
+// Aplica os stacks de um efeito "dot" de golpe (veneno, queimadura) em `target`. O nível não
+// aumenta o dano por stack (fixo por item): aumenta os stacks por golpe e o dano base.
+// A resistência do alvo reduz os stacks que entram (imune: nenhum).
+function applyDotEffect(effect, item, target) {
+  if (!rolls(effect)) return;
+  const perm = permanentDamage();
+  const damage = effect.damage * perm;
+  const base = levelValue(item, effect, "base", effect.base || 0) * perm;
+  const maxStacks =
+    effect.maxStacks == null ? Infinity : levelValue(item, effect, "maxStacks", effect.maxStacks);
+  const wanted = scaled(
+    Math.round(levelValue(item, effect, "stacks", effect.stacks ?? 1)) + state.player.extraStacks,
+  );
+  const stacks = landStacks(target, STACK_ELEMENT[effect.dot] || "physical", wanted, item.id);
+  if (stacks <= 0) return;
+  applyDot(target, effect.dot, damage, effect.duration, true, {
+    maxStacks,
+    base,
+    sourceId: item.id,
+    stacks,
+  });
+  const dot = DOTS[effect.dot];
+  log(
+    t("log.dot", {
+      icon: dot?.icon || "✨",
+      target: enemyName(target),
+      verb: t(dot ? `dot.${effect.dot}` : "dot.generic"),
+    }),
+    "dmg",
+  );
+}
+
+// Frio de um golpe: soma stacks; no 5º o alvo congela (ver applyCold)
+function applyColdEffect(effect, item, target) {
+  if (!rolls(effect)) return;
+  const wanted = scaled(
+    Math.round(levelValue(item, effect, "stacks", effect.stacks ?? 1)) + state.player.extraStacks,
+  );
+  const landed = applyCold(target, wanted, {
+    itemId: item.id,
+    freezeMs: levelValue(item, effect, "freezeMs", FREEZE_MS),
+  });
+  if (landed > 0) {
+    log(t("log.cold", { icon: item.icon, item: item.name, target: enemyName(target), stacks: landed }), "item");
+  }
+}
+
+// Labareda: dano de fogo de 1 por stack nos inimigos perto de `origin`
+function flareAround(origin, stacks, item) {
+  const near = enemiesWithin(origin.x, NEIGHBOR_RADIUS, origin);
+  if (near.length === 0) return;
+  const damage = Math.round(stacks * permanentDamage());
+  for (const en of near) applyElementalDamage(en, damage, "fire", "player", false, item.id);
+  spawnEffect("dragon_roar", origin.x, origin.y - 30, { life: 30 });
+  log(t("log.flare", { icon: item.icon, item: item.name, count: near.length, damage }), "dmg");
+}
+
+// Fogo do herói (Escama Dracônica): stacks no inimigo e, a partir do nível do encantamento,
+// no inimigo mais perto dele também
+function igniteWith(item, effect, target, stacks) {
+  const targets = [target];
+  if (itemLevel(item.id) >= (effect.otherLevel ?? Infinity)) {
+    const other = livingEnemies()
+      .filter((e) => e !== target)
+      .sort((a, b) => Math.abs(a.x - target.x) - Math.abs(b.x - target.x))[0];
+    if (other) targets.push(other);
+  }
+  let total = 0;
+  for (const en of targets) {
+    const landed = landStacks(en, "fire", plusStacks(stacks), item.id);
+    if (landed <= 0) continue;
+    total += landed;
+    applyDot(en, "burning", permanentDamage(), 0, true, { stacks: landed, sourceId: item.id });
+  }
+  return total;
+}
+
 // trigger "hit": a cada golpe de arma. ctx = { target, damage, refund }
 const HIT_EFFECTS = {
   dot(effect, item, ctx) {
-    if (!rolls(effect)) return;
-    // O nível não aumenta o dano por stack (fixo por item): ele aumenta os stacks por golpe
-    // (Lâmina de Brasa) e o dano base do veneno. O bônus permanente vale para tudo.
-    const perm = permanentDamage();
-    const damage = effect.damage * perm;
-    const base = levelValue(item, effect, "base", effect.base || 0, { legacy: false }) * perm;
-    const maxStacks =
-      effect.maxStacks == null
-        ? Infinity
-        : levelValue(item, effect, "maxStacks", effect.maxStacks, { legacy: false });
-    const wanted = Math.round(levelValue(item, effect, "stacks", effect.stacks ?? 1, { legacy: false }));
-    // A resistência do alvo reduz os stacks que entram (imune: nenhum)
-    const stacks = landStacks(ctx.target, STACK_ELEMENT[effect.dot] || "physical", wanted, item.id);
-    if (stacks <= 0) return;
-    applyDot(ctx.target, effect.dot, damage, effect.duration, true, {
-      maxStacks,
-      base,
-      sourceId: item.id,
-      stacks,
-    });
-    const dot = DOTS[effect.dot];
-    log(
-      t("log.dot", {
-        icon: dot?.icon || "✨",
-        target: enemyName(ctx.target),
-        verb: t(dot ? `dot.${effect.dot}` : "dot.generic"),
-      }),
-      "dmg",
-    );
+    applyDotEffect(effect, item, ctx.target);
   },
   cooldownRefund(effect, item, ctx) {
     if (!rolls(effect)) return;
     ctx.refund += effect.ms;
     log(t("log.cooldownRefund", { icon: item.icon, item: item.name }), "item");
   },
-  // Frio: cada golpe soma stacks; no 5º o alvo congela (ver applyCold)
   cold(effect, item, ctx) {
-    if (!rolls(effect)) return;
-    const wanted = Math.round(levelValue(item, effect, "stacks", effect.stacks ?? 1, { legacy: false }));
-    const landed = applyCold(ctx.target, wanted, {
-      itemId: item.id,
-      freezeMs: effect.freezeMs ?? FREEZE_MS,
-    });
-    if (landed > 0) {
-      log(t("log.cold", { icon: item.icon, item: item.name, target: enemyName(ctx.target), stacks: landed }), "item");
-    }
+    applyColdEffect(effect, item, ctx.target);
   },
   // heal com onCrit só vale quando o golpe foi crítico
   heal(effect, item, ctx) {
     if (effect.onCrit && !ctx.crit) return;
-    healPlayer(Math.round(levelValue(item, effect, "amount")), item);
+    healPlayer(scaled(Math.round(levelValue(item, effect, "amount"))), item);
   },
   lifesteal(effect, item, ctx) {
-    healPlayer(Math.round(ctx.dealt * levelValue(item, effect, "ratio")), item);
+    const over = healPlayer(Math.round(ctx.dealt * levelValue(item, effect, "ratio")), item);
+    // Cura acima da vida máxima vira vida máxima (+1 por cura, até o teto da run)
+    if (over > 0 && itemLevel(item.id) >= (effect.overhealLevel ?? Infinity)) {
+      const p = state.player;
+      const gained = Math.min(effect.overhealMax - (p.maxHpBonus || 0), 1);
+      if (gained > 0) {
+        p.maxHpBonus = (p.maxHpBonus || 0) + gained;
+        applyPassives();
+        log(t("log.maxHpUp", { icon: item.icon, item: item.name, amount: p.maxHpBonus }), "heal");
+      }
+    }
   },
   // Respingo: cada golpe também fere os vizinhos do alvo. Sem crítico e sem efeitos de
   // golpe da arma nos vizinhos (é dano de área); abates contam para os gatilhos de abate.
+  // Com `onHitLevel`, os efeitos de golpe dos outros itens (roubo de vida) valem nos vizinhos.
   splash(effect, item, ctx) {
-    const near = enemiesWithin(ctx.target.x, effect.radius, ctx.target);
+    const radius = levelValue(item, effect, "radius") + state.player.reach * REACH_RADIUS;
+    const near = enemiesWithin(ctx.target.x, radius, ctx.target);
     if (near.length === 0) return;
-    const damage = Math.round(ctx.damage * effect.ratio);
+    const damage = Math.round(ctx.damage * levelValue(item, effect, "ratio"));
+    const onHit = itemLevel(item.id) >= (effect.onHitLevel ?? Infinity);
     for (const en of near) {
-      applyElementalDamage(en, damage, item.dmgType || "physical", "player", false, item.id);
+      const dealt = applyElementalDamage(en, damage, item.dmgType || "physical", "player", false, item.id);
+      if (onHit) runAnyHit({ ...ctx, target: en, dealt, damage, crit: false });
     }
     log(t("log.splash", { icon: item.icon, item: item.name, count: near.length, damage }), "dmg");
+  },
+  // Alvo com muitos stacks de queimadura solta uma labareda nos vizinhos
+  flare(effect, item, ctx) {
+    const stacks = burnStacks(ctx.target);
+    if (stacks >= effect.threshold) flareAround(ctx.target, stacks, item);
+  },
+  // Execução: golpe que deixa um inimigo comum com pouca vida acaba com ele (chefe não)
+  execute(effect, item, ctx) {
+    const en = ctx.target;
+    if (en.isBoss || en.dead || en.hp <= 0 || en.hp > en.maxHp * effect.ratio) return;
+    creditDamage(item.id, en.hp);
+    en.hp = 0;
+    spawnEffect("text", en.x, en.y - 60, { life: 35, text: t("float.execute"), color: "#ff6666" });
+    log(t("log.execute", { icon: item.icon, item: item.name, enemy: enemyName(en) }), "dmg");
+  },
+  // A cada N golpes, um raio de luz acerta todos os inimigos
+  ray(effect, item, ctx) {
+    if (ctx.extra) return; // ataque extra (Eco, contra-ataque, Moeda) não conta
+    const counters = state.player.counters;
+    const key = `ray_${item.id}`;
+    counters[key] = (counters[key] || 0) + 1;
+    if (counters[key] % effect.every !== 0) return;
+    const damage = Math.round(ctx.damage * levelValue(item, effect, "ratio"));
+    const all = livingEnemies();
+    for (const en of all) {
+      applyElementalDamage(en, damage, item.dmgType || "holy", "player", false, item.id);
+      spawnEffect("lightning", en.x, en.y - 20, { life: 25, color: "#ffe27a" });
+    }
+    log(t("log.ray", { icon: item.icon, item: item.name, count: all.length, damage }), "item");
   },
 };
 
 // trigger "anyHit": a cada golpe de arma, de qualquer item possuído
 const ANY_HIT_EFFECTS = {
-  // Abaixo do limite de vida o roubo sobe (lowHpRatio)
+  // Abaixo do limite de vida o roubo sobe (Sede)
   lifesteal(effect, item, ctx) {
     const p = state.player;
-    const low = effect.lowHpRatio && p.hp / p.maxHp < effect.threshold;
-    const ratio = levelValue(item, effect, low ? "lowHpRatio" : "ratio");
+    const thirst = effect.thirst;
+    let ratio = levelValue(item, effect, "ratio");
+    if (thirst && itemLevel(item.id) >= thirst.level && p.hp / p.maxHp < thirst.threshold) {
+      ratio *= thirst.mult;
+    }
     healPlayer(Math.round(ctx.dealt * ratio), item);
   },
 };
 
+function runAnyHit(ctx) {
+  for (const { item, effect } of ownedEffects("anyHit")) {
+    ANY_HIT_EFFECTS[effect.type]?.(effect, item, ctx);
+  }
+}
+
+// Roubo de vida também no dano contínuo (Amuleto Vampírico N5)
+function dotLifesteal(dmg) {
+  for (const { item, effect } of ownedEffects("anyHit")) {
+    if (effect.type !== "lifesteal" || itemLevel(item.id) < (effect.dotLevel ?? Infinity)) continue;
+    healPlayer(Math.round(dmg * levelValue(item, effect, "ratio")), item);
+  }
+}
+
 // trigger "anyAttack": a cada ataque de arma completo, de qualquer item possuído
 const ANY_ATTACK_EFFECTS = {
-  // A cada N ataques, a arma que atacou recarrega na hora
+  // A cada N ataques, a arma que atacou recarrega na hora (allLevel: todos os itens)
   sprint(effect, item, ctx) {
     const counters = state.player.counters;
     counters.sprint = (counters.sprint || 0) + 1;
     if (counters.sprint % effect.every !== 0) return;
     ctx.refund = Infinity;
+    if (itemLevel(item.id) >= (effect.allLevel ?? Infinity)) {
+      for (const other of state.items) {
+        const timer = state.itemTimers[other.id];
+        if (timer && !other.fixedRate) timer.elapsed = timer.cooldown;
+      }
+    }
     log(t("log.sprint", { icon: item.icon, item: item.name, weapon: ctx.weapon.name }), "item");
   },
 };
@@ -482,11 +664,14 @@ const KILL_EFFECTS = {
     p.harvestReady = true;
     log(t("log.harvestReady", { icon: item.icon, item: item.name }), "item");
   },
+  // Almas: a Foice ganha dano permanente a cada N abates da run; o bônus sai de
+  // state.kills (ver soulBonus), então não há nada a contar aqui
+  soulHarvest() {},
   // Contágio: a queimadura de quem morreu passa aos N vivos mais próximos (N = nível).
   // Todo abate (golpe, dano contínuo, explosão, reflexo, espinhos) passa pelo teste de
   // morte do updateEnemies, que chama este gatilho; por isso o contágio pega todos.
   spread(effect, item, en) {
-    spreadBurn(en, itemLevel(item.id), item);
+    spreadBurn(en, itemLevel(item.id) + state.player.reach, item, effect);
   },
   critFragment(effect, item, en) {
     if (!en.lastHitCrit) return;
@@ -498,25 +683,21 @@ const KILL_EFFECTS = {
   pact(effect, item) {
     const p = state.player;
     if (p.hp > 1) p.hp = Math.max(1, p.hp - effect.hpCost);
-    p.pactBonus = Math.min(effect.max, (p.pactBonus || 0) + effect.bonus);
+    p.pactBonus = Math.min(levelValue(item, effect, "max"), (p.pactBonus || 0) + effect.bonus);
   },
 };
 
 // trigger "attack": uma vez por ataque, depois do primeiro golpe
 const ATTACK_EFFECTS = {
+  // Salta para os próximos inimigos (+1 salto por nível; o Manto do Arcano N5 soma mais um)
   chain(effect, item, ctx) {
+    const targets = Math.round(levelValue(item, effect, "targets")) + state.player.reach;
+    const ratio = levelValue(item, effect, "ratio");
     const others = state.enemies
       .filter((e) => !e.dead && e !== ctx.target)
-      .slice(0, effect.targets);
+      .slice(0, targets);
     others.forEach((en) => {
-      applyElementalDamage(
-        en,
-        Math.round(ctx.damage * effect.ratio),
-        effect.element,
-        "player",
-        false,
-        item.id,
-      );
+      applyElementalDamage(en, Math.round(ctx.damage * ratio), effect.element, "player", false, item.id);
       spawnEffect("lightning", en.x, en.y - 20, {
         life: 25,
         color: "#66aaff",
@@ -526,13 +707,15 @@ const ATTACK_EFFECTS = {
       log(t("log.chain", { count: others.length }), "item");
     }
   },
-  // Atinge todos os outros inimigos vivos com o dano base do golpe (sem crítico)
+  // Atinge todos os outros inimigos vivos com o dano base do golpe (sem crítico);
+  // em chefe vale o multiplicador do ataque (Tomo do Julgamento N5)
   hitAll(effect, item, ctx) {
     const others = livingEnemies().filter((e) => e !== ctx.target);
     if (others.length === 0) return;
     const damage = Math.round(ctx.damage * effect.ratio);
     for (const en of others) {
-      applyElementalDamage(en, damage, item.dmgType || "physical", "player", false, item.id);
+      const dmg = en.isBoss ? Math.round(damage * ctx.bossMult) : damage;
+      applyElementalDamage(en, dmg, item.dmgType || "physical", "player", false, item.id);
       spawnEffect("lightning", en.x, en.y - 20, { life: 25, color: "#ffe27a" });
     }
     log(t("log.hitAll", { icon: item.icon, item: item.name, count: others.length, damage }), "item");
@@ -540,11 +723,47 @@ const ATTACK_EFFECTS = {
   // Adianta a recarga dos outros itens (não do próprio)
   cooldownOthers(effect, item, ctx) {
     if (ctx.extra) return;
+    const ms = levelValue(item, effect, "ms");
     for (const other of state.items) {
       const timer = state.itemTimers[other.id];
-      if (other.id === item.id || !timer) continue;
-      timer.elapsed = Math.min(timer.cooldown, timer.elapsed + effect.ms);
+      if (other.id === item.id || !timer || other.fixedRate) continue; // aura de ritmo fixo não acelera
+      timer.elapsed = Math.min(timer.cooldown, timer.elapsed + ms);
     }
+  },
+  // Atravessa: o golpe também acerta o(s) próximo(s) da fila e aplica os stacks da arma neles
+  pierce(effect, item, ctx) {
+    const next = othersByDistance(ctx.target).slice(0, effect.targets ?? 1);
+    for (const en of next) {
+      applyElementalDamage(en, ctx.damage, item.dmgType || "physical", "player", false, item.id);
+      for (const hit of effectsOf(item, "hit")) {
+        if (hit.type === "cold") applyColdEffect(hit, item, en);
+        else if (hit.type === "dot") applyDotEffect(hit, item, en);
+      }
+    }
+    if (next.length > 0) log(t("log.pierce", { icon: item.icon, item: item.name, count: next.length }), "item");
+  },
+  // O golpe também acerta os próximos da fila, com a mesma força
+  cleave(effect, item, ctx) {
+    const next = othersByDistance(ctx.target).slice(0, effect.targets);
+    for (const en of next) {
+      applyElementalDamage(en, Math.round(ctx.damage * effect.ratio), item.dmgType || "physical", "player", false, item.id);
+    }
+  },
+  // Julgamento: todos os inimigos vivos recebem mais dano por um tempo
+  judge(effect, item) {
+    const ms = levelValue(item, effect, "ms");
+    for (const en of livingEnemies()) en.judged = { ms, bonus: effect.bonus };
+  },
+  // Maré cheia: com o máximo de acúmulos, o golpe vira uma onda que acerta todos
+  tideWave(effect, item, ctx) {
+    const p = state.player;
+    if (!ctx.tideFull || !p.tide) return;
+    const damage = Math.round(ctx.damage * levelValue(item, effect, "ratio"));
+    for (const en of livingEnemies().filter((e) => e !== ctx.target)) {
+      applyElementalDamage(en, damage, item.dmgType || "water", "player", false, item.id);
+    }
+    p.tide.stacks = 0;
+    log(t("log.tideWave", { icon: item.icon, item: item.name }), "item");
   },
 };
 
@@ -564,14 +783,22 @@ const ATTACK_MODS = {
     const p = state.player;
     if (!p.tide || p.tide.target !== ctx.target) p.tide = { target: ctx.target, stacks: 0 };
     ctx.flat += p.tide.stacks * effect.damage;
+    ctx.tideFull = p.tide.stacks >= effect.max;
     p.tide.stacks = Math.min(effect.max, p.tide.stacks + 1);
+  },
+  // Multiplicador contra chefes (só vale no alvo que é chefe)
+  bossBonus(effect, item, ctx) {
+    ctx.bossMult = effect.mult;
   },
 };
 
+const ONE_SHOT_MODS = new Set(["storm", "tide"]);
+
 // Passa TODOS os stacks de queimadura de `dead` aos `count` inimigos vivos mais próximos
 // dele, somando aos que cada alvo já tem (a resistência do alvo reduz os que entram).
-// Os alvos que também morrerem queimando espalham de novo (cadeia).
-function spreadBurn(dead, count, item) {
+// Os alvos que também morrerem queimando espalham de novo (cadeia). Com `flareLevel`, o
+// salto também causa uma labareda de 1 por stack no alvo novo.
+function spreadBurn(dead, count, item, effect = {}) {
   const burn = (dead.dots || []).find((d) => d.type === "burning");
   if (!burn || burn.stacks <= 0) return;
   const targets = livingEnemies()
@@ -582,10 +809,12 @@ function spreadBurn(dead, count, item) {
     .map((o) => o.e);
   if (targets.length === 0) return;
   const reached = [];
+  const flare = itemLevel(item.id) >= (effect.flareLevel ?? Infinity);
   for (const en of targets) {
-    const stacks = landStacks(en, "fire", burn.stacks, item.id);
+    const stacks = landStacks(en, "fire", plusStacks(burn.stacks), item.id);
     if (stacks <= 0) continue;
     applyDot(en, "burning", burn.damage, 0, true, { stacks, sourceId: burn.sourceId }); // a arma original leva o crédito
+    if (flare) applyElementalDamage(en, Math.round(stacks * permanentDamage()), "fire", "player", false, item.id);
     reached.push(en);
   }
   if (reached.length === 0) return;
@@ -602,144 +831,175 @@ function spreadBurn(dead, count, item) {
 
 // trigger "use": itens que não são armas, quando a recarga fica pronta
 const USE_EFFECTS = {
-  // Explosão em volta do herói: dano fixo (cresce com o nível) em todos no raio
+  // Explosão em volta do herói: dano fixo (cresce com o nível) em todos no raio, com fogo
+  // a partir do nível do encantamento (burnPerLevel stacks por nível do item)
   blast(effect, item, p) {
-    const damage = Math.round(levelValue(item, effect, "damage") * permanentDamage());
-    const near = enemiesWithin(p.x, effect.radius);
+    const damage = Math.round(scaled(levelValue(item, effect, "damage")) * permanentDamage());
+    const near = enemiesWithin(p.x, levelValue(item, effect, "radius"));
     // Sem ninguém no alcance não explode: a recarga fica pronta para quando houver alvo
     if (near.length === 0) return false;
-    for (const en of near) applyElementalDamage(en, damage, effect.element, "player", false, item.id);
+    const burn =
+      itemLevel(item.id) >= (effect.burnLevel ?? Infinity)
+        ? plusStacks(scaled(effect.burnPerLevel * itemLevel(item.id)))
+        : 0;
+    for (const en of near) {
+      applyElementalDamage(en, damage, effect.element, "player", false, item.id);
+      const landed = burn > 0 ? landStacks(en, "fire", burn, item.id) : 0;
+      if (landed > 0) applyDot(en, "burning", permanentDamage(), 0, true, { stacks: landed, sourceId: item.id });
+    }
     spawnEffect("dragon_roar", p.x, p.y - 30, { life: 40 });
     sound("explode");
     emit("explode", { x: p.x, y: p.y, kind: "fire", radius: effect.radius });
     log(t("log.blast", { icon: item.icon, item: item.name, damage, count: near.length }), "item");
     p.anim = "berserk";
   },
+  // Bloqueia os próximos golpes (2 a partir do nível 5)
   blockNext(effect, item, p) {
-    p.nextBlockActive = true;
+    p.blocksLeft = Math.round(levelValue(item, effect, "blocks"));
     spawnEffect("shield", p.x, p.y - 40, { life: 40 });
     log(t("log.blockNext", { icon: item.icon, item: item.name }), "item");
     p.anim = "block";
   },
-  barrier(effect, item, p) {
-    const amount = Math.round(levelValue(item, effect, "amount"));
-    // Nova barreira só vale se for maior que a atual; quem a criou guarda a origem
-    if (amount >= p.barrier) {
-      p.barrier = amount;
-      p.barrierSource = item.id;
-      spawnEffect("dragon_roar", p.x, p.y - 40, { life: 50 });
-      log(t("log.barrier", { icon: item.icon, item: item.name, amount }), "item");
-    } else {
-      log(t("log.barrierKept", { icon: item.icon, item: item.name }), "item");
-    }
-    p.anim = "berserk";
-  },
   heal(effect, item, p) {
-    const charges = (p.charges[item.id] || 0) + 1;
+    const charges = (p.charges[item.id] || 0) + (echoing ? 0 : 1);
     p.charges[item.id] = charges;
-    const bonus = effect.bonusEvery
-      ? Math.floor(charges / effect.bonusEvery) * effect.bonusAmount
-      : 0;
-    const healAmt = Math.round(levelValue(item, effect, "amount", effect.amount + bonus));
+    // Ressonância: a cada N cargas a cura ganha um bônus permanente na run
+    const bonus =
+      effect.bonusEvery && itemLevel(item.id) >= (effect.bonusLevel ?? 1)
+        ? Math.floor(charges / effect.bonusEvery) * effect.bonusAmount
+        : 0;
+    const healAmt = scaled(Math.round(levelValue(item, effect, "amount", effect.amount + bonus)));
     p.hp = Math.min(p.maxHp, p.hp + healAmt);
     spawnEffect("heal", p.x, p.y - 50, { life: 45 });
     spawnNumber(p.x, p.y - 60, `+${healAmt}`, "#44cc88", 2);
     log(t("log.heal", { icon: item.icon, item: item.name, amount: healAmt }), "heal");
     p.anim = "heal";
   },
-  mana(effect, item, p) {
-    const overflow = p.mana >= p.maxMana;
-    const amount = Math.round(levelValue(item, effect, "amount"));
-    p.mana = Math.min(p.maxMana, p.mana + amount);
-    spawnEffect("mana_orb", p.x, p.y - 50, { life: 35 });
-    if (overflow && effect.overflowBonus) {
-      p.manaOverflow = effect.overflowBonus;
-      log(
-        t("log.overflow", {
-          icon: item.icon,
-          item: item.name,
-          percent: Math.round(effect.overflowBonus * 100),
-        }),
-        "item",
-      );
-    } else {
-      log(t("log.mana", { icon: item.icon, item: item.name, amount }), "item");
-    }
-    p.anim = "heal";
-  },
   frenzy(effect, item, p) {
     p.berserking = true;
-    const duration = Math.round(levelValue(item, effect, "duration"));
-    p.berserkRemaining = duration;
+    const duration = Math.round(scaled(levelValue(item, effect, "duration")));
+    p.berserkRemaining = Math.max(p.berserkRemaining || 0, duration); // o Eco não encurta um Frenesi ativo
     p.berserkSpeed = effect.speedBonus;
     spawnEffect("berserk", p.x, p.y - 40, { life: 60 });
     log(t("log.frenzy", { icon: item.icon, item: item.name, seconds: formatNumber(duration / 1000) }), "item");
     p.anim = "berserk";
   },
-};
-
-// trigger "barrierBreak": a barreira criada pelo item chegou a 0 absorvendo dano
-const BARRIER_BREAK_EFFECTS = {
-  explode(effect, item, p) {
-    const damage = Math.round(levelValue(item, effect, "damage") * permanentDamage());
+  // Aura de frio: stacks nos inimigos colados no herói (o 5º congela)
+  coldAura(effect, item, p) {
+    const near = enemiesWithin(p.x, levelValue(item, effect, "radius"));
+    if (near.length === 0) return false;
+    const stacks = scaled(Math.round(levelValue(item, effect, "stacks"))) + p.extraStacks;
     let froze = 0;
-    for (const en of state.enemies.filter((e) => !e.dead && e.hp > 0)) {
-      applyElementalDamage(en, damage, effect.element, "player", false, item.id);
-      // Gelo unificado: a explosão aplica stacks de frio (o 5º congela)
-      if (effect.coldStacks) {
-        const before = en.frozen || 0;
-        applyCold(en, effect.coldStacks, { itemId: item.id, quiet: true });
-        if ((en.frozen || 0) > before) froze++;
-      }
+    for (const en of near) {
+      const before = en.frozen || 0;
+      applyCold(en, stacks, { itemId: item.id, quiet: true });
+      if ((en.frozen || 0) > before) froze++;
     }
+    spawnEffect("crystal_shield", p.x, p.y - 40, { life: 30 });
     if (froze > 0) {
       sound("freeze");
       emit("freeze", { x: p.x, y: p.y });
       log(t("log.freezeMany", { count: froze }), "item");
     }
-    spawnEffect("dragon_roar", p.x, p.y - 30, { life: 40 });
-    sound("explode");
-    emit("explode", { x: p.x, y: p.y });
-    log(t("log.barrierBurst", { icon: item.icon, item: item.name, damage }), "item");
+    p.anim = "block";
+  },
+  // Pele em brasa (Escama Dracônica N5): 1 stack de fogo por segundo nos inimigos colados
+  emberSkin(effect, item, p) {
+    const near = enemiesWithin(p.x, effect.radius);
+    if (near.length === 0) return false;
+    for (const en of near) igniteWith(item, effect, en, scaled(Math.round(levelValue(item, effect, "stacks"))));
+    spawnEffect("dragon_roar", p.x, p.y - 30, { life: 25 });
+    log(t("log.emberSkin", { icon: item.icon, item: item.name, count: near.length }), "item");
+  },
+  // Eco: repete o último item ativado (arma ou relíquia) com parte do efeito
+  echo(effect, item, p) {
+    const last = state.items.find((i) => i.id === p.lastActivated);
+    if (!last) return false; // nada para repetir: a recarga fica pronta
+    const ratio = levelValue(item, effect, "ratio");
+    const repeats = Math.round(levelValue(item, effect, "repeats"));
+    const previous = echoScale;
+    echoScale = ratio;
+    echoing = true;
+    let done = 0;
+    try {
+      for (let i = 0; i < repeats; i++) if (activateItem(last, { echo: true })) done++;
+    } finally {
+      echoScale = previous;
+      echoing = false;
+    }
+    if (done === 0) return false;
+    spawnEffect("echo", p.x, p.y - 50, { life: 35 });
+    log(
+      t("log.echo", { icon: item.icon, item: item.name, target: last.name, percent: Math.round(ratio * 100), count: done }),
+      "item",
+    );
+    p.anim = "heal";
   },
 };
 
-// trigger "dodge": quando o herói esquiva
+// trigger "freeze": um inimigo acabou de congelar (por qualquer fonte)
+let shardDepth = 0;
+const FREEZE_EFFECTS = {
+  // Estilhaços: o congelado solta gelo que aplica stacks de frio nos vizinhos
+  shards(effect, item, en) {
+    if (shardDepth >= 3) return; // vizinhos que congelam soltam os seus, mas a cadeia tem fim
+    const stacks = levelValue(item, effect, "stacks");
+    const near = enemiesWithin(en.x, effect.radius, en);
+    shardDepth++;
+    try {
+      for (const other of near) applyCold(other, plusStacks(stacks), { itemId: item.id, quiet: true });
+    } finally {
+      shardDepth--;
+    }
+    if (near.length > 0) log(t("log.shards", { icon: item.icon, item: item.name, count: near.length }), "item");
+  },
+};
+
+// trigger "dodge": quando o herói esquiva. ctx = { enemy }
 const DODGE_EFFECTS = {
   empowerNext(effect, item) {
-    state.player.empowered = Math.max(state.player.empowered || 0, effect.bonus);
-    log(
-      t("log.nextBonus", { icon: item.icon, item: item.name, percent: Math.round(effect.bonus * 100) }),
-      "item",
-    );
+    const bonus = levelValue(item, effect, "bonus");
+    state.player.empowered = Math.max(state.player.empowered || 0, bonus);
+    log(t("log.nextBonus", { icon: item.icon, item: item.name, percent: Math.round(bonus * 100) }), "item");
+  },
+  // Contra-ataque: a arma mais perto de ficar pronta ataca na hora o inimigo que errou
+  // (ataque extra: não mexe na recarga nem conta para Sprint)
+  counterAttack(effect, item, ctx) {
+    const ready = (w) => {
+      const timer = state.itemTimers[w.id];
+      return timer ? timer.elapsed / timer.cooldown : 0;
+    };
+    const weapon = state.items
+      .filter((i) => i.type === "weapon")
+      .sort((a, b) => ready(b) - ready(a))[0];
+    if (!weapon || ctx.enemy.dead || ctx.enemy.hp <= 0) return;
+    log(t("log.counter", { icon: item.icon, item: item.name, weapon: weapon.name }), "item");
+    weaponAttack(weapon, ctx.enemy, { extra: true });
   },
 };
 
 // trigger "hurt": ao tomar dano de HP. ctx = { enemy, damage }
 const HURT_EFFECTS = {
-  manaFromDamage(effect, item, ctx) {
-    const p = state.player;
-    const manaAbsorb = Math.round(ctx.damage * levelValue(item, effect, "ratio"));
-    p.mana = Math.min(p.maxMana, p.mana + manaAbsorb);
-    if (manaAbsorb > 0)
-      log(t("log.manaAbsorb", { icon: item.icon, item: item.name, amount: manaAbsorb }), "item");
-  },
-  // Espinhos: só chega aqui quando o golpe tirou HP (esquiva, bloqueio e barreira
-  // que absorve tudo retornam antes). Fere todos os vivos ao alcance do herói.
+  // Espinhos: só chega aqui quando o golpe tirou HP (a esquiva e o bloqueio só chamam
+  // com o encantamento do nível 5). Fere todos os vivos ao alcance do herói.
   thorns(effect, item) {
     const p = state.player;
     const near = enemiesWithin(p.x, effect.radius);
     if (near.length === 0) return;
-    const damage = Math.round(levelValue(item, effect, "damage") * permanentDamage());
+    let damage = levelValue(item, effect, "damage");
+    if (itemLevel(item.id) >= (effect.armorBonusLevel ?? Infinity)) {
+      damage *= 1 + effect.armorBonus * p.armor; // +1% por ponto de armadura
+    }
+    damage = Math.round(damage * permanentDamage());
     for (const en of near) {
       applyElementalDamage(en, damage, "physical", "thorns", false, item.id);
       spawnEffect("text", en.x, en.y - 60, { life: 30, text: "🌵", color: "#66aa44" });
     }
     log(t("log.thorns", { icon: item.icon, item: item.name, count: near.length, damage }), "item");
   },
-  // Devolve parte do dano recebido ao atacante
+  // Devolve parte do dano recebido ao atacante (chance e fração crescem por degrau)
   reflect(effect, item, ctx) {
-    if (!rolls(effect)) return;
+    if (random() >= levelValue(item, effect, "chance", effect.chance ?? 1)) return;
     const reflected = Math.round(ctx.damage * levelValue(item, effect, "ratio"));
     if (reflected <= 0) return;
     applyElementalDamage(ctx.enemy, reflected, "physical", "reflect");
@@ -748,15 +1008,53 @@ const HURT_EFFECTS = {
       "item",
     );
   },
+  // Escama Dracônica: quem bate no herói pega fogo
+  burnAttacker(effect, item, ctx) {
+    const landed = igniteWith(item, effect, ctx.enemy, Math.round(levelValue(item, effect, "stacks")));
+    if (landed > 0) {
+      log(t("log.burnAttacker", { icon: item.icon, item: item.name, enemy: enemyName(ctx.enemy) }), "item");
+    }
+  },
 };
 
+// Espinhos também reagem quando o ataque é esquivado ou bloqueado (Cota de Espinhos N5)
+function avoidThorns() {
+  for (const { item, effect } of ownedEffects("hurt")) {
+    if (effect.type === "thorns" && itemLevel(item.id) >= (effect.avoidLevel ?? Infinity)) {
+      HURT_EFFECTS.thorns(effect, item);
+    }
+  }
+}
+
+// trigger "death": efeitos que acompanham o renascimento (o próprio "revive" é em checkPlayerDeath)
+const DEATH_EFFECTS = {
+  resetCooldowns() {
+    Object.values(state.itemTimers).forEach((timer) => {
+      timer.elapsed = timer.cooldown;
+    });
+  },
+  // Pena de Fênix N5: ao reviver, explode em fogo e queima todos os inimigos
+  reviveBurst(effect, item, p) {
+    for (const en of livingEnemies()) {
+      const landed = landStacks(en, "fire", plusStacks(effect.stacks), item.id);
+      if (landed > 0) applyDot(en, "burning", permanentDamage(), 0, true, { stacks: landed, sourceId: item.id });
+    }
+    spawnEffect("dragon_roar", p.x, p.y - 30, { life: 40 });
+    sound("explode");
+    emit("explode", { x: p.x, y: p.y, kind: "fire" });
+  },
+};
+
+// Cura o herói e devolve o que passou da vida máxima (a Foice de Sangue o usa)
 function healPlayer(amount, item) {
+  if (amount <= 0) return 0;
   const p = state.player;
   const healed = Math.min(amount, p.maxHp - p.hp);
-  if (healed <= 0) return;
+  if (healed <= 0) return amount;
   p.hp += healed;
   spawnNumber(p.x, p.y - 60, `+${healed}`, "#44cc88", 2);
   log(t("log.hpGain", { icon: item.icon, item: item.name, amount: healed }), "heal");
+  return amount - healed;
 }
 
 // Congelado: o inimigo não anda nem ataca por `ms` de tempo de jogo
@@ -764,10 +1062,12 @@ function healPlayer(amount, item) {
 function freezeEnemy(en, ms, quiet = false) {
   en.frozen = Math.max(en.frozen || 0, ms);
   spawnEffect("text", en.x, en.y - 60, { life: 30, text: "❄️", color: "#88ddff" });
-  if (quiet) return;
-  sound("freeze");
-  emit("freeze", { x: en.x, y: en.y });
-  log(t("log.freeze", { target: enemyName(en), seconds: formatNumber(ms / 1000) }), "item");
+  if (!quiet) {
+    sound("freeze");
+    emit("freeze", { x: en.x, y: en.y });
+    log(t("log.freeze", { target: enemyName(en), seconds: formatNumber(ms / 1000) }), "item");
+  }
+  for (const { item, effect } of ownedEffects("freeze")) FREEZE_EFFECTS[effect.type]?.(effect, item, en);
 }
 
 // Tipos que o jogo sabe executar, por gatilho (os testes conferem o items.json contra isto)
@@ -779,46 +1079,59 @@ export const KNOWN_EFFECTS = {
   crit: Object.keys(CRIT_EFFECTS),
   kill: Object.keys(KILL_EFFECTS),
   dodge: Object.keys(DODGE_EFFECTS),
-  barrierBreak: Object.keys(BARRIER_BREAK_EFFECTS),
   use: Object.keys(USE_EFFECTS),
-  passive: ["stats"],
-  damage: ["lowHpBonus"],
+  freeze: Object.keys(FREEZE_EFFECTS),
+  passive: ["stats", "strikes", "lowHpHaste"],
+  damage: ["frenzyBoost"],
+  vulnerable: ["corrosion", "frozenVuln"],
   block: ["reflect"],
-  barrierAbsorb: ["reflect"],
   hurt: Object.keys(HURT_EFFECTS),
-  death: ["revive"],
+  death: ["revive", ...Object.keys(DEATH_EFFECTS)],
   lowHp: ["useNow"],
 };
 
 // ═══════════════════════════════════════════
 //  ITEM ACTIVATION LOGIC
 // ═══════════════════════════════════════════
-// Dano de um golpe. Ordem: base × nível × (bônus de dano), modificadores do ataque,
-// transbordamento e vida baixa, e por fim o crítico. Devolve { dmg, crit }.
-function attackDamage(item, ctx, firstHit) {
+// Dano extra permanente da Foice de Sangue: +amount a cada N abates da run
+function soulBonus(item) {
+  const e = effectsOf(item, "kill").find((k) => k.type === "soulHarvest");
+  if (!e) return 0;
+  return Math.floor(state.kills / e.every) * e.amount;
+}
+
+// Golpes por ataque: os do item mais os "strikes" liberados por nível (marcos da Lâmina)
+function strikeCount(item) {
+  return effectsOf(item, "passive")
+    .filter((e) => e.type === "strikes")
+    .reduce((n, e) => n + e.hits * effectCount(item, e), item.hits || 1);
+}
+
+// Dano de um golpe. Ordem: base × nível × (bônus de dano), elemental, modificadores do
+// ataque, Frenesi, chefe e, por fim, o crítico. Devolve { dmg, crit, base }.
+function attackDamage(item, ctx) {
   const p = state.player;
   let dmg = Math.round(
-    levelValue(item, item, "baseDmg", item.baseDmg + (item.bonusDmg || 0)) * permanentDamage(),
+    (levelValue(item, item, "baseDmg", item.baseDmg + (item.bonusDmg || 0)) + soulBonus(item)) *
+      permanentDamage(),
   );
+  // Amplificador mágico (Manto do Arcano): só armas que não são físicas
+  if ((item.dmgType || "physical") !== "physical" && p.elementalBoost) {
+    dmg = Math.round(dmg * (1 + p.elementalBoost));
+  }
   // Tempestade, Maré, Colheita e Fuga (calculados uma vez por ataque)
   dmg = Math.round((dmg + ctx.flat) * ctx.mult);
-  // Transbordamento de mana: bônus só no primeiro golpe
-  if (p.manaOverflow) {
-    dmg = Math.round(dmg * (1 + p.manaOverflow));
-    if (firstHit) {
-      log(t("log.overflowHit", { percent: Math.round(p.manaOverflow * 100) }), "item");
-    }
-    p.manaOverflow = 0;
-  }
-  // Bônus de dano com vida baixa (ex.: Escama Dracônica)
-  for (const { item: owner, effect } of ownedEffects("damage")) {
-    if (effect.type === "lowHpBonus" && p.hp / p.maxHp < effect.threshold) {
-      dmg = Math.round(dmg * (1 + levelValue(owner, effect, "bonus")));
+  // Durante o Frenesi (Totem Berserker N5)
+  if (p.berserking) {
+    for (const { item: owner, effect } of ownedEffects("damage")) {
+      if (effect.type === "frenzyBoost") dmg = Math.round(dmg * (1 + levelValue(owner, effect, "bonus")));
     }
   }
+  dmg = scaled(dmg);
   const crit = random() < (p.critChance || 0);
-  const base = dmg; // sem o crítico: é o que o Relâmpago em cadeia repassa
-  if (crit) dmg = Math.round(dmg * CRIT_MULT);
+  const base = dmg; // sem chefe e sem crítico: é o que o Relâmpago em cadeia repassa
+  if (ctx.bossMult > 1 && ctx.target.isBoss) dmg = Math.round(dmg * ctx.bossMult);
+  if (crit) dmg = Math.round(dmg * (p.critMult || CRIT_MULT));
   return { dmg, crit, base };
 }
 
@@ -835,9 +1148,18 @@ function attackModifiers(item, target, extra) {
     extra,
     mult: 1,
     flat: 0,
+    bossMult: 1,
+    tideFull: false,
     wantExtra: false,
   };
-  if (extra) return ctx;
+  // Ataque extra (Moeda, contra-ataque, Eco): só os modificadores permanentes (chefe);
+  // os de uso único (Tempestade, Maré, Colheita, Fuga) ficam de fora
+  if (extra) {
+    for (const effect of effectsOf(item, "attack")) {
+      if (!ONE_SHOT_MODS.has(effect.type)) ATTACK_MODS[effect.type]?.(effect, item, ctx);
+    }
+    return ctx;
+  }
   for (const effect of effectsOf(item, "attack")) {
     ATTACK_MODS[effect.type]?.(effect, item, ctx);
   }
@@ -856,11 +1178,12 @@ function attackModifiers(item, target, extra) {
   return ctx;
 }
 
-// extra: objeto quando é o ataque extra da Moeda: ataque comum, sem bônus de uso único
-// (Colheita, Tempestade, Fuga, Maré) e sem contar para Sprint nem gerar outro extra
+// extra: objeto quando é um ataque extra (Moeda da Fortuna, Contra-ataque, Eco): ataque
+// comum, sem bônus de uso único (Colheita, Tempestade, Fuga, Maré) e sem contar para
+// Sprint nem gerar outro extra
 function weaponAttack(item, target, extra = null) {
   const p = state.player;
-  const hits = item.hits || 1;
+  const hits = strikeCount(item);
   const ctx = attackModifiers(item, target, extra);
   let totalDmg = 0;
   // Arma sem dano próprio (ex.: Lâmina de Brasa só aplica queimadura): o golpe não
@@ -872,7 +1195,7 @@ function weaponAttack(item, target, extra = null) {
     if (h > 0 && target.hp <= 0) break;
     const { dmg, crit, base } = appliesOnly
       ? { dmg: 0, crit: false, base: 0 }
-      : attackDamage(item, ctx, h === 0);
+      : attackDamage(item, ctx);
     const dealt = appliesOnly
       ? 0
       : applyElementalDamage(target, dmg, item.dmgType || "physical", "player", crit, item.id);
@@ -897,11 +1220,7 @@ function weaponAttack(item, target, extra = null) {
       HIT_EFFECTS[effect.type]?.(effect, item, ctx);
     }
     // Roubo de vida e afins dependem do dano do golpe: sem dano, não há o que roubar
-    if (!appliesOnly) {
-      for (const { item: owner, effect } of ownedEffects("anyHit")) {
-        ANY_HIT_EFFECTS[effect.type]?.(effect, owner, ctx);
-      }
-    }
+    if (!appliesOnly) runAnyHit(ctx);
     if (h === 0) {
       for (const effect of effectsOf(item, "attack")) {
         ATTACK_EFFECTS[effect.type]?.(effect, item, ctx);
@@ -941,7 +1260,9 @@ function weaponAttack(item, target, extra = null) {
   return ctx.refund;
 }
 
-export function activateItem(item) {
+// echo: repetição da Pedra de Eco. Não mexe na recarga do item, nas estatísticas de uso nem
+// no "último item ativado"; o ataque de arma sai como ataque extra.
+export function activateItem(item, { echo = false } = {}) {
   const p = state.player;
   // Inimigo com vida 0 ainda não foi marcado como morto (isso é no updateEnemies)
   const enemies = state.enemies.filter((e) => !e.dead && e.hp > 0);
@@ -956,7 +1277,7 @@ export function activateItem(item) {
   let cooldownRefund = 0;
 
   if (item.type === "weapon") {
-    cooldownRefund = weaponAttack(item, target);
+    cooldownRefund = weaponAttack(item, target, echo ? { extra: true } : null);
     activated = true;
   } else {
     for (const effect of effectsOf(item, "use")) {
@@ -969,10 +1290,14 @@ export function activateItem(item) {
     }
   }
 
-  if (activated) {
+  if (activated && !echo) {
     p.animTimer = ANIM_MS.playerAction;
     state.runStats.itemUses[item.id] =
       (state.runStats.itemUses[item.id] || 0) + 1;
+    // A Pedra de Eco repete armas e relíquias; ela mesma e as armaduras não contam
+    if (item.type !== "armor" && !effectsOf(item, "use").some((e) => e.type === "echo")) {
+      p.lastActivated = item.id;
+    }
     emit("itemUsed", item.id);
     const timer = state.itemTimers[item.id];
     if (timer) timer.elapsed = Math.min(timer.cooldown, cooldownRefund);
@@ -988,10 +1313,13 @@ export function updateItemTimers(dt) {
     if (!isActivatable(item)) continue;
     const timer = state.itemTimers[item.id];
     // Armas recarregam mais rápido com as Botas e enquanto o Frenesi dura
-    const speed =
+    let speed =
       item.type === "weapon"
         ? 1 + (p.weaponSpeed || 0) + (p.berserking ? p.berserkSpeed : 0)
         : 1;
+    // Vida baixa acelera a recarga do próprio item (Cristal Vital N5)
+    const haste = effectsOf(item, "passive").find((e) => e.type === "lowHpHaste");
+    if (haste && p.hp / p.maxHp < haste.threshold) speed *= haste.factor;
     if (timer.elapsed < timer.cooldown) {
       timer.elapsed += dt * speed;
     }
@@ -1013,6 +1341,23 @@ export function updateItemTimers(dt) {
   }
 }
 
+// Regeneração (Couraça de Batalha): cura inteira a cada segundo de jogo
+export function updateRegen(dt) {
+  const p = state.player;
+  const amount = Math.round(p.regen || 0);
+  if (amount <= 0 || p.hp <= 0 || p.hp >= p.maxHp) {
+    p.regenTimer = 0;
+    return;
+  }
+  p.regenTimer += dt;
+  while (p.regenTimer >= 1000) {
+    p.regenTimer -= 1000;
+    const healed = Math.min(amount, p.maxHp - p.hp);
+    if (healed <= 0) break;
+    p.hp += healed;
+    spawnNumber(p.x, p.y - 60, `+${healed}`, "#44cc88", 2);
+  }
+}
 // Frenesi conta em tempo de jogo: para na pausa e acelera com 2×/3×
 export function updateFrenzy(dt) {
   const p = state.player;
@@ -1038,7 +1383,7 @@ export function updatePlayerAnim(dt) {
 // ═══════════════════════════════════════════
 //  ENEMY ATTACKS PLAYER
 // ═══════════════════════════════════════════
-// Devolve o resultado: "dodged" | "blocked" | "absorbed" (barreira) | "hit" (dano em HP)
+// Devolve o resultado: "dodged" | "blocked" | "hit" (dano em HP)
 export function enemyAttack(en) {
   const p = state.player;
   let dmg = en.dmg;
@@ -1051,22 +1396,20 @@ export function enemyAttack(en) {
     sound("dodge");
     emit("dodge", { x: p.x, y: p.y });
     for (const { item, effect } of ownedEffects("dodge")) {
-      DODGE_EFFECTS[effect.type]?.(effect, item, p);
+      DODGE_EFFECTS[effect.type]?.(effect, item, { enemy: en });
     }
+    avoidThorns();
     return "dodged";
   }
 
   // Block
-  if (p.nextBlockActive) {
-    p.nextBlockActive = false;
-    // Parry: itens com efeito "block" refletem dano
-    const reflected = ownedEffects("block")
+  if (p.blocksLeft > 0) {
+    p.blocksLeft--;
+    // Parry: itens com efeito "block" devolvem parte do golpe ao atacante
+    const ratio = ownedEffects("block")
       .filter(({ effect }) => effect.type === "reflect")
-      .reduce(
-        (sum, { item, effect }) =>
-          sum + Math.round(levelValue(item, effect, "damage")),
-        0,
-      );
+      .reduce((sum, { item, effect }) => sum + levelValue(item, effect, "ratio"), 0);
+    const reflected = Math.round(en.dmg * ratio);
     if (reflected > 0) {
       en.hp -= reflected;
       en.lastHitCrit = false;
@@ -1078,35 +1421,14 @@ export function enemyAttack(en) {
     sound("block");
     spawnEffect("shield", p.x, p.y - 40, { life: 25 });
     emit("blocked", { x: p.x, y: p.y });
+    avoidThorns();
     return "blocked";
   }
 
-  // Barrier
-  if (p.barrier > 0) {
-    const absorbed = Math.min(dmg, p.barrier);
-    p.barrier -= absorbed;
-    const broke = p.barrier <= 0;
-    const ratio = ownedEffects("barrierAbsorb")
-      .filter(({ effect }) => effect.type === "reflect")
-      .reduce((sum, { item, effect }) => sum + levelValue(item, effect, "ratio"), 0);
-    const reflected = Math.round(absorbed * ratio);
-    en.hp -= reflected;
-    if (reflected > 0) en.lastHitCrit = false;
-    dmg -= absorbed;
-    if (reflected > 0)
-      log(t("log.barrierReflect", { amount: reflected, enemy: enemyName(en) }), "item");
-    if (broke) breakBarrier(p);
-    if (dmg <= 0) {
-      log(t("log.barrierAbsorb"), "item");
-      return "absorbed";
-    }
-  }
-
-  // Armor reduction
   // Armadura com retorno decrescente: armadura / (armadura + 100), sem teto
-  dmg = Math.max(1, Math.round(dmg * (1 - armorReduction(p.armor))));
+  dmg = Math.max(1, Math.round(dmg * (1 - armorReduction(p.armor)) * (1 - (p.damageReduction || 0))));
 
-  // Dano recebido vira mana (Manto do Arcano) ou volta ao atacante (Cota de Malha)
+  // Dano recebido volta ao atacante (Cota de Malha), espinhos, fogo na Escama Dracônica...
   const hurtCtx = { enemy: en, damage: dmg };
   for (const { item, effect } of ownedEffects("hurt")) {
     HURT_EFFECTS[effect.type]?.(effect, item, hurtCtx);
@@ -1122,16 +1444,6 @@ export function enemyAttack(en) {
   return "hit";
 }
 
-// A barreira chegou a 0 absorvendo dano: o item que a criou pode reagir (explosão)
-function breakBarrier(p) {
-  const source = state.items.find((i) => i.id === p.barrierSource);
-  p.barrierSource = null;
-  if (!source) return;
-  for (const effect of effectsOf(source, "barrierBreak")) {
-    BARRIER_BREAK_EFFECTS[effect.type]?.(effect, source, p);
-  }
-}
-
 // Morte ou renascimento quando a vida do herói chega a 0 (golpes e dano contínuo)
 export function checkPlayerDeath() {
   const p = state.player;
@@ -1141,11 +1453,10 @@ export function checkPlayerDeath() {
     );
     if (revive && !p.reviveUsed) {
       p.reviveUsed = true;
-      p.hp = Math.round(p.maxHp * revive.effect.hpRatio);
-      if (revive.effect.resetCooldowns) {
-        Object.values(state.itemTimers).forEach((timer) => {
-          timer.elapsed = timer.cooldown;
-        });
+      p.hp = Math.round(p.maxHp * levelValue(revive.item, revive.effect, "hpRatio"));
+      // Encantamentos da Pena: zerar recargas (N3), explosão de fogo (N5)
+      for (const effect of effectsOf(revive.item, "death")) {
+        DEATH_EFFECTS[effect.type]?.(effect, revive.item, p);
       }
       spawnEffect("phoenix", p.x, p.y - 40, { life: 80 });
       sound("revive");
@@ -1168,6 +1479,7 @@ export function updateEnemies(dt) {
   const playerX = state.player.x;
   state.enemies.forEach((en) => {
     if (en.attackAnim > 0) en.attackAnim = Math.max(0, en.attackAnim - dt);
+    if (en.judged && (en.judged.ms -= dt) <= 0) en.judged = null;
     if (en.dead) {
       if (en.deathAnim > 0) en.deathAnim = Math.max(0, en.deathAnim - dt);
       return;
@@ -1207,6 +1519,7 @@ export function updateEnemies(dt) {
       for (const { item, effect } of ownedEffects("kill")) {
         KILL_EFFECTS[effect.type]?.(effect, item, en);
       }
+      addEvolutionKill(); // formas evoluídas ganham progresso de nível
     }
   });
 }

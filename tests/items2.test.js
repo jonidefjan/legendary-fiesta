@@ -130,7 +130,7 @@ test("veneno não tem teto de stacks e o Anel multiplica o tick inteiro", () => 
   assert.equal(poison(target).stacks, 12);
   const hp = target.hp;
   processDots(1000);
-  assert.equal(hp - target.hp, Math.round((1 + 12) * 1.5));
+  assert.equal(hp - target.hp, Math.round((1 + 12) * 1.3));
 });
 
 // ─── Contágio (Coração de Brasa) ───
@@ -269,7 +269,8 @@ test("contágio: dispara quando o morto cai por reflexo (Parry)", () => {
   const dying = burningEnemy(2, { hp: 5, x: 150 });
   const a = enemy({ x: 400 });
   setupRun(["ember_heart", "iron_shield"], [dying, a]);
-  state.player.nextBlockActive = true;
+  setLevel("iron_shield", 3); // Aparo
+  state.player.blocksLeft = 1;
   enemyAttack(dying);
   assert.ok(dying.hp <= 0);
   updateEnemies(16);
@@ -326,6 +327,7 @@ test("Martelo Sísmico: respingo não causa crítico nem efeitos de golpe, mas o
   const weak = enemy({ x: 200, hp: 3 });
   const spare = enemy({ x: 230 });
   setupRun(["seismic_hammer", "blood_scythe", "vampiric_amulet"], [target, weak, spare]);
+  setLevel("blood_scythe", 3); // a Colheita (contador de abates) liberou no nível 3
   state.player.critChance = 1;
   state.player.hp = 50; // 50% da vida: o Amuleto rouba 8% (não os 15% de vida baixa)
   const events = captureEvents();
@@ -358,13 +360,19 @@ test("Núcleo Explosivo: dano fixo em todos num raio de 220 px, só vivos", () =
   assert.equal(state.itemTimers.blast_core.elapsed, 0, "recarga reiniciada");
 });
 
-test("Núcleo Explosivo: cresce com o nível e tem recarga de 6 s", () => {
+test("Núcleo Explosivo: +5 de dano por nível, recarga de 6 s; fogo no nível 3", () => {
   const target = enemy({ x: 200 });
   setupRun(["blast_core"], [target]);
   assert.equal(item("blast_core").cooldown, 6000);
+  setLevel("blast_core", 2);
+  activateItem(item("blast_core"));
+  assert.equal(target.hp, 1000 - 15);
+  assert.equal(burning(target), undefined, "sem fogo antes do nível 3");
+
   setLevel("blast_core", 3);
   activateItem(item("blast_core"));
-  assert.equal(target.hp, 1000 - Math.round(10 * 1.4));
+  assert.equal(target.hp, 1000 - 15 - 20);
+  assert.equal(burning(target).stacks, 9, "3 stacks por nível do item");
 });
 
 test("Tomo do Julgamento: 9 de dano em todos os vivos, sem crítico nos outros", () => {
@@ -394,12 +402,12 @@ test("Cota de Espinhos: golpe que tira HP fere todos os vivos a 120 px do herói
   assert.equal(dead.hp, 1000);
 });
 
-test("Cota de Espinhos: cresce com o nível e não age em esquiva, bloqueio ou barreira total", () => {
+test("Cota de Espinhos: +3 de dano por nível e não age em esquiva nem bloqueio antes do nível 5", () => {
   const a = enemy({ x: 170, dmg: 5 });
   setupRun(["thorn_mail"], [a]);
   setLevel("thorn_mail", 2);
   enemyAttack(a);
-  assert.equal(a.hp, 1000 - Math.round(6 * 1.2));
+  assert.equal(a.hp, 1000 - 9);
 
   a.hp = 1000;
   state.player.evasion = 1;
@@ -408,13 +416,9 @@ test("Cota de Espinhos: cresce com o nível e não age em esquiva, bloqueio ou b
   assert.equal(a.hp, 1000, "esquiva");
 
   state.player.evasion = 0;
-  state.player.nextBlockActive = true;
+  state.player.blocksLeft = 1;
   assert.equal(enemyAttack(a), "blocked");
   assert.equal(a.hp, 1000, "bloqueio");
-
-  state.player.barrier = 100;
-  assert.equal(enemyAttack(a), "absorbed");
-  assert.equal(a.hp, 1000, "barreira absorveu tudo");
 });
 
 // ─── Lendário garantido ───
@@ -477,6 +481,7 @@ test("sem lendário sorteável o sorteio segue normal e sem erro", () => {
 
 test("tela sem opções não conta para o contador", () => {
   for (const it of ITEMS) {
+    if (it.evolvedFrom) continue; // as formas evoluídas não têm nível máximo
     if (!state.items.includes(it)) state.items.push(it);
     state.itemLevels[it.id] = maxLevelOf(it);
   }

@@ -22,11 +22,16 @@ test("todo efeito do items.json tem um gatilho e um tipo que o jogo executa", ()
   }
 });
 
-test("todo item com recarga faz algo quando fica pronto", () => {
+test("todo item com recarga faz algo quando fica pronto (no nível máximo)", () => {
+  setupRun([]);
   for (const it of ITEMS) {
     if (it.cooldown <= 0) continue;
+    // A Escama Dracônica só ativa (Pele em brasa) no nível 5
+    state.itemLevels[it.id] = 5;
     assert.ok(isActivatable(it), `${it.id} tem recarga mas nada para ativar`);
+    delete state.itemLevels[it.id];
   }
+  assert.equal(isActivatable(item("dragonscale")), false, "nível 1: só reage a golpes");
 });
 
 test("IDs dos itens são únicos", () => {
@@ -60,14 +65,14 @@ test("sorteio devolve menos itens quando o catálogo acaba", () => {
   );
 });
 
-test("efeitos passivos somam armadura e mana máxima", () => {
+test("efeitos passivos somam armadura e o amplificador do Manto do Arcano", () => {
   setupRun(["leather_vest", "chainmail", "mage_robe"]);
   assert.equal(state.player.armor, 12 + 18);
-  assert.equal(state.player.maxMana, 120);
-  assert.equal(state.player.magicBoost, 0.15);
+  assert.ok(Math.abs(state.player.elementalBoost - 0.1) < 1e-9);
+  assert.equal(state.player.extraStacks, 0, "o Manto só dá +1 stack a partir do nível 3");
 
   state.items = [item("rusted_sword")];
   applyPassives();
   assert.equal(state.player.armor, 0);
-  assert.equal(state.player.maxMana, 100);
+  assert.equal(state.player.elementalBoost, 0);
 });

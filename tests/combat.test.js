@@ -6,6 +6,7 @@ import {
   item,
   fixedRandom,
   captureEvents,
+  setLevel,
 } from "./helpers.js";
 import { state } from "../game/src/state.js";
 import { on } from "../game/src/events.js";
@@ -72,11 +73,15 @@ test("Lâmina de Brasa não causa dano direto e queima em todo golpe", () => {
   assert.equal(target.dots[0].stacks, 2);
 });
 
-test("Adaga das Sombras devolve 0,5 s de recarga por golpe que acerta a chance", () => {
+test("Adaga das Sombras (nível 5) devolve 0,5 s de recarga por golpe que acerta a chance", () => {
   setupRun(["shadow_dagger"]);
   fixedRandom(0.1);
   activateItem(item("shadow_dagger"));
-  assert.equal(state.itemTimers.shadow_dagger.elapsed, 1000, "2 golpes × 500");
+  assert.equal(state.itemTimers.shadow_dagger.elapsed, 0, "antes do nível 5 não devolve");
+
+  setLevel("shadow_dagger", 5);
+  activateItem(item("shadow_dagger"));
+  assert.equal(state.itemTimers.shadow_dagger.elapsed, 1500, "3 golpes × 500");
   fixedRandom(0.9);
   activateItem(item("shadow_dagger"));
   assert.equal(state.itemTimers.shadow_dagger.elapsed, 0);
@@ -94,27 +99,10 @@ test("Cajado do Trovão ricocheteia em até 2 outros inimigos com metade do dano
   );
 });
 
-test("transbordamento de mana dá +25% só no próximo ataque", () => {
-  const target = enemy();
-  setupRun(["mana_stone", "rusted_sword"], [target]);
-  state.player.mana = state.player.maxMana;
-  activateItem(item("mana_stone"));
-  activateItem(item("rusted_sword"));
-  assert.equal(1000 - target.hp, 10, "8 × 1,25");
-  activateItem(item("rusted_sword"));
-  assert.equal(1000 - target.hp, 18);
-});
-
-test("Escama Dracônica dá +30% de dano abaixo de 40% de vida", () => {
-  const target = enemy();
-  setupRun(["dragonscale", "rusted_sword"], [target]);
-  state.player.hp = 39;
-  activateItem(item("rusted_sword"));
-  assert.equal(1000 - target.hp, 10, "8 × 1,3");
-});
 
 // ─── Itens de uso ───
-test("Cristal Vital cura e ganha +3 a cada 10 cargas", () => {
+// ─── Itens de uso ───
+test("Cristal Vital cura 8; a Ressonância (nível 3) soma +3 a cada 10 cargas", () => {
   setupRun(["health_crystal"]);
   state.player.hp = 50;
   activateItem(item("health_crystal"));
@@ -122,7 +110,13 @@ test("Cristal Vital cura e ganha +3 a cada 10 cargas", () => {
   state.player.charges.health_crystal = 9;
   state.player.hp = 50;
   activateItem(item("health_crystal"));
-  assert.equal(state.player.hp, 61);
+  assert.equal(state.player.hp, 58, "nível 1 não tem Ressonância");
+
+  setLevel("health_crystal", 3); // 8 + 3 por nível
+  state.player.charges.health_crystal = 9;
+  state.player.hp = 40;
+  activateItem(item("health_crystal"));
+  assert.equal(state.player.hp, 40 + 14 + 3);
 });
 
 test("item de uso não ativa sem inimigos vivos", () => {
@@ -131,25 +125,21 @@ test("item de uso não ativa sem inimigos vivos", () => {
 });
 
 // ─── Defesa ───
-test("Escudo de Ferro bloqueia o próximo ataque e reflete 5 de dano", () => {
+test("Escudo de Ferro bloqueia o próximo ataque; o Aparo (nível 3) devolve 100% do golpe", () => {
   const attacker = enemy({ dmg: 40 });
   setupRun(["iron_shield"], [attacker]);
   activateItem(item("iron_shield"));
   enemyAttack(attacker);
   assert.equal(state.player.hp, 100);
-  assert.equal(attacker.hp, 995);
+  assert.equal(attacker.hp, 1000, "nível 1 não devolve dano");
   enemyAttack(attacker);
   assert.equal(state.player.hp, 60, "só um ataque é bloqueado");
-});
 
-test("barreira absorve dano e reflete 20% do que absorveu", () => {
-  const attacker = enemy({ dmg: 40 });
-  setupRun(["dragonscale"], [attacker]);
-  activateItem(item("dragonscale"));
+  setLevel("iron_shield", 3);
+  activateItem(item("iron_shield"));
   enemyAttack(attacker);
-  assert.equal(state.player.barrier, 0);
-  assert.equal(attacker.hp, 1000 - 6);
-  assert.equal(state.player.hp, 90);
+  assert.equal(state.player.hp, 60);
+  assert.equal(attacker.hp, 960, "devolve os 40 do golpe");
 });
 
 test("armadura reduz o dano com retorno decrescente, com mínimo 1", () => {
@@ -160,20 +150,14 @@ test("armadura reduz o dano com retorno decrescente, com mínimo 1", () => {
   assert.equal(state.player.hp, 55 - 1);
 });
 
-test("Manto do Mago converte 30% do dano recebido em mana", () => {
-  setupRun(["mage_robe"]);
-  enemyAttack(enemy({ dmg: 20 }));
-  assert.equal(state.player.mana, 6);
-});
-
-test("Pena de Fênix revive uma vez com 40% de vida e recargas prontas", () => {
+test("Pena de Fênix revive uma vez com 40% de vida; as recargas zeram só a partir do nível 3", () => {
   setupRun(["phoenix_feather", "rusted_sword"]);
   const events = captureEvents();
   state.itemTimers.rusted_sword.elapsed = 0;
   state.player.hp = 5;
   enemyAttack(enemy({ dmg: 50 }));
   assert.equal(state.player.hp, 40);
-  assert.equal(state.itemTimers.rusted_sword.elapsed, 2200);
+  assert.equal(state.itemTimers.rusted_sword.elapsed, 0, "nível 1 não zera as recargas");
   assert.equal(state.running, true);
 
   state.player.hp = 5;
@@ -181,6 +165,16 @@ test("Pena de Fênix revive uma vez com 40% de vida e recargas prontas", () => {
   assert.equal(state.player.hp, 0);
   assert.equal(state.running, false);
   assert.ok(events.some((e) => e.type === "playerDied"));
+});
+
+test("Pena de Fênix (nível 3) revive com 60% e zera as recargas", () => {
+  setupRun(["phoenix_feather", "rusted_sword"]);
+  setLevel("phoenix_feather", 3);
+  state.itemTimers.rusted_sword.elapsed = 0;
+  state.player.hp = 5;
+  enemyAttack(enemy({ dmg: 50 }));
+  assert.equal(state.player.hp, 60, "40% + 10% por nível");
+  assert.equal(state.itemTimers.rusted_sword.elapsed, 2200);
 });
 
 // ─── Totem e Frenesi ───
@@ -199,8 +193,9 @@ test("Frenesi acelera a recarga das armas em 40% e termina no tempo de jogo", ()
   assert.equal(state.player.berserking, false);
 });
 
-test("Totem ativa sozinho abaixo de 25% de vida, uma vez por onda", () => {
+test("Totem (nível 3) ativa sozinho abaixo de 25% de vida, uma vez por onda", () => {
   setupRun(["berserker_totem"]);
+  setLevel("berserker_totem", 3);
   state.itemTimers.berserker_totem.elapsed = 0;
   state.player.hp = 30;
   updateItemTimers(16);

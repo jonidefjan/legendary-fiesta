@@ -9,7 +9,8 @@ import {
   itemIconHTML,
 } from "../game/src/sprites.js";
 
-const ids = ITEMS.map((i) => i.id);
+// Formas evoluídas reaproveitam a arte do item base (campo "art")
+const ids = [...new Set(ITEMS.map((i) => i.art || i.id))];
 
 test("todo item do items.json tem arte, e não sobra arte de item inexistente", () => {
   assert.deepEqual(
