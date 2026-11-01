@@ -10,6 +10,9 @@ import {
   itemLevel,
   effectiveCooldown,
   enchantTiers,
+  isActivatable,
+  evolutionProgress,
+  evolvedRarity,
 } from "./items.js";
 import { t, formatNumber } from "./i18n.js";
 import { defaultCollapsed, usesItemPanel, needsInvScroll } from "./layout.js";
@@ -22,6 +25,40 @@ export const isMobile =
 const $ = (id) => document.getElementById(id);
 
 const ROMAN = ["", "I", "II", "III", "IV", "V"];
+
+// Selo de nível: algarismo romano até o V; as formas evoluídas passam disso e viram número
+const levelBadge = (level) => ROMAN[level] || String(level);
+
+// "Nível 3/5", ou só "Nível 8" nas formas evoluídas, que não têm máximo
+function levelText(item, level) {
+  const max = maxLevelOf(item);
+  return Number.isFinite(max) ? t("item.level", { level, max }) : t("item.levelUncapped", { level });
+}
+
+// Evolução: o item comum mostra em que vira; a forma evoluída mostra os abates para o
+// próximo nível (o texto do progresso é atualizado no updateHUD)
+function evolutionHTML(item, cls) {
+  if (item.evolution) {
+    const into = findItem(item.evolution.into);
+    return `<div class="${cls}">🧬 ${t("item.evolvesInto", { name: into?.name || "", level: item.evolution.level })}</div>`;
+  }
+  const progress = evolutionProgress(item);
+  if (!progress) return "";
+  return `<div class="${cls}" data-evo="${item.id}">${evolutionText(progress)}</div>`;
+}
+
+function evolutionText({ kills, need }) {
+  return `🧬 ${t("item.evolveProgress", { kills, need })}`;
+}
+
+// Os abates mudam o tempo todo: só o texto do progresso é refeito, sem redesenhar a dica
+function refreshEvolution() {
+  document.querySelectorAll("[data-evo]").forEach((el) => {
+    const item = findItem(el.dataset.evo);
+    const progress = item && evolutionProgress(item);
+    if (progress) el.textContent = evolutionText(progress);
+  });
+}
 
 // Encantamentos do item: os já liberados normais e os que dependem de nível apagados,
 // com o aviso de em qual nível liberam. level: o nível a considerar.
@@ -52,10 +89,15 @@ export function renderInventory() {
       slot.dataset.id = item.id;
       const level = itemLevel(item.id);
       if (level >= maxLevelOf(item) && maxLevelOf(item) > 1) slot.classList.add("max-level");
+      // Forma evoluída: a moldura acompanha a raridade atual
+      if (item.evolvedFrom) {
+        slot.classList.add("evolved");
+        slot.style.setProperty("--frame", RARITIES[item.rarity].color);
+      }
       slot.innerHTML = `
         <div class="item-icon">${itemIconHTML(item)}</div>
         <div class="rarity-gem rarity-${item.rarity}"></div>
-        ${level > 1 ? `<div class="level-badge">${ROMAN[level]}</div>` : ""}
+        ${level > 1 ? `<div class="level-badge">${levelBadge(level)}</div>` : ""}
         <div class="cooldown-overlay" id="cd-text-${item.id}"></div>
         <div class="cd-bar" id="cd-bar-${item.id}" style="width:100%"></div>
       `;
@@ -91,14 +133,15 @@ function showTooltip(item, e) {
   if (panelMode()) return; // no celular os detalhes vão para o painel
   const r = RARITIES[item.rarity];
   const level = itemLevel(item.id);
-  const cooldown = item.cooldown > 0 ? effectiveCooldown(item) : 0;
+  const cooldown = isActivatable(item) ? effectiveCooldown(item) : 0;
   tooltip.innerHTML = `
     <div class="tt-name" style="color:${r.color}"><span class="inline-icon tt-icon">${itemIconHTML(item, { badge: false })}</span> ${item.name}</div>
     <div class="tt-rarity" style="color:${r.color}">${r.label}</div>
-    <div class="tt-level">${t("item.level", { level, max: maxLevelOf(item) })}</div>
+    <div class="tt-level">${levelText(item, level)}</div>
     <div class="tt-desc">${item.desc}</div>
     <div class="tt-effect">${item.effect}</div>
     ${enchantsHTML(item, level, "tt-enchant")}
+    ${evolutionHTML(item, "evo-note tt-evo")}
     ${cooldown > 0 ? `<div class="tt-cd">${t("item.cooldown", { seconds: formatNumber(cooldown / 1000, 1) })}</div>` : ""}
   `;
 
@@ -153,7 +196,7 @@ let panelItemId = null;
 function panelHTML(item) {
   const r = RARITIES[item.rarity];
   const level = itemLevel(item.id);
-  const cooldown = item.cooldown > 0 ? effectiveCooldown(item) : 0;
+  const cooldown = isActivatable(item) ? effectiveCooldown(item) : 0;
   return `
     <button type="button" class="item-panel-close" id="item-panel-close" aria-label="${t("item.close")}">✕</button>
     <div class="item-panel-head">
@@ -161,11 +204,12 @@ function panelHTML(item) {
       <div class="item-panel-title">
         <div class="item-panel-name" id="item-panel-name" style="color:${r.color}">${item.name}</div>
         <div class="item-panel-meta"><span style="color:${r.color}">${r.label}</span> · ${getTypeLabel(item.type)}</div>
-        <div class="item-panel-meta">${t("item.level", { level, max: maxLevelOf(item) })}${cooldown > 0 ? " · " + t("item.cooldown", { seconds: formatNumber(cooldown / 1000, 1) }) : ""}</div>
+        <div class="item-panel-meta">${levelText(item, level)}${cooldown > 0 ? " · " + t("item.cooldown", { seconds: formatNumber(cooldown / 1000, 1) }) : ""}</div>
       </div>
     </div>
     <div class="item-panel-effect">${item.effect}</div>
     ${enchantsHTML(item, level, "item-panel-enchant")}
+    ${evolutionHTML(item, "evo-note item-panel-evo")}
   `;
 }
 
@@ -232,8 +276,8 @@ export function updateHUD() {
   // Bars
   $("hp-bar").style.width = (p.hp / p.maxHp) * 100 + "%";
   $("hp-val").textContent = `${Math.max(0, Math.round(p.hp))}/${p.maxHp}`;
-  $("mana-bar").style.width = (p.mana / p.maxMana) * 100 + "%";
-  $("mana-val").textContent = `${Math.round(p.mana)}/${p.maxMana}`;
+  refreshEvolution();
+
 
   // Header stats
   $("hdr-wave").textContent = state.wave;
@@ -282,10 +326,12 @@ function itemCard(item, onClick) {
   card.dataset.itemId = item.id;
   card.onclick = () => onClick(card);
 
-  const rarityInfo = RARITIES[item.rarity];
   // Quem já tem o item vê a oferta como melhoria de nível
   const owned = state.items.some((i) => i.id === item.id);
   const level = itemLevel(item.id);
+  // Forma evoluída: a carta mostra a raridade que ela terá depois de subir
+  const rarityId = owned && item.evolvedFrom ? evolvedRarity(level + 1) : item.rarity;
+  const rarityInfo = RARITIES[rarityId];
   const tag = owned
     ? `<div class="item-choice-tag upgrade">${t("card.upgrade", { from: level, to: level + 1 })}</div>`
     : `<div class="item-choice-tag new">${t("card.new")}</div>`;
@@ -295,10 +341,11 @@ function itemCard(item, onClick) {
     <div class="item-choice-type">${getTypeLabel(item.type)}</div>
     <div class="item-choice-icon">${itemIconHTML(item)}</div>
     <div class="item-choice-name">${item.name}</div>
-    <div class="item-choice-rarity rarity-${item.rarity}">${rarityInfo.label}</div>
+    <div class="item-choice-rarity rarity-${rarityId}">${rarityInfo.label}</div>
     <div class="item-choice-desc">${item.desc}</div>
     <div class="item-choice-effect">${item.effect}</div>
     ${enchantsHTML(item, owned ? level + 1 : 1, "item-choice-enchant")}
+    ${item.evolution ? evolutionHTML(item, "evo-note item-choice-evo") : ""}
     <div class="selection-indicator">✓</div>
   `;
   return card;

@@ -10,7 +10,7 @@ This page describes the game as it is now. For the full item list see [items.md]
 2. **Weapon pick.** Choose 1 of 3 random weapons.
 3. **Waves.** Each wave spawns a lineup of skeletons (skeleton, rogue, warrior). Enemy HP grows 20% per wave and damage 15% per wave (on mobile, damage is 15% lower).
 4. **Reward.** After each wave clear, choose 1 of 3 items (4 with the One More Option upgrade, and the Reroll upgrade adds a Reroll button). A new item is added; one you already own goes up a level. The next wave starts as soon as you pick.
-5. **Item levels.** Up to level 5. Each item defines what grows per level (see "Level data" below); items that do not declare it yet keep the generic rule of +20% main effect and -5% cooldown per level. Items at max level leave the reward pool. Items that cannot scale (for example the Phoenix Feather) declare their own `maxLevel`.
+5. **Item levels.** Up to level 5. Each item defines what grows per level (see "Level data" below); nothing scales by default. The first enchant unlocks at level 3 and the extra enchant at level 5, and the tooltip shows locked tiers with the level that unlocks them. Items at max level leave the reward pool. Items that cannot scale (for example the Phoenix Feather) declare their own `maxLevel`.
 6. **Boss every 10 waves.** One of two bosses, chosen at random, with an escort:
    - **Lich**: summons skeletons every 6s (up to 6 alive at once).
    - **Demon Lord**: fire nova every 5s (it leaves burn stacks on the hero); enrages below 33% HP (faster attacks and abilities).
@@ -43,11 +43,31 @@ DoT ticks never count as crits. Burn can spread (contagion); poison cannot yet. 
 
 ### Other effects
 
-- **Cold** (all ice): each stack slows movement and attacks by 10%; at 5 stacks the enemy freezes for 2s and the stacks reset (a frozen enemy gathers no more cold). Without new cold, an enemy loses 1 stack every 2s; cold also slows boss abilities. Sources: Frost Bow (+1 stack per hit), Crystal Armor (2 stacks on everything its barrier explosion hits). The enemy tint lerps from normal to frozen with the stacks.
+- **Cold** (all ice): each stack slows movement and attacks by 10%; at 5 stacks the enemy freezes for 2s and the stacks reset (a frozen enemy gathers no more cold). Cold starts fading 3s after the last application (1 stack, then 1 more every 2s); cold also slows boss abilities. Sources: Frost Bow (+1 stack per hit), Crystal Armor (2 stacks on everything its barrier explosion hits). The enemy tint lerps from normal to frozen with the stacks.
 - **Freeze**: a frozen enemy does not move or attack (a frozen boss does not advance its ability timer).
 - **Contagion**: when a burning enemy dies, from any killing blow, Ember Heart passes ALL its burn stacks to the nearest living enemies (count equals item level), adding to theirs. Targets that die burning spread again, so it chains.
 - **Boss stacks**: every stack on the boss (fire, poison, cold...) is shown as icon and count under its health bar.
 - **Area items**: Seismic Hammer (splash around the target), Blast Core (explosion around the hero), Judgment Tome (hits every enemy), Thorn Mail (damages nearby enemies when you are hit), Thunder Staff (chain lightning).
+- **Echo Stone**: every 6s it repeats the last activated weapon or relic (not armor) at 50% of the effect (+10% per level): damage, stacks, healing and duration are scaled. Level 3 repeats twice, level 5 repeats at 100%. The repeat does not touch the cooldown of the repeated item and never becomes the "last item" itself.
+- **Counter-attack** (Shadow Cloak level 3): on a dodge, the weapon closest to being ready attacks the enemy that missed, as an extra attack (no cooldown change, no Sprint count).
+- **Damage taken modifiers**: poisoned enemies (Venom Blade Corrosion), frozen enemies (Crystal Armor) and judged enemies (Tome of Judgment) take extra damage from every source, including damage over time.
+- **Regeneration and DoT reduction** (Battle Cuirass): whole HP per second, and a cut of damage-over-time taken. The level 15 milestone is -15% damage taken, applied after armor.
+
+### Evolution of common items
+
+Common items (Rusted Sword, Leather Vest; the Lucky Horseshoe comes in 11c) declare `evolution: { into, level }`. When the item reaches that level through a reward, it is replaced in the same slot by its evolved form (Veteran's Blade, Battle Cuirass), keeping level and cooldown timer. The evolved form (`evolvedFrom` in the JSON):
+
+- has no level cap and stays in the reward pool as a level-up (the base item leaves the pool once its form is owned);
+- also levels up by kills: the next level needs `round(20 x 1.5^(level - 5))` kills (20, 30, 45, 68, 101...). Progress shows in the tooltip and the item panel, is saved in `evolveKills`, and resets on any level-up;
+- changes rarity with its level: uncommon on evolving, rare at 10, epic at 15, legendary at 20. Rewards roll it by its current rarity weight and the inventory frame takes the rarity color. The rarity is a getter, so everything that reads `item.rarity` follows;
+- reuses the sprite of the base item (`art` field) until the 11c icons arrive.
+
+Milestones are plain effects with `minLevel`. After the last fixed milestone, effects with `every` repeat: `effectCount = 1 + floor((level - minLevel) / every)`.
+
+| Form | Per level | Milestones |
+| --- | --- | --- |
+| Veteran's Blade | +3 damage | 5: double strike. 10: +10% crit chance. 15: execution (a hit that leaves a non-boss enemy at 20% HP or less kills it). After 15, every 5 levels alternately: +1 strike (20, 30, 40...) or +10% crit chance (25, 35, 45...) |
+| Battle Cuirass | +8 armor | 5: regenerates 1 HP/s. 10: damage over time taken -50%. 15: -15% damage taken, on top of armor. After 15, every 5 levels alternately: +1 HP/s of regeneration (20, 30...) or +25 armor (25, 35...) |
 - **Legendary guarantee**: reward screens roll rarity by weight (common 40, uncommon 30, rare 18, epic 9, legendary 3). After 4 screens without a legendary (3, then 2, with the Legendary Luck upgrade), the next one guarantees one; boss rewards in endless mode always do. The counter (`rewardsSinceLegendary`) is saved with the run.
 - **Meta upgrades**: enemies drop fragments, kept across runs and spent in the title shop. The next level costs `round(20 x 1.25^level)`.
 
@@ -115,12 +135,12 @@ There is no keyboard input; everything is on-screen buttons: play, pause, reset,
 | `anyAttack` / `anyHit` | Same, for attacks and hits from any source |
 | `crit`, `kill`, `dodge` | On those events |
 | `use` | When an armor or relic cooldown is ready |
-| `hurt`, `block`, `barrierAbsorb`, `barrierBreak` | Defensive events |
-| `damage`, `lowHp`, `death` | Damage modifier, low-HP reaction, revive |
+| `hurt`, `block`, `freeze` | Defensive events, and an enemy freezing (any source) |
+| `damage`, `vulnerable`, `lowHp`, `death` | Damage dealt modifier (Frenzy), damage taken modifier on enemies, low-HP reaction, revive and its extras |
 
 ### Level data
 
-An item (or one of its effects) declares what grows per level next to the base value, either as `<key>PerLevel` or inside a `perLevel` map. Values are linear: `base + perLevel x (level - 1)`.
+An item (or one of its effects) declares what grows per level next to the base value, either as `<key>PerLevel` or inside a `perLevel` map. Values are linear: `base + perLevel x (level - 1)`. A value that changes at once at a level uses `<key>At`: `"ratioAt": { "3": 0.6, "5": 1 }` (the highest level reached wins and replaces the linear growth).
 
 ```json
 { "id": "x", "baseDmg": 10, "baseDmgPerLevel": 3, "cooldown": 3000, "cooldownPerLevel": -100,
@@ -130,8 +150,8 @@ An item (or one of its effects) declares what grows per level next to the base v
   ] }
 ```
 
-- Keys without level data keep the generic rule: `levelMultiplier` (+20%) on the main effect and -5% cooldown. Helpers: `levelValue`, `perLevelOf`, `effectiveCooldown` in `items.js`.
-- `minLevel` (3 or 5) on an effect keeps it off until the item reaches that level (`effectsOf` filters it). Texts: `items.<id>.enchant` unlocks at `enchantLevel` (default 1) and `items.<id>.enchantExtra` at `enchantExtraLevel` (default 5); tooltips and cards show locked tiers dimmed with "Unlocks at level N".
+- Keys without level data are fixed (the generic +20% / -5% rule is gone). Helpers: `levelValue`, `stepOf`, `perLevelOf`, `effectiveCooldown`, `effectCount` in `items.js`.
+- `minLevel` (3 or 5) on an effect keeps it off until the item reaches that level (`effectsOf` filters it); `every` repeats it every N levels after that. Texts: `items.<id>.enchant` unlocks at `enchantLevel` (default 1, all existing items use 3) and `items.<id>.enchantExtra` at `enchantExtraLevel` (default 5); tooltips and cards show locked tiers dimmed with "Unlocks at level N".
 - `breaksImmunity` (`true`, or the level from which it applies) on an item lets its damage and stacks ignore boss immunity.
 
 ### Render pipeline (`game/src/three/`)
@@ -170,7 +190,7 @@ npm test
 
 ## Known limits
 
-- **Mana is unused in practice.** The MP bar and `maxMana` still exist and only Mage Robe and Mana Stone touch them (the Mage Robe `magicBoost` stat has no effect). Both items are being redesigned, after which mana will be removed from the HUD, state, save and translations.
+- **Mana and the barrier are gone.** Old saves with mana or barrier fields load fine (the fields are ignored); a saved Mana Stone becomes the Echo Stone.oved from the HUD, state, save and translations.
 - **Heavy models**: the KayKit GLB files total about 22 MB.
 - **Water reflection** re-renders the whole scene.
 - **God rays** are faint, and hero contrast against the scene could be better.

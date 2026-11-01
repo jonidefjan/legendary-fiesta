@@ -25,7 +25,7 @@ Notation: N1, N3 and N5 mean item level 1, 3 and 5. "Enchant" is the level-gated
 ### Levels **[11a]** (infrastructure) / **[11b]** (migration of the items)
 
 - Rule per item. Each item defines what grows per level (damage, stacks, chance, targets...) and its description says so. The generic +20% ends.
-- Until an item is migrated in 11b, it keeps the old generic scaling (+20% main effect, -5% cooldown per level).
+- Done in 11b: every item declares its own growth and the generic scaling is gone.
 
 ### Enchant tiers **[11a]** (infrastructure) / **[11b]** (content)
 
@@ -62,7 +62,7 @@ Notation: N1, N3 and N5 mean item level 1, 3 and 5. "Enchant" is the level-gated
 
 - All ice applies cold stacks. Each stack makes the enemy 10% slower.
 - At 5 stacks the enemy freezes for 2s and the stacks reset.
-- Without new cold, an enemy loses 1 cold stack every 2s. Cold also slows the boss ability timer.
+- Decay: cold only starts to fade 3s after the LAST cold application (all ice); then the enemy loses 1 stack, and 1 more every 2s while no new cold lands. Cold also slows the boss ability timer.
 - The Frost Bow also uses cold (+1 stack per hit).
 
 ### Fire (reworked) **[11a]**
@@ -124,7 +124,7 @@ Unless noted, the whole entry is implemented in 11b. Item-specific pieces that d
 - **Iron Shield:** every 8s it blocks the next hit, with -1s of cooldown per level. N3: the block returns 100% of the hit's damage to the attacker. N5: blocks the next 2 hits.
 - **Leather Vest -> Battle Cuirass** (evolves at level 5):
   - +8 armor per level.
-  - Milestones: N5 regenerates 1 HP/s; N10 damage over time received -50%; N15 immune to slow and freeze.
+  - Milestones: N5 regenerates 1 HP/s; N10 damage over time received -50%; N15 -15% damage taken, on top of armor (replaces the slow/freeze immunity).
   - After that, the milestones improve the armor or the regeneration.
 - **Venom Blade:**
   - N3, Corrosion: poisoned enemies take +1% damage from everything per stack, up to +25%.
@@ -145,7 +145,7 @@ Unless noted, the whole entry is implemented in 11b. Item-specific pieces that d
   - N3: Harvest (every 3 kills, the next hit deals x2) and the hit reaches 2 targets.
   - N5: steals 50% and breaks shadow immunity; healing above max HP raises max HP by 1, up to +50 in the run. (Combination confirmed.)
 - **Chainmail:** +18 armor, +8 per level. N3, Deflection: 15% chance to return half the damage received. N5: Deflection rises to 30% and returns 100%.
-- **Thorn Mail:** +8 armor and +3 thorns damage per level. N3: thorns deal +1% damage per armor point. N5: thorns also trigger when the hero dodges or blocks.
+- **Thorn Mail:** +8 armor per level and +3 thorns damage per level (L5 = 40 armor, 18 thorns). N3: thorns deal +1% damage per armor point. N5: thorns also trigger when the hero dodges or blocks.
 - **Arcane Robe** (new, without mana): Magic Amplifier. Elemental (non-physical) weapons deal +10% damage, +5% per level. N3: elemental effects (fire, poison, cold) apply +1 stack. N5: +1 range on bounces and splashes.
 - **Shadow Cloak:** +10% dodge, +4% per level (global cap of 40%). N3: when dodging, the weapon attacks at once. N5: Escape gives +100% on the next attack.
 - **Mana Stone -> Echo Stone:** every 6s it repeats the last activated item (weapon or relic) at 50% of the effect, +10% per level. N3: 2 repeats. N5: 100% of the effect.
@@ -180,6 +180,25 @@ The evolution of common items (Lucky Horseshoe -> Golden Clover) is **[11b]** in
   - **Ash Cloak** (rare armor): burning enemies deal -2% damage per stack, up to -40%. N3: when hit, it applies 3 stacks to the attacker. N5: immune to boss fire.
 - **Long Crossbow** (rare weapon, 3s): shoots the farthest enemy, 12 damage +3 per level. N3: the shot pierces the whole line. N5: targets in the rear take +50%.
 - **Phantom Hunter's Bow** (legendary weapon): fires at every enemy that has not yet come close to the hero, 18 damage. N3: +1 arrow per target. N5: kills in the rear return 1s of cooldown.
+
+## Clarifications made while implementing 11b
+
+- **Thorn Mail:** both the armor (+8) and the thorns (+3) grow per level, by the owner's decision after review.
+- **Fixed-rate effects:** the Crystal Armor aura (2s) and Burning Skin (1/s) do not speed up with the shop cooldown upgrade, Speed Boots, the Water Orb advance or Sprint N5 (`fixedRate` in the JSON). Only real cooldown items accelerate.
+- **Arcane Robe N3 (+1 stack)** applies to every stack source: weapons, Dragonscale, Burning Skin, Blast Core, Phoenix burst, Shards, Ember Heart spread and the Crystal aura.
+- **Blood Scythe souls** derive from `state.kills`, so they count every kill of the run.
+- **Extra attacks** (Echo, counter-attack, Lucky Coin) keep permanent modifiers (boss multiplier) and skip one-shot ones (Storm, Tide, Harvest, Escape); they do not count toward charges or the Holy Mace ray counter.
+- **Rusted Sword:** also gets +3 damage per level before evolving, so the level 5 sword and the level 5 Veteran's Blade deal the same damage.
+- **Shadow Cloak, Counter-attack:** the weapon closest to being ready attacks the enemy that missed.
+- **Arcane Robe, N5 "+1 range":** +1 chain bounce (Thunder Staff), +1 neighbour for the fire jump (Ember Heart) and +30 splash radius (Seismic Hammer).
+- **Dragonscale, "another enemy":** the nearest other enemy to the one hit. It applies to Ember Skin too.
+- **Crystal Armor aura:** radius 100 plus 25 per level (the level grows the radius, the pace stays 2s).
+- **Echo Stone** scales damage, stacks, healing and duration; it repeats weapons and relics, not armor. The id changed to `echo_stone`; saves with `mana_stone` are migrated.
+- **Tome of Judgment, N3:** the judgment is applied after the hits of the same attack, so it boosts the following hits (and every other source).
+- **Veteran's Blade after 15:** alternating +1 strike (20, 30...) and +10% crit chance (25, 35...). Battle Cuirass: +1 regeneration (20, 30...) and +25 armor (25, 35...). The crit chance is global, like the Lucky Coin.
+- **Evolution:** kill progress resets on every level-up (reward or kills).
+- **Blood Scythe:** the "+1 permanent damage per 20 kills" counts every kill of the run (`counters.souls`); overheal gives +1 max HP per heal, saved as `maxHpBonus`.
+- **Phoenix Feather** now levels to 5.
 
 ## Open implementation notes
 

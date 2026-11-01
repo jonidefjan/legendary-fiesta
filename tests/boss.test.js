@@ -7,7 +7,7 @@ import {
   MAX_SUMMONS,
 } from "../game/src/boss.js";
 import { setRandom } from "../game/src/random.js";
-import { setupRun } from "./helpers.js";
+import { setupRun, setLevel } from "./helpers.js";
 import { state } from "../game/src/state.js";
 
 const arena = { width: 800, height: 400 };
@@ -113,7 +113,8 @@ test("Nova de Fogo: o Parry reflete no próprio chefe e o bloqueio evita a queim
   setupRun(["iron_shield"], enemies);
   demonWave.abilityTimer = demonWave.abilityInterval;
   const hpBefore = demonWave.hp;
-  state.player.nextBlockActive = true;
+  setLevel("iron_shield", 3); // Aparo: devolve o golpe ao atacante
+  state.player.blocksLeft = 1;
   updateBosses(1);
   assert.equal(state.player.hp, state.player.maxHp, "ataque bloqueado");
   assert.ok(demonWave.hp < hpBefore, "reflexo acerta o chefe");

@@ -152,7 +152,7 @@ const KIND_DEFS = {
       }
     },
   },
-  mana: {
+  echo: {
     base: 8,
     fn: (x, y, n, k) => {
       for (let i = 0; i < n; i++) {
@@ -165,7 +165,7 @@ const KIND_DEFS = {
     base: 8,
     fn: (x, y, n, k) => ring(x, y, n, 12, 50 * k, rnd(300, 420), 3, [P.white, P.mist, P.silver]),
   },
-  barrier: {
+  coldAura: {
     base: 12,
     fn: (x, y, n, k) => ring(x, y, n, 16, 35 * k, rnd(450, 650), 3, [P.cyan, P.blue, P.teal]),
   },

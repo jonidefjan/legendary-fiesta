@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { sfx } from "../game/src/audio.js";
 
 const ELEMENTS = ["physical", "fire", "ice", "lightning", "shadow", "water", "poison", "holy"];
-const USES = ["blockNext", "barrier", "heal", "mana", "frenzy"];
+const USES = ["blockNext", "coldAura", "heal", "echo", "emberSkin", "frenzy"];
 const DOTS = ["burning", "poison", "bleeding"];
 
 function callAll() {

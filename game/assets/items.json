@@ -6,9 +6,64 @@
     "rarity": "common",
     "cooldown": 2200,
     "baseDmg": 8,
+    "baseDmgPerLevel": 3,
     "dmgType": "physical",
     "anim": "slash",
-    "fx": "slash"
+    "fx": "slash",
+    "evolution": {
+      "into": "veterans_blade",
+      "level": 5
+    }
+  },
+  {
+    "id": "veterans_blade",
+    "evolvedFrom": "rusted_sword",
+    "art": "rusted_sword",
+    "type": "weapon",
+    "icon": "⚔️",
+    "rarity": "uncommon",
+    "cooldown": 2200,
+    "baseDmg": 8,
+    "baseDmgPerLevel": 3,
+    "dmgType": "physical",
+    "anim": "slash",
+    "fx": "slash",
+    "enchantLevel": 10,
+    "enchantExtraLevel": 15,
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "strikes",
+        "hits": 1,
+        "minLevel": 5
+      },
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "critChance": 0.1,
+        "minLevel": 10
+      },
+      {
+        "trigger": "hit",
+        "type": "execute",
+        "ratio": 0.2,
+        "minLevel": 15
+      },
+      {
+        "trigger": "passive",
+        "type": "strikes",
+        "hits": 1,
+        "minLevel": 20,
+        "every": 10
+      },
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "critChance": 0.1,
+        "minLevel": 25,
+        "every": 10
+      }
+    ]
   },
   {
     "id": "ember_blade",
@@ -20,6 +75,8 @@
     "dmgType": "fire",
     "anim": "fire_slash",
     "fx": "fire",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "hit",
@@ -29,6 +86,12 @@
         "stacks": 1,
         "stacksPerLevel": 1,
         "chance": 1
+      },
+      {
+        "trigger": "hit",
+        "type": "flare",
+        "threshold": 20,
+        "minLevel": 3
       }
     ]
   },
@@ -39,17 +102,27 @@
     "rarity": "epic",
     "cooldown": 2400,
     "baseDmg": 9,
+    "baseDmgPerLevel": 2,
     "dmgType": "shadow",
     "hits": 2,
     "anim": "double_slash",
     "fx": "slash",
     "fxColor": "#aa66ee",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
+      {
+        "trigger": "passive",
+        "type": "strikes",
+        "hits": 1,
+        "minLevel": 3
+      },
       {
         "trigger": "hit",
         "type": "cooldownRefund",
         "ms": 500,
-        "chance": 0.3
+        "chance": 0.3,
+        "minLevel": 5
       }
     ]
   },
@@ -60,22 +133,30 @@
     "rarity": "legendary",
     "cooldown": 4500,
     "baseDmg": 22,
+    "baseDmgPerLevel": 5,
     "dmgType": "lightning",
     "anim": "lightning",
     "fx": "lightning",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "attack",
         "type": "chain",
         "targets": 2,
+        "targetsPerLevel": 1,
         "ratio": 0.5,
+        "ratioAt": {
+          "5": 1
+        },
         "element": "lightning"
       },
       {
         "trigger": "attack",
         "type": "storm",
         "every": 4,
-        "bonus": 0.5
+        "bonus": 0.5,
+        "minLevel": 3
       }
     ]
   },
@@ -87,11 +168,69 @@
     "cooldown": 0,
     "passive": true,
     "anim": "block",
+    "evolution": {
+      "into": "battle_cuirass",
+      "level": 5
+    },
     "effects": [
       {
         "trigger": "passive",
         "type": "stats",
-        "armor": 12
+        "armor": 12,
+        "armorPerLevel": 8
+      }
+    ]
+  },
+  {
+    "id": "battle_cuirass",
+    "evolvedFrom": "leather_vest",
+    "art": "leather_vest",
+    "type": "armor",
+    "icon": "🛡️",
+    "rarity": "uncommon",
+    "cooldown": 0,
+    "passive": true,
+    "anim": "block",
+    "enchantLevel": 10,
+    "enchantExtraLevel": 15,
+    "effects": [
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "armor": 12,
+        "armorPerLevel": 8
+      },
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "regen": 1,
+        "minLevel": 5
+      },
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "dotReduction": 0.5,
+        "minLevel": 10
+      },
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "damageReduction": 0.15,
+        "minLevel": 15
+      },
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "regen": 1,
+        "minLevel": 20,
+        "every": 10
+      },
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "armor": 25,
+        "minLevel": 25,
+        "every": 10
       }
     ]
   },
@@ -101,16 +240,23 @@
     "icon": "🔰",
     "rarity": "uncommon",
     "cooldown": 8000,
+    "cooldownPerLevel": -1000,
     "anim": "shield_block",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "use",
-        "type": "blockNext"
+        "type": "blockNext",
+        "blocks": 1,
+        "blocksAt": {
+          "5": 2
+        }
       },
       {
         "trigger": "block",
         "type": "reflect",
-        "damage": 5
+        "ratio": 1,
+        "minLevel": 3
       }
     ]
   },
@@ -122,17 +268,25 @@
     "cooldown": 0,
     "passive": true,
     "anim": "block",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "passive",
         "type": "stats",
-        "maxMana": 20,
-        "magicBoost": 0.15
+        "elementalBoost": 0.1,
+        "elementalBoostPerLevel": 0.05
       },
       {
-        "trigger": "hurt",
-        "type": "manaFromDamage",
-        "ratio": 0.3
+        "trigger": "passive",
+        "type": "stats",
+        "extraStacks": 1,
+        "minLevel": 3
+      },
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "reach": 1,
+        "minLevel": 5
       }
     ]
   },
@@ -141,24 +295,25 @@
     "type": "armor",
     "icon": "🐉",
     "rarity": "legendary",
-    "cooldown": 12000,
+    "cooldown": 1000,
+    "fixedRate": true,
     "anim": "dragon_roar",
+    "enchantLevel": 3,
     "effects": [
       {
+        "trigger": "hurt",
+        "type": "burnAttacker",
+        "stacks": 1,
+        "stacksPerLevel": 1,
+        "otherLevel": 3
+      },
+      {
         "trigger": "use",
-        "type": "barrier",
-        "amount": 30
-      },
-      {
-        "trigger": "barrierAbsorb",
-        "type": "reflect",
-        "ratio": 0.2
-      },
-      {
-        "trigger": "damage",
-        "type": "lowHpBonus",
-        "threshold": 0.4,
-        "bonus": 0.3
+        "type": "emberSkin",
+        "stacks": 1,
+        "radius": 100,
+        "otherLevel": 3,
+        "minLevel": 5
       }
     ]
   },
@@ -169,29 +324,47 @@
     "rarity": "uncommon",
     "cooldown": 5000,
     "anim": "heal",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "use",
         "type": "heal",
         "amount": 8,
+        "amountPerLevel": 3,
         "bonusEvery": 10,
-        "bonusAmount": 3
+        "bonusAmount": 3,
+        "bonusLevel": 3
+      },
+      {
+        "trigger": "passive",
+        "type": "lowHpHaste",
+        "threshold": 0.3,
+        "factor": 2,
+        "minLevel": 5
       }
     ]
   },
   {
-    "id": "mana_stone",
+    "id": "echo_stone",
     "type": "relic",
     "icon": "🔮",
     "rarity": "rare",
-    "cooldown": 4000,
-    "anim": "mana_orb",
+    "cooldown": 6000,
+    "anim": "heal",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "use",
-        "type": "mana",
-        "amount": 12,
-        "overflowBonus": 0.25
+        "type": "echo",
+        "ratio": 0.5,
+        "ratioPerLevel": 0.1,
+        "ratioAt": {
+          "5": 1
+        },
+        "repeats": 1,
+        "repeatsAt": {
+          "3": 2
+        }
       }
     ]
   },
@@ -202,17 +375,26 @@
     "rarity": "epic",
     "cooldown": 7000,
     "anim": "berserk",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "use",
         "type": "frenzy",
         "speedBonus": 0.4,
-        "duration": 3000
+        "duration": 3000,
+        "durationPerLevel": 500
       },
       {
         "trigger": "lowHp",
         "type": "useNow",
-        "threshold": 0.25
+        "threshold": 0.25,
+        "minLevel": 3
+      },
+      {
+        "trigger": "damage",
+        "type": "frenzyBoost",
+        "bonus": 0.2,
+        "minLevel": 5
       }
     ]
   },
@@ -224,15 +406,26 @@
     "cooldown": 0,
     "passive": true,
     "anim": "phoenix",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "death",
         "type": "revive",
         "hpRatio": 0.4,
-        "resetCooldowns": true
+        "hpRatioPerLevel": 0.1
+      },
+      {
+        "trigger": "death",
+        "type": "resetCooldowns",
+        "minLevel": 3
+      },
+      {
+        "trigger": "death",
+        "type": "reviveBurst",
+        "stacks": 20,
+        "minLevel": 5
       }
-    ],
-    "maxLevel": 1
+    ]
   },
   {
     "id": "frost_bow",
@@ -240,15 +433,26 @@
     "icon": "🏹",
     "rarity": "rare",
     "cooldown": 2800,
-    "baseDmg": 12,
-    "bonusDmg": 5,
+    "baseDmg": 17,
+    "baseDmgPerLevel": 3,
     "dmgType": "ice",
     "anim": "arrow",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "hit",
         "type": "cold",
-        "stacks": 1
+        "stacks": 1,
+        "freezeMs": 2000,
+        "freezeMsAt": {
+          "5": 3000
+        }
+      },
+      {
+        "trigger": "attack",
+        "type": "pierce",
+        "minLevel": 3
       }
     ]
   },
@@ -261,6 +465,8 @@
     "baseDmg": 10,
     "dmgType": "poison",
     "anim": "stab",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "hit",
@@ -269,7 +475,18 @@
         "damage": 1,
         "base": 1,
         "basePerLevel": 3,
+        "stacks": 1,
+        "stacksAt": {
+          "5": 2
+        },
         "chance": 1
+      },
+      {
+        "trigger": "vulnerable",
+        "type": "corrosion",
+        "bonus": 0.01,
+        "max": 0.25,
+        "minLevel": 3
       }
     ]
   },
@@ -280,19 +497,31 @@
     "rarity": "epic",
     "cooldown": 3500,
     "baseDmg": 18,
+    "baseDmgPerLevel": 4,
     "dmgType": "holy",
     "anim": "smash",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "hit",
         "type": "heal",
-        "amount": 5
+        "amount": 5,
+        "amountPerLevel": 1
       },
       {
         "trigger": "hit",
         "type": "heal",
         "amount": 10,
-        "onCrit": true
+        "onCrit": true,
+        "minLevel": 3
+      },
+      {
+        "trigger": "hit",
+        "type": "ray",
+        "every": 5,
+        "ratio": 0.5,
+        "minLevel": 5
       }
     ]
   },
@@ -303,18 +532,40 @@
     "rarity": "legendary",
     "cooldown": 4000,
     "baseDmg": 20,
+    "baseDmgPerLevel": 5,
     "dmgType": "shadow",
     "anim": "reap",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "hit",
         "type": "lifesteal",
-        "ratio": 0.3
+        "ratio": 0.3,
+        "ratioAt": {
+          "5": 0.5
+        },
+        "overhealLevel": 5,
+        "overhealMax": 50
+      },
+      {
+        "trigger": "kill",
+        "type": "soulHarvest",
+        "every": 20,
+        "amount": 1
       },
       {
         "trigger": "kill",
         "type": "harvest",
-        "every": 3
+        "every": 3,
+        "minLevel": 3
+      },
+      {
+        "trigger": "attack",
+        "type": "cleave",
+        "targets": 1,
+        "ratio": 1,
+        "minLevel": 3
       }
     ]
   },
@@ -325,19 +576,29 @@
     "rarity": "rare",
     "cooldown": 3200,
     "baseDmg": 15,
+    "baseDmgPerLevel": 3,
     "dmgType": "water",
     "anim": "water_blast",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "attack",
         "type": "cooldownOthers",
-        "ms": 300
+        "ms": 300,
+        "msPerLevel": 50
       },
       {
         "trigger": "attack",
         "type": "tide",
         "damage": 3,
-        "max": 5
+        "max": 5,
+        "minLevel": 3
+      },
+      {
+        "trigger": "attack",
+        "type": "tideWave",
+        "ratio": 0.5,
+        "minLevel": 5
       }
     ]
   },
@@ -349,17 +610,26 @@
     "cooldown": 0,
     "passive": true,
     "anim": "block",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "passive",
         "type": "stats",
-        "armor": 18
+        "armor": 18,
+        "armorPerLevel": 8
       },
       {
         "trigger": "hurt",
         "type": "reflect",
         "chance": 0.15,
-        "ratio": 0.5
+        "chanceAt": {
+          "5": 0.3
+        },
+        "ratio": 0.5,
+        "ratioAt": {
+          "5": 1
+        },
+        "minLevel": 3
       }
     ]
   },
@@ -371,16 +641,24 @@
     "cooldown": 0,
     "passive": true,
     "anim": "vanish",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "passive",
         "type": "stats",
-        "evasion": 0.1
+        "evasion": 0.1,
+        "evasionPerLevel": 0.04
+      },
+      {
+        "trigger": "dodge",
+        "type": "counterAttack",
+        "minLevel": 3
       },
       {
         "trigger": "dodge",
         "type": "empowerNext",
-        "bonus": 0.5
+        "bonus": 1,
+        "minLevel": 5
       }
     ]
   },
@@ -389,20 +667,31 @@
     "type": "armor",
     "icon": "💠",
     "rarity": "legendary",
-    "cooldown": 10000,
+    "cooldown": 2000,
+    "fixedRate": true,
     "anim": "crystal_shield",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "use",
-        "type": "barrier",
-        "amount": 40
+        "type": "coldAura",
+        "stacks": 1,
+        "radius": 100,
+        "radiusPerLevel": 25
       },
       {
-        "trigger": "barrierBreak",
-        "type": "explode",
-        "damage": 15,
-        "element": "ice",
-        "coldStacks": 2
+        "trigger": "vulnerable",
+        "type": "frozenVuln",
+        "bonus": 0.3,
+        "minLevel": 3
+      },
+      {
+        "trigger": "freeze",
+        "type": "shards",
+        "stacks": 2,
+        "radius": 120,
+        "minLevel": 5
       }
     ]
   },
@@ -414,13 +703,19 @@
     "cooldown": 0,
     "passive": true,
     "anim": "blood_drain",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "anyHit",
         "type": "lifesteal",
         "ratio": 0.08,
-        "lowHpRatio": 0.15,
-        "threshold": 0.5
+        "ratioPerLevel": 0.02,
+        "thirst": {
+          "level": 3,
+          "threshold": 0.5,
+          "mult": 2
+        },
+        "dotLevel": 5
       }
     ]
   },
@@ -432,16 +727,20 @@
     "cooldown": 0,
     "passive": true,
     "anim": "dash",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "passive",
         "type": "stats",
-        "weaponSpeed": 0.15
+        "weaponSpeed": 0.15,
+        "weaponSpeedPerLevel": 0.05
       },
       {
         "trigger": "anyAttack",
         "type": "sprint",
-        "every": 5
+        "every": 5,
+        "allLevel": 5,
+        "minLevel": 3
       }
     ]
   },
@@ -453,21 +752,30 @@
     "cooldown": 0,
     "passive": true,
     "anim": "sparkle",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "passive",
         "type": "stats",
-        "critChance": 0.2
-      },
-      {
-        "trigger": "crit",
-        "type": "extraAttack",
-        "chance": 0.25
+        "critChance": 0.15,
+        "critChancePerLevel": 0.05
       },
       {
         "trigger": "kill",
         "type": "critFragment",
         "amount": 1
+      },
+      {
+        "trigger": "crit",
+        "type": "extraAttack",
+        "chance": 0.25,
+        "minLevel": 3
+      },
+      {
+        "trigger": "passive",
+        "type": "stats",
+        "critMult": 2,
+        "minLevel": 5
       }
     ]
   },
@@ -479,19 +787,28 @@
     "cooldown": 0,
     "passive": true,
     "anim": "dark_pulse",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "passive",
         "type": "stats",
-        "damageBoost": 0.5,
-        "maxHpMult": -0.2
+        "damageBoost": 0.3,
+        "damageBoostPerLevel": 0.1,
+        "maxHpMult": -0.2,
+        "maxHpMultAt": {
+          "5": -0.1
+        }
       },
       {
         "trigger": "kill",
         "type": "pact",
         "hpCost": 2,
         "bonus": 0.01,
-        "max": 0.25
+        "max": 0.25,
+        "maxAt": {
+          "5": 0.5
+        },
+        "minLevel": 3
       }
     ]
   },
@@ -503,10 +820,13 @@
     "cooldown": 0,
     "passive": true,
     "anim": "dark_pulse",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "kill",
-        "type": "spread"
+        "type": "spread",
+        "flareLevel": 3
       }
     ]
   },
@@ -517,15 +837,24 @@
     "rarity": "rare",
     "cooldown": 3400,
     "baseDmg": 14,
+    "baseDmgPerLevel": 4,
     "dmgType": "physical",
     "anim": "smash",
     "fx": "slash",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "hit",
         "type": "splash",
         "radius": 90,
-        "ratio": 0.4
+        "radiusAt": {
+          "3": 130
+        },
+        "ratio": 0.4,
+        "ratioAt": {
+          "3": 0.6
+        },
+        "onHitLevel": 5
       }
     ]
   },
@@ -536,13 +865,21 @@
     "rarity": "epic",
     "cooldown": 6000,
     "anim": "berserk",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "use",
         "type": "blast",
         "damage": 10,
+        "damagePerLevel": 5,
         "radius": 220,
-        "element": "fire"
+        "radiusAt": {
+          "5": 440
+        },
+        "element": "fire",
+        "burnLevel": 3,
+        "burnPerLevel": 3
       }
     ]
   },
@@ -553,14 +890,30 @@
     "rarity": "epic",
     "cooldown": 5000,
     "baseDmg": 9,
+    "baseDmgPerLevel": 3,
     "dmgType": "holy",
     "anim": "lightning",
     "fx": "lightning",
+    "enchantLevel": 3,
+    "breaksImmunity": 5,
     "effects": [
       {
         "trigger": "attack",
         "type": "hitAll",
         "ratio": 1
+      },
+      {
+        "trigger": "attack",
+        "type": "judge",
+        "ms": 3000,
+        "bonus": 0.15,
+        "minLevel": 3
+      },
+      {
+        "trigger": "attack",
+        "type": "bossBonus",
+        "mult": 2,
+        "minLevel": 5
       }
     ]
   },
@@ -572,17 +925,23 @@
     "cooldown": 0,
     "passive": true,
     "anim": "block",
+    "enchantLevel": 3,
     "effects": [
       {
         "trigger": "passive",
         "type": "stats",
-        "armor": 8
+        "armor": 8,
+        "armorPerLevel": 8
       },
       {
         "trigger": "hurt",
         "type": "thorns",
         "damage": 6,
-        "radius": 120
+        "damagePerLevel": 3,
+        "radius": 120,
+        "armorBonusLevel": 3,
+        "armorBonus": 0.01,
+        "avoidLevel": 5
       }
     ]
   }

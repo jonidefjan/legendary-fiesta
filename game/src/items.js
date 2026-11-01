@@ -5,6 +5,7 @@
 // (gatilho + tipo + parâmetros); combat.js tem uma função para cada tipo.
 import { state, PLAYER_BASE } from "./state.js";
 import { random } from "./random.js";
+import { emit } from "./events.js";
 import { t, hasKey } from "./i18n.js";
 
 // O rótulo vem do idioma atual (getter), então quem lê RARITIES[r].label sempre
@@ -35,8 +36,29 @@ const RARITY_WEIGHTS = {
 
 let catalog = [];
 
+// Forma evoluída: a raridade acompanha o nível (marcos), então vira getter. O JSON guarda a
+// raridade ao evoluir (incomum); quem lê item.rarity sempre pega a atual.
+export const EVOLVED_RARITY_STEPS = [
+  [20, "legendary"],
+  [15, "epic"],
+  [10, "rare"],
+  [0, "uncommon"],
+];
+
+export function evolvedRarity(level) {
+  return EVOLVED_RARITY_STEPS.find(([from]) => level >= from)[1];
+}
+
 export function setItems(list) {
   catalog = list;
+  for (const item of catalog) {
+    if (!item.evolvedFrom) continue;
+    Object.defineProperty(item, "rarity", {
+      get: () => evolvedRarity(itemLevel(item.id)),
+      configurable: true,
+      enumerable: true,
+    });
+  }
   localizeItems();
 }
 
@@ -79,6 +101,13 @@ export function effectsOf(item, trigger) {
   return (item.effects || []).filter((e) => e.trigger === trigger && (e.minLevel ?? 1) <= level);
 }
 
+// Efeito com "every" se repete a cada N níveis depois do minLevel (marcos das formas
+// evoluídas, que sobem sem limite): nível 20 e every 10 conta 1 em 20..29, 2 em 30..39...
+export function effectCount(item, effect) {
+  if (!effect.every) return 1;
+  return 1 + Math.floor((itemLevel(item.id) - (effect.minLevel ?? 1)) / effect.every);
+}
+
 // Efeitos de um gatilho em todos os itens do jogador, com o item de origem
 export function ownedEffects(trigger) {
   return state.items.flatMap((item) =>
@@ -107,25 +136,19 @@ export function starterItems() {
 
 // ─── Níveis ───
 // Pegar um item que já tem sobe o nível dele. Regra por item: o JSON declara o que cresce
-// ("damage" + "damagePerLevel", ou perLevel: { damage: 3 }). Quem ainda não declara nada
-// segue a regra genérica: +20% no efeito principal e -5% de recarga por nível.
-// No nível máximo ele sai do sorteio.
+// ("damage" + "damagePerLevel", ou perLevel: { damage: 3 }) e, quando um valor muda de
+// vez num nível, "<chave>At": { "5": valor }. Sem declaração o valor é fixo.
+// No nível máximo o item sai do sorteio; as formas evoluídas não têm máximo.
 export const MAX_ITEM_LEVEL = 5;
-export const LEVEL_POWER = 0.2;
-export const LEVEL_COOLDOWN = 0.05;
 
 // Itens cujo efeito não cresce (ex.: Pena de Fênix revive uma vez) declaram maxLevel no JSON
 export function maxLevelOf(item) {
+  if (item.evolvedFrom) return Infinity;
   return item.maxLevel ?? MAX_ITEM_LEVEL;
 }
 
 export function itemLevel(id) {
   return state.itemLevels[id] || 1;
-}
-
-// Multiplicador do efeito principal (dano, cura, barreira, mana, duração...)
-export function levelMultiplier(id) {
-  return 1 + LEVEL_POWER * (itemLevel(id) - 1);
 }
 
 // Crescimento por nível declarado em `obj` (item ou efeito) para `key`; null se não declara
@@ -134,30 +157,49 @@ export function perLevelOf(obj, key) {
   return typeof v === "number" ? v : null;
 }
 
-// Valor de `key` no nível do item: base + crescimento × (nível - 1) quando declarado.
-// Sem declaração: o valor × levelMultiplier (regra genérica), ou fixo com legacy: false.
-export function levelValue(item, obj, key, base = obj[key] ?? 0, { legacy = true } = {}) {
-  const per = perLevelOf(obj, key);
-  if (per != null) return base + per * (itemLevel(item.id) - 1);
-  return legacy ? base * levelMultiplier(item.id) : base;
+// Valor que muda de vez a partir de um nível ("<chave>At": { "3": 0.6, "5": 1 }): o do
+// maior nível já alcançado; undefined se o item ainda não chegou em nenhum
+export function stepOf(obj, key, level) {
+  const steps = obj[`${key}At`];
+  if (!steps) return undefined;
+  const reached = Object.keys(steps)
+    .map(Number)
+    .filter((from) => from <= level)
+    .sort((a, b) => b - a)[0];
+  return reached == null ? undefined : steps[reached];
 }
 
-// Recarga com nível do item e bônus permanente de velocidade. "cooldownPerLevel" (ms,
-// negativo) no item troca o -5% genérico.
-export function effectiveCooldown(item) {
+// Valor de `key` no nível do item: o degrau alcançado ("At") ou base + crescimento × (nível - 1)
+export function levelValue(item, obj, key, base = obj[key] ?? 0) {
   const level = itemLevel(item.id);
-  const per = perLevelOf(item, "cooldown");
-  const levelCooldown =
-    per != null ? item.cooldown + per * (level - 1) : item.cooldown * (1 - LEVEL_COOLDOWN * (level - 1));
-  const metaFactor = 1 - (state.player.cooldownBonus || 0);
+  const step = stepOf(obj, key, level);
+  if (step !== undefined) return step;
+  const per = perLevelOf(obj, key);
+  return per != null ? base + per * (level - 1) : base;
+}
+
+// Recarga com o nível do item ("cooldownPerLevel", em ms e negativo, no item) e o bônus
+// permanente de velocidade
+export function effectiveCooldown(item) {
+  const per = perLevelOf(item, "cooldown") ?? 0;
+  const levelCooldown = item.cooldown + per * (itemLevel(item.id) - 1);
+  // Auras de ritmo fixo (Armadura Cristalina, Escama) não aceleram com a melhoria Pressa
+  const metaFactor = item.fixedRate ? 1 : 1 - (state.player.cooldownBonus || 0);
   return Math.max(100, Math.round(levelCooldown * metaFactor));
 }
 
-// Adiciona o item ou, se já existe, sobe o nível. Devolve { leveled, level }.
+// Adiciona o item ou, se já existe, sobe o nível. Devolve { leveled, level, evolvedTo }.
 export function addItemOrLevel(item) {
   if (state.items.some((i) => i.id === item.id)) {
     const level = Math.min(maxLevelOf(item), itemLevel(item.id) + 1);
     state.itemLevels[item.id] = level;
+    if (state.evolveKills[item.id]) state.evolveKills[item.id] = 0; // nível novo, meta nova
+    const into = evolutionTarget(item, level);
+    if (into) {
+      evolveItem(item, into);
+      return { leveled: true, level, evolvedTo: into.id };
+    }
+    applyPassives();
     ensureTimers();
     return { leveled: true, level };
   }
@@ -167,6 +209,86 @@ export function addItemOrLevel(item) {
   return { leveled: false, level: 1 };
 }
 
+// ─── Evolução dos itens comuns ───
+// O item com `evolution: { into, level }` vira outro (`evolvedFrom` no JSON) ao chegar no
+// nível. A forma evoluída continua subindo sem limite, por recompensa e por abates.
+// Abates para o próximo nível: 20 e ×1,5 a cada nível (20, 30, 45, 68...).
+export const EVOLVE_KILLS_BASE = 20;
+export const EVOLVE_KILLS_GROWTH = 1.5;
+
+// A forma evoluída que o item vira neste nível (ou null)
+function evolutionTarget(item, level) {
+  if (!item.evolution || level < item.evolution.level) return null;
+  return findItem(item.evolution.into);
+}
+
+// Troca o item pela forma evoluída, no mesmo lugar, levando nível e recarga
+function evolveItem(item, into) {
+  const index = state.items.findIndex((i) => i.id === item.id);
+  state.items[index] = into;
+  state.itemLevels[into.id] = state.itemLevels[item.id];
+  delete state.itemLevels[item.id];
+  if (state.itemTimers[item.id]) {
+    state.itemTimers[into.id] = state.itemTimers[item.id];
+    delete state.itemTimers[item.id];
+  }
+  state.evolveKills[into.id] = 0;
+  // Estatísticas e "último item ativado" passam para o id novo
+  for (const bag of [state.runStats.damageByItem, state.runStats.itemUses]) {
+    if (bag?.[item.id] != null) {
+      bag[into.id] = (bag[into.id] || 0) + bag[item.id];
+      delete bag[item.id];
+    }
+  }
+  if (state.player.lastActivated === item.id) state.player.lastActivated = into.id;
+  applyPassives();
+  ensureTimers();
+  emit("evolved", { from: item.id, to: into.id });
+}
+
+// Save antigo (de antes da evolução) pode ter o item base já no nível da evolução
+export function migrateEvolutions() {
+  for (const item of [...state.items]) {
+    const into = evolutionTarget(item, itemLevel(item.id));
+    if (into) evolveItem(item, into);
+  }
+}
+
+// Abates necessários para sair deste nível (`from`: nível em que a forma nasceu)
+export function killsForNextLevel(level, from = 5) {
+  return Math.round(EVOLVE_KILLS_BASE * EVOLVE_KILLS_GROWTH ** Math.max(0, level - from));
+}
+
+// Progresso da forma evoluída: { kills, need }; null para os outros itens
+export function evolutionProgress(item) {
+  if (!item.evolvedFrom) return null;
+  const from = findItem(item.evolvedFrom)?.evolution?.level;
+  return {
+    kills: state.evolveKills[item.id] || 0,
+    need: killsForNextLevel(itemLevel(item.id), from),
+  };
+}
+
+// Sobe um nível sem passar pela recompensa (abates)
+export function levelUpItem(item) {
+  const level = itemLevel(item.id) + 1;
+  state.itemLevels[item.id] = level;
+  state.evolveKills[item.id] = 0;
+  applyPassives();
+  ensureTimers();
+  emit("itemLeveled", { id: item.id, level });
+}
+
+// Chamada a cada abate: as formas evoluídas ganham 1 de progresso e sobem ao chegar na meta
+export function addEvolutionKill() {
+  for (const item of [...state.items]) {
+    const progress = evolutionProgress(item);
+    if (!progress) continue;
+    state.evolveKills[item.id] = progress.kills + 1;
+    if (progress.kills + 1 >= progress.need) levelUpItem(item);
+  }
+}
+
 // Esquiva não passa disso, por mais itens e níveis que existam
 export const MAX_EVASION = 0.4;
 
@@ -174,10 +296,13 @@ export const MAX_EVASION = 0.4;
 // sempre parte de baseMaxHp, e a vida atual nunca passa do novo máximo.
 export function applyMaxHp(p = state.player) {
   const mult = ownedEffects("passive").reduce(
-    (sum, { effect }) => (effect.type === "stats" ? sum + (effect.maxHpMult || 0) : sum),
+    (sum, { item, effect }) =>
+      effect.type === "stats" ? sum + levelValue(item, effect, "maxHpMult", effect.maxHpMult || 0) : sum,
     1,
   );
-  p.maxHp = Math.max(1, Math.round((p.baseMaxHp ?? PLAYER_BASE.maxHp) * mult));
+  // maxHpBonus: vida máxima ganha na run (Foice de Sangue)
+  const base = (p.baseMaxHp ?? PLAYER_BASE.maxHp) + (p.maxHpBonus || 0);
+  p.maxHp = Math.max(1, Math.round(base * mult));
   p.hp = Math.min(p.hp, p.maxHp);
 }
 
@@ -185,23 +310,35 @@ export function applyMaxHp(p = state.player) {
 export function applyPassives() {
   const p = state.player;
   p.armor = p.baseArmor ?? PLAYER_BASE.armor;
-  p.maxMana = PLAYER_BASE.maxMana;
-  p.magicBoost = PLAYER_BASE.magicBoost;
   p.critChance = PLAYER_BASE.critChance + (p.critBonus || 0); // Precisão (loja)
+  p.critMult = PLAYER_BASE.critMult;
   p.evasion = 0;
   p.weaponSpeed = 0;
   p.damageBoost = 0;
+  p.elementalBoost = 0; // Manto do Arcano: dano extra das armas elementais
+  p.extraStacks = 0; // Manto do Arcano N3: +1 stack nos efeitos elementais
+  p.reach = 0; // Manto do Arcano N5: +1 alcance nos saltos e respingos
+  p.regen = 0; // HP por segundo
+  p.dotReduction = 0; // fração do dano contínuo recebido que some
+  p.damageReduction = 0; // fração do dano recebido que some (depois da armadura)
   for (const { item, effect } of ownedEffects("passive")) {
     if (effect.type !== "stats") continue;
-    const v = (key) => levelValue(item, effect, key, effect[key] || 0);
+    // Marcos repetidos (every) somam uma vez por repetição
+    const v = (key) => levelValue(item, effect, key, effect[key] || 0) * effectCount(item, effect);
     p.armor += Math.round(v("armor"));
-    p.maxMana += Math.round(v("maxMana"));
-    p.magicBoost += v("magicBoost");
     p.critChance += v("critChance");
     p.evasion += v("evasion");
     p.weaponSpeed += v("weaponSpeed");
     p.damageBoost += v("damageBoost");
+    p.elementalBoost += v("elementalBoost");
+    p.extraStacks += Math.round(v("extraStacks"));
+    p.reach += Math.round(v("reach"));
+    p.regen += v("regen");
+    p.dotReduction += v("dotReduction");
+    if (effect.critMult) p.critMult = Math.max(p.critMult, effect.critMult);
+    p.damageReduction += v("damageReduction");
   }
+  p.dotReduction = Math.min(0.9, p.dotReduction);
   p.critChance = Math.min(1, p.critChance);
   p.evasion = Math.min(MAX_EVASION, p.evasion);
   applyMaxHp(p);
@@ -228,6 +365,14 @@ function ownedLevel(id) {
   return state.items.some((i) => i.id === id) ? 1 : 0;
 }
 
+// Entra no sorteio? A forma evoluída só aparece para quem a tem (como "subir de nível"), e
+// o item base some depois de evoluir
+function offerable(item) {
+  if (item.evolvedFrom) return ownedLevel(item.id) > 0;
+  if (item.evolution && ownedLevel(item.evolution.into) > 0) return false;
+  return ownedLevel(item.id) < maxLevelOf(item);
+}
+
 // ─── Sorteio ───
 // excludeIds: itens que não podem aparecer; type: só um tipo (ex.: "weapon").
 // Itens no nível máximo nunca aparecem (os que o jogador ainda não tem sempre podem).
@@ -242,7 +387,7 @@ export function generateRandomItems(
     (i) =>
       !excludeIds.has(i.id) &&
       (!type || i.type === type) &&
-      ownedLevel(i.id) < maxLevelOf(i),
+      offerable(i),
   );
   const selectedItems = [];
   const usedIds = new Set();

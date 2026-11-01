@@ -40,6 +40,9 @@ export function itemSpriteURL(id) {
   return cached("item:" + id, ITEM_ART[id]);
 }
 
+// Formas evoluídas usam a arte do item base (campo "art" do items.json)
+const artId = (item) => item.art || item.id;
+
 // Data URL do símbolo 7×7 do elemento; null se não houver
 export function elementSpriteURL(element) {
   return cached("el:" + element, ELEMENT_ART[element]);
@@ -53,9 +56,9 @@ export function itemElement(id) {
 // HTML do ícone do item: <img> do sprite (+ selo do elemento) ou o emoji de reserva.
 // O selo do elemento (canto superior esquerdo) só aparece se o item tiver elemento
 export function itemIconHTML(item, { badge = true } = {}) {
-  const url = itemSpriteURL(item.id);
+  const url = itemSpriteURL(artId(item));
   if (!url) return item.icon;
-  const el = badge ? itemElement(item.id) : null;
+  const el = badge ? itemElement(artId(item)) : null;
   const elUrl = el ? elementSpriteURL(el) : null;
   const img = `<img class="item-sprite" src="${url}" alt="" draggable="false">`;
   const mark = elUrl

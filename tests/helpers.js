@@ -88,3 +88,10 @@ export function memoryStorage(initial = {}) {
     },
   };
 }
+
+// Define o nível de um item possuído e recalcula passivos e recargas
+export function setLevel(id, level) {
+  state.itemLevels[id] = level;
+  applyPassives();
+  ensureTimers();
+}

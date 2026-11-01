@@ -4,10 +4,9 @@
 // Objeto único compartilhado: os módulos leem e alteram este estado.
 export const PLAYER_BASE = {
   maxHp: 100,
-  maxMana: 100,
   armor: 0,
-  magicBoost: 0,
   critChance: 0.05,
+  critMult: 1.5, // golpe crítico causa ×1,5 (a Moeda da Fortuna N5 sobe para ×2)
 };
 
 export function createPlayer(x = 180, y = 0) {
@@ -15,12 +14,18 @@ export function createPlayer(x = 180, y = 0) {
     hp: PLAYER_BASE.maxHp,
     maxHp: PLAYER_BASE.maxHp,
     baseMaxHp: PLAYER_BASE.maxHp, // vida máxima antes dos itens passivos (meta.js define)
-    mana: 0,
-    maxMana: PLAYER_BASE.maxMana,
     armor: PLAYER_BASE.armor,
-    magicBoost: PLAYER_BASE.magicBoost,
     // Atributos dos itens passivos (items.applyPassives recalcula)
     critChance: PLAYER_BASE.critChance,
+    critMult: PLAYER_BASE.critMult,
+    elementalBoost: 0, // +0.1 = +10% de dano das armas elementais (Manto do Arcano)
+    extraStacks: 0,
+    reach: 0,
+    regen: 0, // HP por segundo (Couraça de Batalha)
+    regenTimer: 0,
+    dotReduction: 0,
+    damageReduction: 0,
+    maxHpBonus: 0, // vida máxima ganha na run (Foice de Sangue N5; vai no save)
     evasion: 0,
     weaponSpeed: 0, // +0.15 = armas recarregam 15% mais rápido
     damageBoost: 0, // +0.5 = +50% de dano (Anel Amaldiçoado)
@@ -35,10 +40,8 @@ export function createPlayer(x = 180, y = 0) {
     // Itens que já usaram o gatilho de vida baixa nesta onda
     lowHpUsed: {},
     reviveUsed: false,
-    nextBlockActive: false,
-    barrier: 0,
-    manaOverflow: 0,
-    barrierSource: null, // id do item que criou a barreira atual
+    blocksLeft: 0, // golpes que o Escudo de Ferro ainda bloqueia
+    lastActivated: null, // id do último item ativado: a Pedra de Eco o repete
     // Estado dos itens na run (salvo): bônus do Pacto, contadores de Tempestade/Sprint/Colheita
     pactBonus: 0,
     counters: {},
@@ -66,6 +69,8 @@ function freshRun() {
     // Nível de cada item da run (id -> 1..MAX_ITEM_LEVEL); repetido sobe de nível
     itemLevels: {},
     itemTimers: {},
+    // Formas evoluídas: abates acumulados para o próximo nível (id -> abates)
+    evolveKills: {},
     running: true,
     isPaused: true,
     waveTransition: false,

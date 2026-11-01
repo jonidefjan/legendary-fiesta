@@ -19,6 +19,7 @@
 // Filosofia: "Quebrar o jogo é divertido" - sinergias absurdas são features
 import { state, resetRun } from "./state.js";
 import { on } from "./events.js";
+import { spawnNumber } from "./fx.js";
 import { sfx } from "./audio.js";
 import { t, initLang } from "./i18n.js";
 import {
@@ -36,6 +37,7 @@ import {
   processDots,
   updateItemTimers,
   updateFrenzy,
+  updateRegen,
   updatePlayerAnim,
   updateEnemies,
 } from "./combat.js";
@@ -78,12 +80,25 @@ on("langChange", () => {
 });
 on("sfx", ({ name, detail }) => sfx[name]?.(detail));
 on("itemUsed", (id) => ui.flashItem(id));
+// Formas evoluídas sobem por abates e evoluem: o inventário refaz selo, moldura e dica
+on("itemLeveled", ({ id, level }) => {
+  ui.renderInventory();
+  const p = state.player;
+  spawnNumber(p.x, p.y - 85, t("float.levelUp", { level }), "#ffdd44", 3);
+  sfx.reward();
+});
+on("evolved", () => {
+  ui.renderInventory();
+  const p = state.player;
+  spawnNumber(p.x, p.y - 85, t("float.evolved"), "#7ad6a0", 4);
+});
 // Partículas: os eventos chegam com a posição no chão; o corpo fica ~25 px acima
 const USE_PARTICLES = {
   blockNext: "shield",
-  barrier: "barrier",
   heal: "heal",
-  mana: "mana",
+  echo: "echo",
+  coldAura: "coldAura",
+  emberSkin: "frenzy",
   frenzy: "frenzy",
 };
 // direction 1: inimigos ficam à direita, as partículas voam para longe do herói
@@ -460,6 +475,7 @@ function gameLoop(timestamp) {
     }
     updateItemTimers(dt);
     updateFrenzy(dt);
+    updateRegen(dt);
     processDots(dt);
     updateEnemies(dt);
     boss.updateBosses(dt);

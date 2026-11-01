@@ -135,7 +135,7 @@ export async function renderResultCanvas(result) {
   ].join(" ");
   const [, sprite] = await Promise.all([
     waitFonts(sample),
-    loadImage(weapon && itemSpriteURL(weapon.id)),
+    loadImage(weapon && itemSpriteURL(weapon.art || weapon.id)),
   ]);
 
   const { width: W, height: H } = IMAGE_SIZE;

@@ -37,7 +37,7 @@
   --orange: #cc6a22;
   --orange2: #ee8a44;
   --hp-bar: #cc3333;
-  --mana-bar: #3366cc;
+
   --slot-size: 72px;
 }
 
@@ -654,9 +654,7 @@ h3,
 .bar-fill.hp {
   background: linear-gradient(90deg, #882222, var(--hp-bar));
 }
-.bar-fill.mana {
-  background: linear-gradient(90deg, #223388, var(--mana-bar));
-}
+
 .bar-val {
   font-family: var(--font-num);
   font-size: 11px;
@@ -2223,4 +2221,25 @@ canvas {
     grid-template-columns: repeat(2, 1fr);
     max-width: none;
   }
+}
+
+/* Fase 11b: evolução dos itens comuns */
+.evo-note {
+  font-size: 12px;
+  color: #7ad6a0;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.item-panel-evo {
+  margin-top: 8px;
+  font-size: 16px;
+}
+.item-choice-evo {
+  margin-top: 6px;
+  font-size: 0.8rem;
+}
+.item-slot.evolved {
+  border-color: var(--frame);
 }

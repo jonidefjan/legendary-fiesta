@@ -5,13 +5,16 @@
 // e o progresso permanente (fragmentos). A run guarda só os IDs dos itens:
 // mudanças no items.json valem também para quem já tem save.
 import { state } from "./state.js";
-import { findItem } from "./items.js";
+import { findItem, migrateEvolutions } from "./items.js";
 
 export const RUN_KEY = "reliquary_run";
 export const META_KEY = "reliquary_meta_v1";
 export const SAVE_VERSION = 2;
 // Versão 1: objetos de item inteiros e fragmentos junto com a run
 const LEGACY_RUN_KEY = "reliquary_save_v1";
+// Itens que mudaram de id: a Pedra de Mana virou a Pedra de Eco
+const ITEM_ALIASES = { mana_stone: "echo_stone" };
+const renamed = (id) => ITEM_ALIASES[id] || id;
 
 function defaultStorage() {
   try {
@@ -64,6 +67,7 @@ export function serializeRun() {
     items: state.items.map((i) => i.id),
     itemLevels: state.itemLevels,
     itemTimers: state.itemTimers,
+    evolveKills: state.evolveKills,
     endless: state.endless,
     victoryShown: state.victoryShown,
     rewardsSinceLegendary: state.rewardsSinceLegendary,
@@ -73,8 +77,7 @@ export function serializeRun() {
     player: {
       hp: state.player.hp,
       maxHp: state.player.maxHp,
-      mana: state.player.mana,
-      maxMana: state.player.maxMana,
+      maxHpBonus: state.player.maxHpBonus,
       pactBonus: state.player.pactBonus,
       counters: state.player.counters,
       harvestReady: state.player.harvestReady,
@@ -96,8 +99,6 @@ export function migrateRun(data) {
     player: {
       hp: data.playerHp,
       maxHp: data.playerMaxHp,
-      mana: data.playerMana,
-      maxMana: data.playerMaxMana,
     },
     timestamp: data.timestamp,
   };
@@ -126,12 +127,17 @@ export function loadRun() {
   state.kills = data.kills || 0;
   state.score = data.score || 0;
   // Itens que saíram do jogo (ex.: Tomo Ancestral) são descartados, junto com nível e recarga
-  state.items = (data.items || []).map(findItem).filter(Boolean);
+  state.items = (data.items || []).map((id) => findItem(renamed(id))).filter(Boolean);
   const owned = new Set(state.items.map((i) => i.id));
+  // Níveis, recargas e abates seguem o item, mesmo com o id trocado
   const onlyOwned = (obj) =>
-    Object.fromEntries(Object.entries(obj || {}).filter(([id]) => owned.has(id)));
+    Object.fromEntries(
+      Object.entries(obj || {}).map(([id, v]) => [renamed(id), v]).filter(([id]) => owned.has(id)),
+    );
   state.itemLevels = onlyOwned(data.itemLevels);
   state.itemTimers = onlyOwned(data.itemTimers);
+  state.evolveKills = onlyOwned(data.evolveKills);
+  migrateEvolutions(); // save de antes da evolução: o item base no nível 5 já evolui
   state.endless = !!data.endless;
   state.victoryShown = !!data.victoryShown;
   state.rewardsSinceLegendary = data.rewardsSinceLegendary || 0;
@@ -142,8 +148,7 @@ export function loadRun() {
   state.runStats.damageByItem = { ...data.damageByItem };
   state.player.hp = data.player?.hp || 100;
   state.player.maxHp = data.player?.maxHp || 100;
-  state.player.mana = data.player?.mana || 0;
-  state.player.maxMana = data.player?.maxMana || 100;
+  state.player.maxHpBonus = data.player?.maxHpBonus || 0;
   state.player.pactBonus = data.player?.pactBonus || 0;
   state.player.counters = { ...data.player?.counters };
   state.player.harvestReady = !!data.player?.harvestReady;
