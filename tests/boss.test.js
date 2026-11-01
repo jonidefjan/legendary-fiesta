@@ -55,14 +55,10 @@ test("chefe é grande, forte e cresce com a onda", () => {
   const b20 = bossWave("lich", 20).find((e) => e.isBoss);
   assert.equal(b10.size, 30);
   assert.equal(b10.shape, "mage");
-  assert.equal(b10.resist.ice, 0.5);
-  assert.equal(b10.resist.holy, -0.3);
   assert.ok(b10.maxHp > 12 * 35);
   assert.ok(b20.maxHp > b10.maxHp && b20.dmg > b10.dmg);
   const demon = bossWave("demon").find((e) => e.isBoss);
   assert.equal(demon.shape, "demonlord");
-  assert.equal(demon.resist.fire, 0.6);
-  assert.equal(demon.resist.water, -0.3);
 });
 
 test("updateBosses não faz nada sem chefe vivo", () => {

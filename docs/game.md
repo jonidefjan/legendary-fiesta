@@ -9,12 +9,13 @@ This page describes the game as it is now. For the full item list see [items.md]
 1. **Title screen.** Start a new run, continue a saved one, or spend fragments in the shop (meta upgrades).
 2. **Weapon pick.** Choose 1 of 3 random weapons.
 3. **Waves.** Each wave spawns a lineup of skeletons (skeleton, rogue, warrior). Enemy HP grows 20% per wave and damage 15% per wave (on mobile, damage is 15% lower).
-4. **Reward.** After each wave clear, choose 1 of 3 items. A new item is added; one you already own goes up a level. The next wave starts as soon as you pick.
-5. **Item levels.** Up to level 5. Each level adds 20% to the item's main effect and cuts its cooldown by 5%. Items at max level leave the reward pool. Items that cannot scale (for example the Phoenix Feather) declare their own `maxLevel`.
+4. **Reward.** After each wave clear, choose 1 of 3 items (4 with the One More Option upgrade, and the Reroll upgrade adds a Reroll button). A new item is added; one you already own goes up a level. The next wave starts as soon as you pick.
+5. **Item levels.** Up to level 5. Each item defines what grows per level (see "Level data" below); items that do not declare it yet keep the generic rule of +20% main effect and -5% cooldown per level. Items at max level leave the reward pool. Items that cannot scale (for example the Phoenix Feather) declare their own `maxLevel`.
 6. **Boss every 10 waves.** One of two bosses, chosen at random, with an escort:
-   - **Lich**: summons skeletons every 6s (up to 6 alive at once). Resists ice and shadow; takes extra damage from fire and holy.
-   - **Demon Lord**: fire nova every 5s; enrages below 33% HP (faster attacks and abilities). Resists fire; takes extra damage from water and ice.
+   - **Lich**: summons skeletons every 6s (up to 6 alive at once).
+   - **Demon Lord**: fire nova every 5s (it leaves burn stacks on the hero); enrages below 33% HP (faster attacks and abilities).
    - Both have 12x the HP and 2x the damage of a regular skeleton of that wave.
+   - **Resistances are rolled when the boss spawns.** Each element (fire, ice, poison, lightning, holy, shadow, water) gets 50% or 80% resistance; the first boss of a run has no immune element, every later boss has exactly one, and each has one weak element (+50% damage, also on DoT ticks). Physical always takes 100%.
 7. **Victory.** Clearing the wave 10 boss opens the victory screen: continue in endless mode or end the run.
 8. **Endless mode.** Waves keep scaling, with a boss every 10 waves (20, 30, ...). Boss rewards always include a legendary.
 9. **Death.** Fragments and the best wave/score are kept; the run is gone.
@@ -26,7 +27,8 @@ The run is saved at the start of each wave, so reloading the page repeats the cu
 ### Damage and crits
 
 - Base crit chance is 5% (items can raise it). A crit deals x1.5.
-- Armor reduces damage received by its value in percent, capped at 75%. Evasion is capped at 50%.
+- Armor has diminishing returns: damage reduction is `armor / (armor + 100)` (100 armor = 50%), with no cap. Dodge is capped at 40%.
+- Resistance reduces damage and also the stacks applied (fire, poison, cold): a deterministic accumulator lets 1 in 5 stacks land at 80%. Weakness raises damage, not stacks. Immunity blocks both, unless the source item has `breaksImmunity` (then that element counts as 100%).
 - Permanent bonuses (Might upgrade, Cursed Ring, Pact) scale weapons, DoTs and explosions alike.
 - A weapon with base damage 0 (Ember Blade) only applies its effects.
 
@@ -34,25 +36,33 @@ The run is saved at the start of each wave, so reloading the page repeats the cu
 
 | DoT | Tick | Stacking | Cap |
 | --- | --- | --- | --- |
-| Burn | 1 per second, fixed damage per stack | Each hit adds a stack and refreshes the duration | 3 stacks, +1 per item level |
-| Poison | 1 per second, `base + damage x stacks`; base is `1 + 3 x (level - 1)` | Each hit adds a stack | None |
+| Burn | 1 damage per stack per second; each second it loses `max(1, floor(stacks / 10))` stacks (5 -> 1/s, 30 -> 3/s, 100 -> 10/s) | Each hit adds stacks (Ember Blade: 1 per item level); no duration | None |
+| Poison | 1 per second, `base + damage x stacks`; base is `1 + 3 x (level - 1)` | Each hit adds a stack; never expires (lasts until the enemy dies) | None |
 
-DoT ticks never count as crits. Burn can spread (contagion); poison cannot.
+DoT ticks never count as crits. Burn can spread (contagion); poison cannot yet. The Demon Lord's nova puts `4 + floor(wave / 5)` burn stacks on the hero.
 
 ### Other effects
 
-- **Freeze**: a frozen enemy does not move or attack (a frozen boss does not advance its ability timer). Sources: Frost Bow (20% on hit), Crystal Armor (when its barrier breaks).
-- **Contagion**: when a burning enemy dies, Ember Heart copies its burn to the nearest living enemies (count equals item level). Targets that die burning spread again, so it chains.
+- **Cold** (all ice): each stack slows movement and attacks by 10%; at 5 stacks the enemy freezes for 2s and the stacks reset (a frozen enemy gathers no more cold). Without new cold, an enemy loses 1 stack every 2s; cold also slows boss abilities. Sources: Frost Bow (+1 stack per hit), Crystal Armor (2 stacks on everything its barrier explosion hits). The enemy tint lerps from normal to frozen with the stacks.
+- **Freeze**: a frozen enemy does not move or attack (a frozen boss does not advance its ability timer).
+- **Contagion**: when a burning enemy dies, from any killing blow, Ember Heart passes ALL its burn stacks to the nearest living enemies (count equals item level), adding to theirs. Targets that die burning spread again, so it chains.
+- **Boss stacks**: every stack on the boss (fire, poison, cold...) is shown as icon and count under its health bar.
 - **Area items**: Seismic Hammer (splash around the target), Blast Core (explosion around the hero), Judgment Tome (hits every enemy), Thorn Mail (damages nearby enemies when you are hit), Thunder Staff (chain lightning).
-- **Legendary guarantee**: reward screens roll rarity by weight (common 40, uncommon 30, rare 18, epic 9, legendary 3). After 4 screens without a legendary, the next one guarantees one; boss rewards in endless mode always do. The counter (`rewardsSinceLegendary`) is saved with the run.
+- **Legendary guarantee**: reward screens roll rarity by weight (common 40, uncommon 30, rare 18, epic 9, legendary 3). After 4 screens without a legendary (3, then 2, with the Legendary Luck upgrade), the next one guarantees one; boss rewards in endless mode always do. The counter (`rewardsSinceLegendary`) is saved with the run.
 - **Meta upgrades**: enemies drop fragments, kept across runs and spent in the title shop. The next level costs `round(20 x 1.25^level)`.
 
 | Upgrade | Per level | Limit |
 | --- | --- | --- |
 | Vitality | +10 max HP | none |
 | Might | +5% damage | none |
-| Guard | +2 armor | none |
+| Guard | +5 armor | none |
 | Haste | -3% cooldowns | 16 levels (50%) |
+| Precision | +1% critical chance | 15 levels |
+| One More Option | Reward screens show 4 items | 1 level, 400 fragments |
+| Reroll | +1 reward reroll per run | 3 levels, 100 / 250 / 500 fragments |
+| Legendary Luck | Guaranteed legendary after 3, then 2 screens (instead of 4) | 2 levels, 200 / 600 fragments |
+
+The last three have fixed costs instead of the `20 x 1.25^level` curve. Remaining rerolls (`rerollsLeft`) are saved with the run.
 
 ## Controls and saves
 
@@ -108,6 +118,22 @@ There is no keyboard input; everything is on-screen buttons: play, pause, reset,
 | `hurt`, `block`, `barrierAbsorb`, `barrierBreak` | Defensive events |
 | `damage`, `lowHp`, `death` | Damage modifier, low-HP reaction, revive |
 
+### Level data
+
+An item (or one of its effects) declares what grows per level next to the base value, either as `<key>PerLevel` or inside a `perLevel` map. Values are linear: `base + perLevel x (level - 1)`.
+
+```json
+{ "id": "x", "baseDmg": 10, "baseDmgPerLevel": 3, "cooldown": 3000, "cooldownPerLevel": -100,
+  "effects": [
+    { "trigger": "hit", "type": "dot", "dot": "burning", "damage": 1, "stacks": 1, "stacksPerLevel": 1 },
+    { "trigger": "hit", "type": "cold", "perLevel": { "stacks": 1 }, "minLevel": 3 }
+  ] }
+```
+
+- Keys without level data keep the generic rule: `levelMultiplier` (+20%) on the main effect and -5% cooldown. Helpers: `levelValue`, `perLevelOf`, `effectiveCooldown` in `items.js`.
+- `minLevel` (3 or 5) on an effect keeps it off until the item reaches that level (`effectsOf` filters it). Texts: `items.<id>.enchant` unlocks at `enchantLevel` (default 1) and `items.<id>.enchantExtra` at `enchantExtraLevel` (default 5); tooltips and cards show locked tiers dimmed with "Unlocks at level N".
+- `breaksImmunity` (`true`, or the level from which it applies) on an item lets its damage and stacks ignore boss immunity.
+
 ### Render pipeline (`game/src/three/`)
 
 An orthographic camera (view height 12.5, minimum half-width 9) looks at a scene spanning z -20 to 18. Each frame:
@@ -123,7 +149,7 @@ Files: `view.js` (camera, fit), `pipeline.js`, `lighting.js`, `characters.js` (K
 ## Adding an item
 
 1. **`game/assets/items.json`**: add an entry with `id`, `type` (`weapon`, `armor`, `relic`), `icon` (emoji fallback), `rarity`, `cooldown` (ms, 0 for passive), and for weapons `baseDmg`, `dmgType`, `anim`, `fx`. Describe behavior in `effects`. If no existing effect type fits, add a handler in `combat.js` under the right trigger.
-2. **Locales**: add `items.<id>.name`, `.desc`, `.effect` and optionally `.enchant` to both `game/locales/items.en.js` and `items.pt-BR.js`.
+2. **Locales**: add `items.<id>.name`, `.desc`, `.effect` and optionally `.enchant` and `.enchantExtra` to both `game/locales/items.en.js` and `items.pt-BR.js`.
 3. **Art**: add a 16x16 grid under the id in `ITEM_ART` in `game/src/item-art.js`. If the item has an element, add it to `ITEM_ELEMENTS`. Preview all icons at `/game/dev/item-art.html`.
 4. **Tests**: add cases in `tests/` for any new handler (see `tests/items2.test.js`). Existing tests already check the catalog, art coverage and locale parity.
 5. **Docs**: run `npm run docs:items` to regenerate `docs/items.md`. A test fails if you forget.

@@ -10,13 +10,14 @@ import { arena, worldToScreen, logicToWorldX, logicToWorldY } from "./view.js";
 import { SCREEN_EFFECTS } from "./effects2d.js";
 import { t } from "../i18n.js";
 import { enemyName } from "../waves.js";
+import { formatStacks } from "../layout.js";
 
 // Dígitos em Tiny5 em todo texto do canvas (a família "Reliquary Digits" do style.css)
 const FONT = "'Reliquary Digits', 'Pixelify Sans'";
 // Números (dano flutuante, vida do chefe, acúmulos): mesma fonte dos números do HTML
 const NUM_FONT = "'Tiny5', 'Pixelify Sans'";
 const BAR = { w: 38, h: 6, border: 2 };
-const DOT_ICONS = { burning: "🔥", poison: "☠️", bleeding: "💉" };
+const DOT_ICONS = { burning: "🔥", poison: "☠️", bleeding: "💉", cold: "❄️" };
 
 let canvas = null;
 let ctx = null;
@@ -182,6 +183,34 @@ function drawBossBar(boss) {
   ctx.fillStyle = PALETTE.night;
   for (let i = 1; i < 10; i++) ctx.fillRect(x + Math.round((w * i) / 10) - 1, y, 2, h);
   outlinedText(`${Math.max(0, Math.ceil(boss.hp))} / ${boss.maxHp}`, W / 2, y + h - 3, PALETTE.white, 11, false, NUM_FONT);
+  drawBossStacks(boss, W, y, h);
+}
+
+// Stacks de qualquer efeito no chefe (fogo, veneno, frio...), em fila abaixo da barra:
+// ícone em bitmap (cache dos emojis) e contador. Sem espaço embaixo, vai acima do nome.
+function drawBossStacks(boss, W, y, h) {
+  const list = (boss.dots || []).filter((d) => d.stacks > 0);
+  if (list.length === 0) return;
+  const size = W < 520 ? 14 : 16;
+  const gap = 14;
+  const labels = list.map((d) => formatStacks(d.stacks));
+  // largura de cada grupo: ícone + contador (≈ 0,6 do corpo por dígito)
+  const widths = labels.map((l) => size + 4 + Math.ceil(l.length * size * 0.6));
+  const total = widths.reduce((a, b) => a + b, 0) + gap * (list.length - 1);
+  const baseY = Math.min(y + h + 6 + size, arena.height - 4); // sempre embaixo da barra
+  let x = W / 2 - total / 2;
+  list.forEach((d, i) => {
+    const icon = DOT_ICONS[d.type] || "✨";
+    const iconX = x + size / 2;
+    if (!spriteText(icon, iconX, baseY, PALETTE.white, `${size}px sans-serif`, false)) {
+      ctx.font = `${size}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(icon, iconX, baseY);
+    }
+    // Só dígitos (e k/M): texto ASCII é desenhado direto, sem criar bitmap por valor
+    outlinedText(labels[i], x + size + 4 + (widths[i] - size - 4) / 2, baseY - 1, PALETTE.white, size - 2, false, NUM_FONT);
+    x += widths[i] + gap;
+  });
 }
 
 const v = new THREE.Vector3();
@@ -214,16 +243,21 @@ export function drawBars(characters) {
       outlinedText(enemyName(en), s.x, s.y - 6, PALETTE.bone, 10);
     }
     if (en.dots && en.dots.length > 0) {
-      let offsetX = (-14 * (en.dots.length - 1)) / 2;
-      for (const d of en.dots) {
+      // Cada grupo (ícone + ×N) é mais largo quando o contador tem mais dígitos
+      const groups = en.dots.map((d) => {
+        const label = d.stacks > 1 ? formatStacks(d.stacks) : "";
+        return { d, label, w: 14 + Math.max(0, label.length - 1) * 5 };
+      });
+      let offsetX = -groups.reduce((a, g) => a + g.w, 0) / 2 + 7;
+      for (const { d, label, w } of groups) {
         const icon = DOT_ICONS[d.type] || "✨";
         if (!spriteText(icon, s.x + offsetX, s.y - 20, PALETTE.white, "11px sans-serif", false)) {
           ctx.font = "11px sans-serif";
           ctx.textAlign = "center";
           ctx.fillText(icon, s.x + offsetX, s.y - 20);
         }
-        if (d.stacks > 1) outlinedText(`×${d.stacks}`, s.x + offsetX + 8, s.y - 15, PALETTE.white, 8, false, NUM_FONT);
-        offsetX += 14;
+        if (label) outlinedText(`x${label}`, s.x + offsetX + 8 + (label.length - 1) * 2, s.y - 15, PALETTE.white, 8, false, NUM_FONT);
+        offsetX += w;
       }
     }
   }

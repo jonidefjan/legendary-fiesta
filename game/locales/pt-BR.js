@@ -58,6 +58,7 @@ export default {
   "item.close": "Fechar",
   "card.new": "Novo",
   "card.upgrade": "⬆️ Nível {from} → {to}",
+  "item.unlocksAt": "Libera no nível {level}",
 
   // Modais de escolha
   "pick.single.title": "⚔️ Escolha sua arma",
@@ -70,6 +71,8 @@ export default {
   "reward.title": "🎁 Recompensa da Onda!",
   "reward.sub.one": "Escolha 1 de {count} opção · Onda {wave} concluída",
   "reward.sub.other": "Escolha 1 de {count} opções · Onda {wave} concluída",
+  "reward.reroll": "🔄 Rerrolar (restam {left})",
+  "reward.rerollLabel": "Rerrolar as opções, restam {left}",
 
   // Derrota
   "gameover.title": "☠️ Derrotado",
@@ -119,13 +122,25 @@ export default {
   "upgrades.might.name": "Força",
   "upgrades.might.desc": "+5% de dano por nível",
   "upgrades.guard.name": "Guarda",
-  "upgrades.guard.desc": "+2 de armadura por nível",
+  "upgrades.guard.desc": "+5 de armadura por nível",
   "upgrades.haste.name": "Celeridade",
   "upgrades.haste.desc": "Recargas 3% mais rápidas por nível",
   "upgrades.effect.maxHp": "+{n} vida",
   "upgrades.effect.damage": "+{n}% dano",
   "upgrades.effect.armor": "+{n} armadura",
   "upgrades.effect.cooldown": "-{n}% recarga",
+  "upgrades.precision.name": "Precisão",
+  "upgrades.precision.desc": "+1% de chance de crítico por nível (máx. 15)",
+  "upgrades.extraOption.name": "Mais uma opção",
+  "upgrades.extraOption.desc": "A recompensa mostra 4 itens em vez de 3",
+  "upgrades.reroll.name": "Rerrolar",
+  "upgrades.reroll.desc": "+1 rerrolagem de recompensa por run, por nível (máx. 3)",
+  "upgrades.luck.name": "Sorte lendária",
+  "upgrades.luck.desc": "O lendário garantido chega 1 tela antes por nível (máx. 2)",
+  "upgrades.effect.crit": "+{n}% crítico",
+  "upgrades.effect.options": "{n} opções",
+  "upgrades.effect.rerolls": "{n} por run",
+  "upgrades.effect.luck": "após {n} telas sem lendário",
 
   // Inimigos
   "enemies.skeleton": "Esqueleto",
@@ -145,6 +160,7 @@ export default {
   "screen.defeatSub": "Onda {wave} · Score: {score}",
   "float.resisted": "RESISTIDO",
   "float.weak": "FRACO!",
+  "float.immune": "IMUNE",
   "float.crit": "CRÍTICO!",
   "float.dodge": "ESQUIVA",
 
@@ -173,6 +189,9 @@ export default {
   "log.dot": "{icon} {target} {verb}! (DoT stacking)",
   "log.cooldownRefund": "{icon} {item}: recarga reduzida!",
   "log.freeze": "❄️ {target} foi congelado por {seconds}s!",
+  "log.freezeMany.one": "❄️ {count} inimigo foi congelado!",
+  "log.freezeMany.other": "❄️ {count} inimigos foram congelados!",
+  "log.cold": "{icon} {item}: {target} está esfriando (+{stacks} de frio)!",
   "log.sprint": "{icon} {item}: sprint! Recarga de {weapon} zerada.",
   "log.harvestReady": "{icon} {item}: colheita pronta! Próximo ataque causa dano duplo.",
   "log.critFragment.one": "{icon} {item}: abate crítico! +{count} fragmento.",

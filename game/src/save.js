@@ -67,6 +67,7 @@ export function serializeRun() {
     endless: state.endless,
     victoryShown: state.victoryShown,
     rewardsSinceLegendary: state.rewardsSinceLegendary,
+    rerollsLeft: state.rerollsLeft,
     totalDamage: state.runStats.totalDamage,
     damageByItem: state.runStats.damageByItem,
     player: {
@@ -134,6 +135,8 @@ export function loadRun() {
   state.endless = !!data.endless;
   state.victoryShown = !!data.victoryShown;
   state.rewardsSinceLegendary = data.rewardsSinceLegendary || 0;
+  // Save antigo (sem o campo) mantém as rerrolagens que a run nova já definiu pela loja
+  if (typeof data.rerollsLeft === "number") state.rerollsLeft = data.rerollsLeft;
   // Saves antigos não têm o dano por item: começa vazio
   state.runStats.totalDamage = data.totalDamage || 0;
   state.runStats.damageByItem = { ...data.damageByItem };

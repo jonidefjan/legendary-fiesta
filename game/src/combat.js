@@ -14,9 +14,11 @@
 //   "enemyDied"   inimigo morreu: size
 //   "crit"        golpe crítico do herói: damage
 //   "dodge"       herói esquivou de um ataque
-//   "freeze"      inimigo congelado (enemy.frozen = ms restantes)
+//   "freeze"      inimigo congelado por 5 stacks de frio (enemy.frozen = ms restantes)
 //   "explode"     explosão (Armadura Cristalina, Núcleo Explosivo): kind "ice" | "fire"
 //   "spread"      queimadura passou de um inimigo morto a outros: from {x,y}, to [{x,y}]
+// Stacks (fogo, veneno, frio): cada elemento tem resistência; ela reduz o dano e também os
+// stacks aplicados (acumulador determinístico, sem sorteio). Imunidade bloqueia tudo.
 // Sons: sound(nome, detalhe) -> "hit" + elemento, "use" + tipo do efeito, "dot" + tipo,
 // além de "crit", "dodge", "freeze" e "explode".
 import { state } from "./state.js";
@@ -29,12 +31,16 @@ import {
   effectsOf,
   ownedEffects,
   isActivatable,
-  levelMultiplier,
+  levelValue,
   itemLevel,
+  findItem,
 } from "./items.js";
 
-// Redução máxima de dano pela armadura (%): com Guarda sem teto, nada fica imune
-export const MAX_ARMOR = 75;
+// Armadura com retorno decrescente: 100 de armadura = 50% de redução, sem teto fixo
+export function armorReduction(armor) {
+  const a = Math.max(0, armor || 0);
+  return a / (a + 100);
+}
 
 // Golpe crítico: a chance base está em PLAYER_BASE.critChance
 export const CRIT_MULT = 1.5;
@@ -58,7 +64,23 @@ const DOTS = {
   burning: { icon: "🔥", color: "#ff8800" },
   poison: { icon: "☠️", color: "#88ff00" },
   bleeding: { icon: "💉", color: "#ff0000" },
+  cold: { icon: "❄️", color: "#88ddff" },
 };
+
+// Elemento (e resistência) de cada efeito com stacks
+const STACK_ELEMENT = { burning: "fire", poison: "poison", cold: "ice", bleeding: "physical" };
+
+// Frio: cada stack deixa o inimigo 10% mais lento; no 5º ele congela e os stacks zeram
+export const COLD_SLOW = 0.1;
+export const COLD_FREEZE_STACKS = 5;
+export const FREEZE_MS = 2000;
+// Sem frio novo, o inimigo perde 1 stack a cada 2s
+export const COLD_DECAY_MS = 2000;
+
+// Fogo: 1 de dano por stack por segundo; a cada segundo perde max(1, ⌊stacks ÷ 10⌋) stacks
+export function burnDecay(stacks) {
+  return Math.max(1, Math.floor(stacks / 10));
+}
 
 // Bônus de dano permanentes (melhoria Força, Anel, Pacto): valem para armas, DoT e explosão
 function permanentDamage() {
@@ -81,11 +103,53 @@ function creditDamage(itemId, amount) {
   state.runStats.totalDamage += amount;
 }
 
+// Imunidade ao elemento: vem de target.immune (chefes) ou de resistência 100%
+function isImmune(target, element) {
+  return target.immune === element || (target.resist?.[element] || 0) >= 1;
+}
+
+// O item quebra a imunidade? `breaksImmunity: true` (ou o nível a partir do qual vale)
+function breaksImmunity(itemId) {
+  if (!itemId) return false;
+  const item = state.items.find((i) => i.id === itemId) || findItem(itemId);
+  if (!item) return false;
+  const flag = item.breaksImmunity;
+  if (flag === true) return true;
+  if (typeof flag === "number") return itemLevel(item.id) >= flag;
+  return effectsOf(item, "passive").some((e) => e.breaksImmunity === true);
+}
+
+// Resistência efetiva do alvo ao elemento: 1 = imune; item que quebra a imunidade a trata
+// como 100% do dano (resistência 0). Fraqueza vem como valor negativo (-0.5 = +50%).
+export function effectiveResist(target, element, itemId = null) {
+  if (isImmune(target, element)) return breaksImmunity(itemId) ? 0 : 1;
+  return target.resist?.[element] || 0;
+}
+
+// Quantos de `stacks` de `element` realmente entram, dada a resistência do alvo. Acumulador
+// por elemento em vez de sorteio: com 80% de resistência entra 1 stack a cada 5. A fraqueza
+// aumenta o dano, mas não os stacks.
+export function landStacks(target, element, stacks, itemId = null) {
+  const resist = effectiveResist(target, element, itemId);
+  if (resist >= 1) return 0;
+  const acc = (target.stackAcc ||= {});
+  const total = (acc[element] || 0) + stacks * Math.min(1, 1 - resist);
+  const landed = Math.floor(total + 1e-9);
+  acc[element] = Math.max(0, total - landed);
+  return landed;
+}
+
 // itemId: item do jogador que causou o dano (crédito); sem ele, só source "player" soma ao total
 export function applyElementalDamage(target, baseDmg, element, source, crit = false, itemId = null) {
   if (!target.resist) target.resist = {};
-  const resist = target.resist[element] || 0;
+  const resist = effectiveResist(target, element, itemId);
+  const immune = resist >= 1;
   target.lastHitCrit = !!crit; // quem mata paga Moeda da Fortuna só se este golpe foi crítico
+  if (immune) {
+    // Só o aviso: sem número de dano, sem partículas e sem som de golpe
+    spawnEffect("text", target.x, target.y - 60, { life: 30, text: t("float.immune"), color: "#888888" });
+    return 0;
+  }
   const finalDmg = Math.max(1, Math.round(baseDmg * (1 - resist)));
 
   target.hp -= finalDmg;
@@ -136,7 +200,9 @@ export function applyElementalDamage(target, baseDmg, element, source, crit = fa
 }
 
 // damage: dano por stack. Cada tick causa base + damage × stacks.
-// maxStacks: teto de stacks (a queimadura depende do nível do item; o veneno não tem teto).
+// maxStacks: teto de stacks (o veneno e a queimadura não têm).
+// Queimadura: sem duração e sem teto; `stacks` são os que entram de uma vez (a resistência
+// já foi aplicada por quem chama, via landStacks).
 export const DEFAULT_MAX_STACKS = 5;
 
 export function applyDot(
@@ -145,16 +211,17 @@ export function applyDot(
   damage,
   duration,
   stackable = true,
-  { maxStacks = DEFAULT_MAX_STACKS, base = 0, sourceId = null } = {},
+  { maxStacks = DEFAULT_MAX_STACKS, base = 0, sourceId = null, stacks = 1 } = {},
 ) {
   if (!target.dots) target.dots = [];
+  if (type === "burning") maxStacks = Infinity;
 
   // Stack or refresh
   const existing = target.dots.find((d) => d.type === type);
   if (existing && stackable) {
-    existing.stacks = Math.min(maxStacks, existing.stacks + 1);
+    existing.stacks = Math.min(maxStacks, existing.stacks + stacks);
     existing.duration = duration;
-    existing.fullDuration = duration; // o contágio renova a duração com este valor
+    existing.fullDuration = duration;
     existing.damage = damage;
     existing.base = base;
     existing.maxStacks = maxStacks;
@@ -170,7 +237,7 @@ export function applyDot(
       duration,
       fullDuration: duration,
       maxStacks,
-      stacks: 1,
+      stacks: Math.min(maxStacks, stacks),
       tickTimer: 0,
       sourceId, // item que aplicou: os ticks creditam o dano a ele
     });
@@ -184,16 +251,70 @@ export function applyDot(
   });
 }
 
+// Stacks de frio no inimigo: lentidão de 10% por stack; no 5º ele congela e zera.
+// Congelado não acumula mais frio. A resistência a gelo reduz os stacks.
+// quiet: quem aplica em área avisa o congelamento uma vez só (evento, som e log)
+export function applyCold(target, stacks = 1, { itemId = null, freezeMs = FREEZE_MS, quiet = false } = {}) {
+  if (target.dead || target.hp <= 0 || target.frozen > 0) return 0;
+  const landed = landStacks(target, "ice", stacks, itemId);
+  if (landed <= 0) return 0;
+  if (!target.dots) target.dots = [];
+  let cold = target.dots.find((d) => d.type === "cold");
+  if (!cold) {
+    cold = { type: "cold", damage: 0, base: 0, duration: 0, stacks: 0, tickTimer: 0, sourceId: itemId };
+    target.dots.push(cold);
+  }
+  cold.stacks += landed;
+  cold.tickTimer = 0; // frio novo reinicia a contagem do decaimento
+  if (cold.stacks >= COLD_FREEZE_STACKS) {
+    target.dots = target.dots.filter((d) => d !== cold);
+    freezeEnemy(target, freezeMs, quiet);
+  } else {
+    spawnEffect("text", target.x, target.y - 50, { life: 30, text: DOTS.cold.icon, color: DOTS.cold.color });
+  }
+  return landed;
+}
+
+// Stacks de frio atuais (0 sem frio)
+export function coldStacks(en) {
+  return en.dots?.find((d) => d.type === "cold")?.stacks || 0;
+}
+
+// Fração da velocidade que sobra com o frio (1 = sem lentidão)
+export function slowFactor(en) {
+  return Math.max(0.1, 1 - COLD_SLOW * coldStacks(en));
+}
+
+// Força do tom gelado (0..1) para o renderer: congelado = 1; o frio sobe até 0.6
+export function coldTint(en) {
+  if (en.frozen > 0) return 1;
+  return Math.min(COLD_FREEZE_STACKS - 1, coldStacks(en)) * 0.15;
+}
+
 export function processDots(dt) {
   [...state.enemies, state.player].forEach((entity) => {
     if (!entity.dots || entity.dead || entity.hp <= 0) return;
 
     entity.dots = entity.dots.filter((dot) => {
+      if (dot.type === "cold") {
+        // Frio não causa dano: só desacelera, e some aos poucos sem frio novo
+        dot.tickTimer += dt;
+        if (dot.tickTimer >= COLD_DECAY_MS) {
+          dot.tickTimer = 0;
+          dot.stacks--;
+        }
+        return dot.stacks > 0;
+      }
       dot.tickTimer += dt;
 
       if (dot.tickTimer >= 1000) {
         dot.tickTimer = 0;
-        const dmg = Math.round((dot.base || 0) + dot.damage * dot.stacks);
+        // Fraqueza ao elemento aumenta o tick (a resistência já reduziu os stacks)
+        const weak =
+          entity === state.player
+            ? 1
+            : 1 - Math.min(0, effectiveResist(entity, STACK_ELEMENT[dot.type] || "physical", dot.sourceId));
+        const dmg = Math.round(((dot.base || 0) + dot.damage * dot.stacks) * weak);
         entity.hp -= dmg;
         entity.hurtTimer = 8;
         entity.lastHitCrit = false; // abate por dano contínuo não conta como crítico
@@ -214,11 +335,19 @@ export function processDots(dt) {
         });
         sound("dot", dot.type);
 
-        dot.duration--;
+        // Queimadura perde stacks a cada tick (menos no que morreu: o Coração de Brasa
+        // lê os stacks no abate). Veneno nunca expira; só outros dots (sangue) têm duração
+        if (dot.type === "burning") {
+          if (entity.hp > 0) dot.stacks -= burnDecay(dot.stacks);
+        } else if (dot.type !== "poison") {
+          dot.duration--;
+        }
       }
 
       // Quem morreu neste tick mantém o dot: o Coração de Brasa lê a queimadura no abate
-      return dot.duration > 0 || entity.hp <= 0;
+      if (entity.hp <= 0) return true;
+      if (dot.type === "poison") return true;
+      return dot.type === "burning" ? dot.stacks > 0 : dot.duration > 0;
     });
   });
   // Queimadura do chefe também mata (ou aciona a Pena de Fênix)
@@ -244,20 +373,24 @@ function enemiesWithin(x, radius, except = null) {
 const HIT_EFFECTS = {
   dot(effect, item, ctx) {
     if (!rolls(effect)) return;
-    // O nível não aumenta o dano por stack (fixo por item): ele aumenta o teto de stacks
-    // da queimadura e o dano base do veneno. O bônus permanente vale para tudo.
-    const level = itemLevel(item.id);
+    // O nível não aumenta o dano por stack (fixo por item): ele aumenta os stacks por golpe
+    // (Lâmina de Brasa) e o dano base do veneno. O bônus permanente vale para tudo.
     const perm = permanentDamage();
     const damage = effect.damage * perm;
-    const base = ((effect.base || 0) + (effect.basePerLevel || 0) * (level - 1)) * perm;
+    const base = levelValue(item, effect, "base", effect.base || 0, { legacy: false }) * perm;
     const maxStacks =
       effect.maxStacks == null
         ? Infinity
-        : effect.maxStacks + (effect.maxStacksPerLevel || 0) * (level - 1);
+        : levelValue(item, effect, "maxStacks", effect.maxStacks, { legacy: false });
+    const wanted = Math.round(levelValue(item, effect, "stacks", effect.stacks ?? 1, { legacy: false }));
+    // A resistência do alvo reduz os stacks que entram (imune: nenhum)
+    const stacks = landStacks(ctx.target, STACK_ELEMENT[effect.dot] || "physical", wanted, item.id);
+    if (stacks <= 0) return;
     applyDot(ctx.target, effect.dot, damage, effect.duration, true, {
       maxStacks,
       base,
       sourceId: item.id,
+      stacks,
     });
     const dot = DOTS[effect.dot];
     log(
@@ -274,18 +407,25 @@ const HIT_EFFECTS = {
     ctx.refund += effect.ms;
     log(t("log.cooldownRefund", { icon: item.icon, item: item.name }), "item");
   },
-  freeze(effect, item, ctx) {
+  // Frio: cada golpe soma stacks; no 5º o alvo congela (ver applyCold)
+  cold(effect, item, ctx) {
     if (!rolls(effect)) return;
-    freezeEnemy(ctx.target, effect.duration);
-    log(t("log.freeze", { target: enemyName(ctx.target), seconds: formatNumber(effect.duration / 1000) }), "item");
+    const wanted = Math.round(levelValue(item, effect, "stacks", effect.stacks ?? 1, { legacy: false }));
+    const landed = applyCold(ctx.target, wanted, {
+      itemId: item.id,
+      freezeMs: effect.freezeMs ?? FREEZE_MS,
+    });
+    if (landed > 0) {
+      log(t("log.cold", { icon: item.icon, item: item.name, target: enemyName(ctx.target), stacks: landed }), "item");
+    }
   },
   // heal com onCrit só vale quando o golpe foi crítico
   heal(effect, item, ctx) {
     if (effect.onCrit && !ctx.crit) return;
-    healPlayer(Math.round(effect.amount * levelMultiplier(item.id)), item);
+    healPlayer(Math.round(levelValue(item, effect, "amount")), item);
   },
   lifesteal(effect, item, ctx) {
-    healPlayer(Math.round(ctx.dealt * effect.ratio * levelMultiplier(item.id)), item);
+    healPlayer(Math.round(ctx.dealt * levelValue(item, effect, "ratio")), item);
   },
   // Respingo: cada golpe também fere os vizinhos do alvo. Sem crítico e sem efeitos de
   // golpe da arma nos vizinhos (é dano de área); abates contam para os gatilhos de abate.
@@ -306,7 +446,7 @@ const ANY_HIT_EFFECTS = {
   lifesteal(effect, item, ctx) {
     const p = state.player;
     const low = effect.lowHpRatio && p.hp / p.maxHp < effect.threshold;
-    const ratio = (low ? effect.lowHpRatio : effect.ratio) * levelMultiplier(item.id);
+    const ratio = levelValue(item, effect, low ? "lowHpRatio" : "ratio");
     healPlayer(Math.round(ctx.dealt * ratio), item);
   },
 };
@@ -428,51 +568,34 @@ const ATTACK_MODS = {
   },
 };
 
-// Passa a queimadura de `dead` aos `count` inimigos vivos mais próximos dele. Cada alvo
-// fica com o maior número de stacks entre o dele e o do morto, e a duração é renovada.
+// Passa TODOS os stacks de queimadura de `dead` aos `count` inimigos vivos mais próximos
+// dele, somando aos que cada alvo já tem (a resistência do alvo reduz os que entram).
 // Os alvos que também morrerem queimando espalham de novo (cadeia).
 function spreadBurn(dead, count, item) {
   const burn = (dead.dots || []).find((d) => d.type === "burning");
-  if (!burn) return;
+  if (!burn || burn.stacks <= 0) return;
   const targets = livingEnemies()
-    .filter((e) => e !== dead)
+    .filter((e) => e !== dead && effectiveResist(e, "fire", item.id) < 1) // imune não gasta vaga
     .map((e) => ({ e, dist: Math.hypot(e.x - dead.x, e.y - dead.y) }))
     .sort((a, b) => a.dist - b.dist)
     .slice(0, count)
     .map((o) => o.e);
   if (targets.length === 0) return;
+  const reached = [];
   for (const en of targets) {
-    if (!en.dots) en.dots = [];
-    const own = en.dots.find((d) => d.type === "burning");
-    const fullDuration = burn.fullDuration ?? burn.duration;
-    if (own) {
-      own.stacks = Math.max(own.stacks, burn.stacks);
-      own.damage = Math.max(own.damage, burn.damage);
-      own.maxStacks = Math.max(own.maxStacks ?? 0, burn.maxStacks ?? 0);
-      own.duration = fullDuration;
-      own.fullDuration = fullDuration;
-    } else {
-      en.dots.push({
-        type: "burning",
-        damage: burn.damage,
-        base: 0,
-        duration: fullDuration,
-        fullDuration,
-        maxStacks: burn.maxStacks,
-        stacks: burn.stacks,
-        tickTimer: 0,
-        sourceId: burn.sourceId, // a arma original continua levando o crédito
-      });
-    }
-    spawnEffect("text", en.x, en.y - 50, { life: 40, text: DOTS.burning.icon, color: "#ff6600" });
+    const stacks = landStacks(en, "fire", burn.stacks, item.id);
+    if (stacks <= 0) continue;
+    applyDot(en, "burning", burn.damage, 0, true, { stacks, sourceId: burn.sourceId }); // a arma original leva o crédito
+    reached.push(en);
   }
+  if (reached.length === 0) return;
   sound("spread");
   emit("spread", {
     from: { x: dead.x, y: dead.y },
-    to: targets.map((e) => ({ x: e.x, y: e.y })),
+    to: reached.map((e) => ({ x: e.x, y: e.y })),
   });
   log(
-    t("log.spread", { icon: item.icon, item: item.name, count: targets.length, stacks: burn.stacks }),
+    t("log.spread", { icon: item.icon, item: item.name, count: reached.length, stacks: burn.stacks }),
     "item",
   );
 }
@@ -481,7 +604,7 @@ function spreadBurn(dead, count, item) {
 const USE_EFFECTS = {
   // Explosão em volta do herói: dano fixo (cresce com o nível) em todos no raio
   blast(effect, item, p) {
-    const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
+    const damage = Math.round(levelValue(item, effect, "damage") * permanentDamage());
     const near = enemiesWithin(p.x, effect.radius);
     // Sem ninguém no alcance não explode: a recarga fica pronta para quando houver alvo
     if (near.length === 0) return false;
@@ -499,7 +622,7 @@ const USE_EFFECTS = {
     p.anim = "block";
   },
   barrier(effect, item, p) {
-    const amount = Math.round(effect.amount * levelMultiplier(item.id));
+    const amount = Math.round(levelValue(item, effect, "amount"));
     // Nova barreira só vale se for maior que a atual; quem a criou guarda a origem
     if (amount >= p.barrier) {
       p.barrier = amount;
@@ -517,9 +640,7 @@ const USE_EFFECTS = {
     const bonus = effect.bonusEvery
       ? Math.floor(charges / effect.bonusEvery) * effect.bonusAmount
       : 0;
-    const healAmt = Math.round(
-      (effect.amount + bonus) * levelMultiplier(item.id),
-    );
+    const healAmt = Math.round(levelValue(item, effect, "amount", effect.amount + bonus));
     p.hp = Math.min(p.maxHp, p.hp + healAmt);
     spawnEffect("heal", p.x, p.y - 50, { life: 45 });
     spawnNumber(p.x, p.y - 60, `+${healAmt}`, "#44cc88", 2);
@@ -528,7 +649,7 @@ const USE_EFFECTS = {
   },
   mana(effect, item, p) {
     const overflow = p.mana >= p.maxMana;
-    const amount = Math.round(effect.amount * levelMultiplier(item.id));
+    const amount = Math.round(levelValue(item, effect, "amount"));
     p.mana = Math.min(p.maxMana, p.mana + amount);
     spawnEffect("mana_orb", p.x, p.y - 50, { life: 35 });
     if (overflow && effect.overflowBonus) {
@@ -548,7 +669,7 @@ const USE_EFFECTS = {
   },
   frenzy(effect, item, p) {
     p.berserking = true;
-    const duration = Math.round(effect.duration * levelMultiplier(item.id));
+    const duration = Math.round(levelValue(item, effect, "duration"));
     p.berserkRemaining = duration;
     p.berserkSpeed = effect.speedBonus;
     spawnEffect("berserk", p.x, p.y - 40, { life: 60 });
@@ -560,14 +681,21 @@ const USE_EFFECTS = {
 // trigger "barrierBreak": a barreira criada pelo item chegou a 0 absorvendo dano
 const BARRIER_BREAK_EFFECTS = {
   explode(effect, item, p) {
-    const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
+    const damage = Math.round(levelValue(item, effect, "damage") * permanentDamage());
+    let froze = 0;
     for (const en of state.enemies.filter((e) => !e.dead && e.hp > 0)) {
       applyElementalDamage(en, damage, effect.element, "player", false, item.id);
-      if (effect.freeze) freezeEnemy(en, effect.freeze, true);
+      // Gelo unificado: a explosão aplica stacks de frio (o 5º congela)
+      if (effect.coldStacks) {
+        const before = en.frozen || 0;
+        applyCold(en, effect.coldStacks, { itemId: item.id, quiet: true });
+        if ((en.frozen || 0) > before) froze++;
+      }
     }
-    if (effect.freeze) {
+    if (froze > 0) {
       sound("freeze");
       emit("freeze", { x: p.x, y: p.y });
+      log(t("log.freezeMany", { count: froze }), "item");
     }
     spawnEffect("dragon_roar", p.x, p.y - 30, { life: 40 });
     sound("explode");
@@ -591,7 +719,7 @@ const DODGE_EFFECTS = {
 const HURT_EFFECTS = {
   manaFromDamage(effect, item, ctx) {
     const p = state.player;
-    const manaAbsorb = Math.round(ctx.damage * effect.ratio * levelMultiplier(item.id));
+    const manaAbsorb = Math.round(ctx.damage * levelValue(item, effect, "ratio"));
     p.mana = Math.min(p.maxMana, p.mana + manaAbsorb);
     if (manaAbsorb > 0)
       log(t("log.manaAbsorb", { icon: item.icon, item: item.name, amount: manaAbsorb }), "item");
@@ -602,7 +730,7 @@ const HURT_EFFECTS = {
     const p = state.player;
     const near = enemiesWithin(p.x, effect.radius);
     if (near.length === 0) return;
-    const damage = Math.round(effect.damage * levelMultiplier(item.id) * permanentDamage());
+    const damage = Math.round(levelValue(item, effect, "damage") * permanentDamage());
     for (const en of near) {
       applyElementalDamage(en, damage, "physical", "thorns", false, item.id);
       spawnEffect("text", en.x, en.y - 60, { life: 30, text: "🌵", color: "#66aa44" });
@@ -612,7 +740,7 @@ const HURT_EFFECTS = {
   // Devolve parte do dano recebido ao atacante
   reflect(effect, item, ctx) {
     if (!rolls(effect)) return;
-    const reflected = Math.round(ctx.damage * effect.ratio * levelMultiplier(item.id));
+    const reflected = Math.round(ctx.damage * levelValue(item, effect, "ratio"));
     if (reflected <= 0) return;
     applyElementalDamage(ctx.enemy, reflected, "physical", "reflect");
     log(
@@ -632,13 +760,14 @@ function healPlayer(amount, item) {
 }
 
 // Congelado: o inimigo não anda nem ataca por `ms` de tempo de jogo
-// quiet: o chamador avisa som e evento uma vez só (explosão em vários inimigos)
+// quiet: o chamador avisa som, evento e log uma vez só (explosão em vários inimigos)
 function freezeEnemy(en, ms, quiet = false) {
   en.frozen = Math.max(en.frozen || 0, ms);
   spawnEffect("text", en.x, en.y - 60, { life: 30, text: "❄️", color: "#88ddff" });
   if (quiet) return;
   sound("freeze");
   emit("freeze", { x: en.x, y: en.y });
+  log(t("log.freeze", { target: enemyName(en), seconds: formatNumber(ms / 1000) }), "item");
 }
 
 // Tipos que o jogo sabe executar, por gatilho (os testes conferem o items.json contra isto)
@@ -669,9 +798,7 @@ export const KNOWN_EFFECTS = {
 function attackDamage(item, ctx, firstHit) {
   const p = state.player;
   let dmg = Math.round(
-    (item.baseDmg + (item.bonusDmg || 0)) *
-      levelMultiplier(item.id) *
-      permanentDamage(),
+    levelValue(item, item, "baseDmg", item.baseDmg + (item.bonusDmg || 0)) * permanentDamage(),
   );
   // Tempestade, Maré, Colheita e Fuga (calculados uma vez por ataque)
   dmg = Math.round((dmg + ctx.flat) * ctx.mult);
@@ -686,7 +813,7 @@ function attackDamage(item, ctx, firstHit) {
   // Bônus de dano com vida baixa (ex.: Escama Dracônica)
   for (const { item: owner, effect } of ownedEffects("damage")) {
     if (effect.type === "lowHpBonus" && p.hp / p.maxHp < effect.threshold) {
-      dmg = Math.round(dmg * (1 + effect.bonus * levelMultiplier(owner.id)));
+      dmg = Math.round(dmg * (1 + levelValue(owner, effect, "bonus")));
     }
   }
   const crit = random() < (p.critChance || 0);
@@ -786,7 +913,7 @@ function weaponAttack(item, target, extra = null) {
     log(t("log.attack", { item: item.name, damage: totalDmg, target: enemyName(target) }), "dmg");
   }
   const element = item.dmgType || "physical";
-  sound("hit", element);
+  if (effectiveResist(target, element, item.id) < 1) sound("hit", element);
   emit("attack", {
     x: p.x,
     y: p.y,
@@ -937,7 +1064,7 @@ export function enemyAttack(en) {
       .filter(({ effect }) => effect.type === "reflect")
       .reduce(
         (sum, { item, effect }) =>
-          sum + Math.round(effect.damage * levelMultiplier(item.id)),
+          sum + Math.round(levelValue(item, effect, "damage")),
         0,
       );
     if (reflected > 0) {
@@ -961,7 +1088,7 @@ export function enemyAttack(en) {
     const broke = p.barrier <= 0;
     const ratio = ownedEffects("barrierAbsorb")
       .filter(({ effect }) => effect.type === "reflect")
-      .reduce((sum, { item, effect }) => sum + effect.ratio * levelMultiplier(item.id), 0);
+      .reduce((sum, { item, effect }) => sum + levelValue(item, effect, "ratio"), 0);
     const reflected = Math.round(absorbed * ratio);
     en.hp -= reflected;
     if (reflected > 0) en.lastHitCrit = false;
@@ -976,8 +1103,8 @@ export function enemyAttack(en) {
   }
 
   // Armor reduction
-  // Armadura reduz até MAX_ARMOR% (melhoria Guarda não tem teto de nível)
-  dmg = Math.max(1, Math.round(dmg * (1 - Math.min(p.armor, MAX_ARMOR) / 100)));
+  // Armadura com retorno decrescente: armadura / (armadura + 100), sem teto
+  dmg = Math.max(1, Math.round(dmg * (1 - armorReduction(p.armor))));
 
   // Dano recebido vira mana (Manto do Arcano) ou volta ao atacante (Cota de Malha)
   const hurtCtx = { enemy: en, damage: dmg };
@@ -1052,10 +1179,10 @@ export function updateEnemies(dt) {
       // Congelado: não anda e o tempo de ataque não avança
       en.frozen = Math.max(0, en.frozen - dt);
     } else if (dist > combatDist && en.moving) {
-      en.x -= en.speed * dt * 0.06;
+      en.x -= en.speed * dt * 0.06 * slowFactor(en);
     } else {
       en.moving = false;
-      en.atkTimer = (en.atkTimer || 0) + dt;
+      en.atkTimer = (en.atkTimer || 0) + dt * slowFactor(en); // frio atrasa o ataque
       if (en.atkTimer >= en.atkInterval) {
         en.atkTimer = 0;
         enemyAttack(en);

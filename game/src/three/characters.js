@@ -12,6 +12,7 @@ import { WORLD, reflectsInWater } from "./world.js";
 import { shareSkeleton, updateOncePerFrame } from "./skeleton.js";
 import { logicToWorldX, arena } from "./view.js";
 import { state } from "../state.js";
+import { coldTint, slowFactor } from "../combat.js";
 import { on } from "../events.js";
 import { PALETTE } from "../palette.js";
 import { LAYERS } from "./layers.js";
@@ -747,10 +748,12 @@ export function createCharacters(scene) {
       }
       if (rec.rig) {
         const flash = !en.dead && en.hurtTimer > 0 ? 0.55 * Math.min(1, en.hurtTimer / 12) : 0;
-        // Congelado: tom gelado e animação parada no quadro atual
+        // Congelado: tom gelado e animação parada no quadro atual. Com stacks de frio o
+        // tom sobe aos poucos e a animação desacelera junto com o inimigo
         const frozen = !en.dead && en.frozen > 0;
-        rec.rig.setFlash(flash, frozen ? 1 : 0);
-        rec.rig.update(frozen ? 0 : dtSec);
+        const tint = en.dead ? 0 : coldTint(en);
+        rec.rig.setFlash(flash, tint);
+        rec.rig.update(frozen ? 0 : dtSec * (en.dead ? 1 : slowFactor(en)));
       }
       if (tickHurt && !en.dead && en.hurtTimer > 0) en.hurtTimer -= 1;
       rec.lastHurt = en.hurtTimer;

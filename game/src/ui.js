@@ -9,6 +9,7 @@ import {
   findItem,
   itemLevel,
   effectiveCooldown,
+  enchantTiers,
 } from "./items.js";
 import { t, formatNumber } from "./i18n.js";
 import { defaultCollapsed, usesItemPanel, needsInvScroll } from "./layout.js";
@@ -21,6 +22,18 @@ export const isMobile =
 const $ = (id) => document.getElementById(id);
 
 const ROMAN = ["", "I", "II", "III", "IV", "V"];
+
+// Encantamentos do item: os já liberados normais e os que dependem de nível apagados,
+// com o aviso de em qual nível liberam. level: o nível a considerar.
+function enchantsHTML(item, level, cls) {
+  return enchantTiers(item, level)
+    .map((tier) =>
+      tier.unlocked
+        ? `<div class="${cls}">${tier.text}</div>`
+        : `<div class="${cls} locked"><span class="enchant-lock">🔒 ${t("item.unlocksAt", { level: tier.minLevel })}</span> ${tier.text}</div>`,
+    )
+    .join("");
+}
 
 // ═══════════════════════════════════════════
 //  INVENTORY
@@ -85,7 +98,7 @@ function showTooltip(item, e) {
     <div class="tt-level">${t("item.level", { level, max: maxLevelOf(item) })}</div>
     <div class="tt-desc">${item.desc}</div>
     <div class="tt-effect">${item.effect}</div>
-    ${item.enchant ? `<div class="tt-enchant">${item.enchant}</div>` : ""}
+    ${enchantsHTML(item, level, "tt-enchant")}
     ${cooldown > 0 ? `<div class="tt-cd">${t("item.cooldown", { seconds: formatNumber(cooldown / 1000, 1) })}</div>` : ""}
   `;
 
@@ -152,7 +165,7 @@ function panelHTML(item) {
       </div>
     </div>
     <div class="item-panel-effect">${item.effect}</div>
-    ${item.enchant ? `<div class="item-panel-enchant">${item.enchant}</div>` : ""}
+    ${enchantsHTML(item, level, "item-panel-enchant")}
   `;
 }
 
@@ -285,7 +298,7 @@ function itemCard(item, onClick) {
     <div class="item-choice-rarity rarity-${item.rarity}">${rarityInfo.label}</div>
     <div class="item-choice-desc">${item.desc}</div>
     <div class="item-choice-effect">${item.effect}</div>
-    ${item.enchant ? `<div class="item-choice-enchant">${item.enchant}</div>` : ""}
+    ${enchantsHTML(item, owned ? level + 1 : 1, "item-choice-enchant")}
     <div class="selection-indicator">✓</div>
   `;
   return card;
@@ -373,17 +386,34 @@ export function showInitialPick(options, maxSelections, onConfirm) {
   modal.style.display = "flex";
 }
 
-// Recompensa da onda: 1 item; onPick recebe o item escolhido
-export function showRewardPick(options, wave, onPick) {
+// Recompensa da onda: 1 item; onPick recebe o item escolhido.
+// reroll: { rerolls (restantes), show, onReroll } -> onReroll() devolve { options, rerolls }
+// ou null; o botão aparece só para quem comprou a melhoria (ou ainda tem rerrolagens).
+export function showRewardPick(options, wave, onPick, reroll = null) {
   const modal = $("item-choice-modal");
   const container = $("item-choices-container");
+  let rerolls = reroll?.rerolls ?? 0;
 
   const build = () => {
     // Reescreve o cabeçalho inteiro: a escolha inicial deixa um contador de seleção nele
+    const rerollBtn = reroll?.show
+      ? `<button type="button" class="reroll-btn" id="reroll-btn" aria-label="${t("reward.rerollLabel", { left: rerolls })}"${rerolls > 0 ? "" : " disabled"}>${t("reward.reroll", { left: rerolls })}</button>`
+      : "";
     modal.querySelector(".modal-header").innerHTML = `
     <h2>${t("reward.title")}</h2>
     <p class="modal-subtitle">${t("reward.sub", { count: options.length, wave })}</p>
+    ${rerollBtn}
   `;
+    const btn = modal.querySelector("#reroll-btn");
+    if (btn) {
+      btn.onclick = () => {
+        const next = reroll.onReroll();
+        if (!next) return;
+        options = next.options;
+        rerolls = next.rerolls;
+        build();
+      };
+    }
     container.innerHTML = "";
     options.forEach((item) => {
       container.appendChild(

@@ -9,6 +9,7 @@ import {
   processDots,
   updateEnemies,
   enemyAttack,
+  burnDecay,
 } from "../game/src/combat.js";
 import {
   rewardOptions,
@@ -29,51 +30,74 @@ const poison = (en) => en.dots.find((d) => d.type === "poison");
 // Inimigo que já queima com `stacks` stacks (como se a Lâmina de Brasa o tivesse acertado)
 function burningEnemy(stacks, overrides = {}) {
   const en = enemy(overrides);
-  for (let i = 0; i < stacks; i++) applyDot(en, "burning", 3, 4, true, { maxStacks: 7 });
+  applyDot(en, "burning", 1, 0, true, { stacks });
   return en;
 }
 
 // ─── Queimadura ───
-test("queimadura: máximo de stacks é 3 no nível 1 e +1 por nível (7 no nível 5)", () => {
+test("queimadura: a Lâmina de Brasa aplica 1 stack por nível do item por golpe", () => {
   for (let level = 1; level <= 5; level++) {
     const target = enemy();
     setupRun(["ember_blade"], [target]);
     setLevel("ember_blade", level);
-    fixedRandom(0);
-    for (let i = 0; i < 12; i++) activateItem(item("ember_blade"));
-    assert.equal(burning(target).stacks, 2 + level, `nível ${level}`);
+    activateItem(item("ember_blade"));
+    assert.equal(burning(target).stacks, level, `nível ${level}`);
+    activateItem(item("ember_blade"));
+    assert.equal(burning(target).stacks, 2 * level, "sem teto de stacks");
   }
 });
 
-test("queimadura: dano por stack é fixo (3) e o tick é 3 × stacks", () => {
+test("queimadura: 1 de dano por stack por segundo e o bônus permanente vale no tick", () => {
   const target = enemy({ hp: 1000 });
   setupRun(["ember_blade"], [target]);
   setLevel("ember_blade", 5);
-  fixedRandom(0);
-  for (let i = 0; i < 3; i++) activateItem(item("ember_blade"));
-  const hp = target.hp;
-  assert.equal(burning(target).damage, 3, "o nível não aumenta o dano por stack");
-  processDots(1000);
-  assert.equal(hp - target.hp, 9);
-});
-
-test("queimadura: aplicar renova a duração e o bônus permanente vale no tick", () => {
-  const target = enemy({ hp: 1000 });
-  setupRun(["ember_blade", "cursed_ring"], [target]);
-  fixedRandom(0);
   activateItem(item("ember_blade"));
-  processDots(1000);
-  assert.equal(burning(target).duration, 3);
-  activateItem(item("ember_blade"));
-  assert.equal(burning(target).duration, 4, "duração renovada");
+  assert.equal(burning(target).damage, 1, "o nível não aumenta o dano por stack");
   const hp = target.hp;
   processDots(1000);
-  assert.equal(hp - target.hp, Math.round(3 * 1.5 * 2));
+  assert.equal(hp - target.hp, 5);
+
+  const ringed = enemy({ hp: 1000 });
+  setupRun(["ember_blade", "cursed_ring"], [ringed]);
+  setLevel("ember_blade", 2);
+  activateItem(item("ember_blade"));
+  processDots(1000);
+  assert.equal(1000 - ringed.hp, Math.round(2 * 1.5));
 });
 
-test("queimadura do chefe no herói segue o teto padrão de 5 stacks", () => {
+test("queimadura: perde max(1, ⌊stacks ÷ 10⌋) stacks por segundo e some em 0", () => {
+  assert.equal(burnDecay(5), 1);
+  assert.equal(burnDecay(9), 1);
+  assert.equal(burnDecay(10), 1);
+  assert.equal(burnDecay(30), 3);
+  assert.equal(burnDecay(100), 10);
   setupRun([]);
-  for (let i = 0; i < 8; i++) applyDot(state.player, "burning", 2, 3);
+  const target = burningEnemy(30, { hp: 100000 });
+  state.enemies = [target];
+  processDots(1000);
+  assert.equal(burning(target).stacks, 27, "30 → 3 por segundo");
+  const small = burningEnemy(3, { hp: 100000 });
+  state.enemies = [small];
+  for (let i = 0; i < 2; i++) processDots(1000);
+  assert.equal(burning(small).stacks, 1);
+  processDots(1000);
+  assert.equal(small.dots.length, 0, "sem duração: acaba quando os stacks acabam");
+});
+
+test("queimadura: não tem teto de stacks nem duração", () => {
+  const target = enemy({ hp: 1e9 });
+  setupRun([], [target]);
+  applyDot(target, "burning", 1, 0, true, { stacks: 500 });
+  applyDot(target, "burning", 1, 0, true, { stacks: 500 });
+  assert.equal(burning(target).stacks, 1000);
+});
+
+test("queimadura do chefe no herói acumula e perde stacks como a dos inimigos", () => {
+  setupRun([]);
+  state.player.hp = 100;
+  applyDot(state.player, "burning", 1, 0, true, { stacks: 6 });
+  processDots(1000);
+  assert.equal(state.player.hp, 94);
   assert.equal(state.player.dots[0].stacks, 5);
 });
 
@@ -119,7 +143,7 @@ function spreadSetup(level, count = 4) {
   return { dead, others };
 }
 
-test("contágio: passa para os N vivos mais próximos, N = nível", () => {
+test("contágio: passa TODOS os stacks para os N vivos mais próximos, N = nível", () => {
   for (let level = 1; level <= 5; level++) {
     const { others } = spreadSetup(level, 6);
     updateEnemies(16);
@@ -127,20 +151,17 @@ test("contágio: passa para os N vivos mais próximos, N = nível", () => {
     assert.equal(burn.length, level, `nível ${level}`);
     assert.deepEqual(burn, others.slice(0, level), "os mais próximos");
     assert.equal(burning(burn[0]).stacks, 3);
-    assert.equal(burning(burn[0]).damage, 3);
-    assert.equal(burning(burn[0]).duration, 4);
+    assert.equal(burning(burn[0]).damage, 1);
   }
 });
 
-test("contágio: cada alvo fica com o maior número de stacks e a duração é renovada", () => {
+test("contágio: os stacks do morto somam aos que o alvo já tem", () => {
   const { others } = spreadSetup(2);
-  for (let i = 0; i < 5; i++) applyDot(others[0], "burning", 3, 1, true, { maxStacks: 7 });
-  applyDot(others[1], "burning", 3, 1, true, { maxStacks: 7 });
+  applyDot(others[0], "burning", 1, 0, true, { stacks: 5 });
+  applyDot(others[1], "burning", 1, 0, true, { stacks: 1 });
   updateEnemies(16);
-  assert.equal(burning(others[0]).stacks, 5, "mantém os próprios, que são mais");
-  assert.equal(burning(others[1]).stacks, 3, "sobe para os do morto");
-  assert.equal(burning(others[0]).duration, 4);
-  assert.equal(burning(others[1]).duration, 4);
+  assert.equal(burning(others[0]).stacks, 8);
+  assert.equal(burning(others[1]).stacks, 4);
 });
 
 test("contágio: ignora mortos e vida 0, avisa com log e evento spread", () => {
@@ -183,7 +204,7 @@ test("contágio: não acontece sem o item, sem queimadura nem para o veneno", ()
 });
 
 test("contágio: dispara quando o morto cai por dano contínuo", () => {
-  const dying = burningEnemy(1, { hp: 2, x: 200 });
+  const dying = burningEnemy(2, { hp: 2, x: 200 });
   const a = enemy({ x: 260 });
   setupRun(["ember_heart"], [dying, a]);
   processDots(1000);
@@ -193,16 +214,26 @@ test("contágio: dispara quando o morto cai por dano contínuo", () => {
   assert.ok(burning(a));
 });
 
-test("contágio: dispara quando o último tick da queimadura é o que mata", () => {
-  const dying = enemy({ hp: 2, x: 200 });
-  applyDot(dying, "burning", 3, 1, true, { maxStacks: 7 }); // duração 1: o tick mata e esgota
+test("contágio: o tick que mata não faz perder stacks: passam todos", () => {
+  const dying = burningEnemy(20, { hp: 5, x: 200 });
   const a = enemy({ x: 260 });
   setupRun(["ember_heart"], [dying, a]);
   processDots(1000);
   assert.ok(dying.hp <= 0);
+  assert.equal(burning(dying).stacks, 20, "o morto não decai");
   updateEnemies(16);
   assert.ok(dying.dead);
-  assert.ok(burning(a), "a queimadura passou");
+  assert.equal(burning(a).stacks, 20, "a queimadura passou inteira");
+});
+
+test("contágio: vale para qualquer golpe que mata, não só o dano contínuo", () => {
+  const dying = burningEnemy(7, { hp: 5, x: 150 });
+  const a = enemy({ x: 260 });
+  setupRun(["rusted_sword", "ember_heart"], [dying, a]);
+  activateItem(item("rusted_sword"));
+  updateEnemies(16);
+  assert.ok(dying.dead);
+  assert.equal(burning(a).stacks, 7);
 });
 
 test("Núcleo Explosivo: sem inimigo no alcance não explode nem gasta a recarga", () => {

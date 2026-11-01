@@ -19,6 +19,7 @@ import {
   enemyAttack,
   updateEnemies,
   CRIT_MULT,
+  coldStacks,
 } from "../game/src/combat.js";
 import {
   applyPassives,
@@ -104,17 +105,20 @@ test("Moeda da Fortuna: abate com golpe crítico dá +1 fragmento", () => {
 });
 
 // ─── Armas ───
-test("Arco Gélido congela: não anda, não ataca e descongela com o tempo", () => {
+test("Arco Gélido: o 5º stack de frio congela; parado, não ataca e descongela com o tempo", () => {
   const target = enemy({ moving: true, speed: 1, x: 400 });
   setupRun(["frost_bow"], [target]);
   const freezes = [];
   on("freeze", (e) => freezes.push(e));
-  fixedRandom(0);
+  for (let i = 0; i < 4; i++) {
+    activateItem(item("frost_bow"));
+    assert.equal(target.frozen, undefined, "ainda não congelou");
+  }
   activateItem(item("frost_bow"));
   assert.equal(target.frozen, 2000);
   assert.equal(freezes.length, 1);
+  assert.equal(target.dots.length, 0, "os stacks zeram");
 
-  fixedRandom(0.99);
   const x = target.x;
   updateEnemies(1000);
   assert.equal(target.x, x, "parado");
@@ -147,7 +151,7 @@ test("Lâmina Venenosa acumula veneno sem limite de stacks", () => {
   assert.equal(poison.stacks, 7);
   assert.equal(poison.damage, 1);
   assert.equal(poison.base, 1);
-  assert.equal(poison.duration, 4);
+  assert.equal(poison.duration, undefined, "veneno não tem duração");
 });
 
 test("Maça Sagrada cura 5 HP por golpe e +10 nos críticos", () => {
@@ -227,13 +231,13 @@ test("Cota de Malha: Deflexão devolve metade do dano recebido", () => {
   setupRun(["chainmail"], [attacker]);
   fixedRandom(0);
   enemyAttack(attacker);
-  // 20 com 18% de redução = 16; devolve 8
-  assert.equal(state.player.hp, 100 - 16);
-  assert.equal(lost(attacker), 8);
+  // 20 com 18 de armadura (18 / 118 = 15,3%) = 17; devolve 9
+  assert.equal(state.player.hp, 100 - 17);
+  assert.equal(lost(attacker), 9);
 
   fixedRandom(0.99);
   enemyAttack(attacker);
-  assert.equal(lost(attacker), 8, "sem reflexo quando a chance falha");
+  assert.equal(lost(attacker), 9, "sem reflexo quando a chance falha");
 });
 
 test("Manto das Sombras: esquiva evita o dano e reforça o próximo ataque", () => {
@@ -263,7 +267,7 @@ test("Manto das Sombras: esquiva evita o dano e reforça o próximo ataque", () 
   assert.ok(state.player.hp < 100, "sem esquiva quando a rolagem falha");
 });
 
-test("evasão tem teto de 50%", () => {
+test("esquiva tem teto de 40%", () => {
   setupRun(["shadow_cloak"]);
   state.itemLevels.shadow_cloak = 5;
   applyPassives();
@@ -271,10 +275,10 @@ test("evasão tem teto de 50%", () => {
   state.player.baseArmor = 0;
   state.items[0] = { ...item("shadow_cloak"), effects: [{ trigger: "passive", type: "stats", evasion: 5 }] };
   applyPassives();
-  assert.equal(state.player.evasion, 0.5);
+  assert.equal(state.player.evasion, 0.4);
 });
 
-test("Armadura Cristalina: barreira quebrada explode em gelo e congela", () => {
+test("Armadura Cristalina: barreira quebrada explode em gelo e aplica frio", () => {
   const near = enemy({ dmg: 50, x: 200 });
   const far = enemy({ x: 600 });
   setupRun(["crystal_armor"], [near, far]);
@@ -290,8 +294,8 @@ test("Armadura Cristalina: barreira quebrada explode em gelo e congela", () => {
   assert.equal(booms.length, 1);
   assert.equal(lost(near), 15);
   assert.equal(lost(far), 15);
-  assert.equal(near.frozen, 1000);
-  assert.equal(far.frozen, 1000);
+  assert.equal(coldStacks(near), 2, "gelo unificado: stacks de frio, não congelamento");
+  assert.equal(coldStacks(far), 2);
   assert.ok(ev.some((e) => e.type === "sfx" && e.payload.name === "explode"));
 });
 
@@ -541,23 +545,21 @@ test("veneno e explosão usam o bônus de dano do Anel", () => {
   assert.equal(hp[1] - b.hp, Math.round(15 * 1.5));
 });
 
-test("explosão ignora inimigo com vida 0 e avisa o congelamento uma vez", () => {
+test("explosão ignora inimigo com vida 0 e não congela com só 2 stacks", () => {
   const live1 = enemy({ x: 200 });
   const live2 = enemy({ x: 300 });
   const corpse = enemy({ hp: 0, x: 400 });
   setupRun(["crystal_armor"], [live1, live2, corpse]);
   const freezes = [];
   on("freeze", (e) => freezes.push(e));
-  const ev = captureEvents();
   state.player.barrier = 1;
   state.player.barrierSource = "crystal_armor";
   enemyAttack(enemy({ dmg: 5 }));
-  assert.equal(freezes.length, 1);
-  assert.equal(ev.filter((e) => e.type === "sfx" && e.payload.name === "freeze").length, 1);
+  assert.equal(freezes.length, 0);
   assert.equal(corpse.hp, 0);
-  assert.equal(corpse.frozen, undefined);
-  assert.equal(live1.frozen, 1000);
-  assert.equal(live2.frozen, 1000);
+  assert.equal(coldStacks(corpse), 0);
+  assert.equal(coldStacks(live1), 2);
+  assert.equal(coldStacks(live2), 2);
 });
 
 test("enemyAttack informa o resultado", () => {

@@ -49,6 +49,7 @@ export function createPlayer(x = 180, y = 0) {
     baseArmor: PLAYER_BASE.armor, // armadura antes dos itens passivos
     damageBonus: 0, // +0.05 = +5% de dano em todos os ataques
     cooldownBonus: 0, // +0.03 = recargas 3% mais rápidas
+    critBonus: 0, // +0.01 = +1% de crítico (melhoria Precisão)
     charges: {},
     dots: [],
   };
@@ -73,6 +74,8 @@ function freshRun() {
     victoryShown: false,
     // Telas de recompensa seguidas sem lendário (4 seguidas garantem um na próxima)
     rewardsSinceLegendary: 0,
+    // Rerrolagens de recompensa que ainda restam nesta run (melhoria Rerrolar; vai no save)
+    rerollsLeft: 0,
     runStats: { totalDamage: 0, itemUses: {}, damageByItem: {}, startTime: 0 },
   };
 }

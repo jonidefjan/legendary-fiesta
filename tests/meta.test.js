@@ -39,7 +39,7 @@ test("applyUpgrades define valores absolutos e é idempotente", () => {
   meta.applyUpgrades(p);
   meta.applyUpgrades(p);
   assert.equal(p.maxHp, 130);
-  assert.equal(p.baseArmor, 8);
+  assert.equal(p.baseArmor, 20);
   assert.ok(Math.abs(p.damageBonus - 0.1) < 1e-9);
   assert.ok(Math.abs(p.cooldownBonus - 0.15) < 1e-9);
 });
@@ -54,7 +54,7 @@ test("bônus de recarga tem teto de 50%", () => {
 test("describeLevel", () => {
   assert.equal(meta.describeLevel("vitality", 3), "+30 vida");
   assert.equal(meta.describeLevel("might", 2), "+10% dano");
-  assert.equal(meta.describeLevel("guard", 1), "+2 armadura");
+  assert.equal(meta.describeLevel("guard", 1), "+5 armadura");
   assert.equal(meta.describeLevel("haste", 2), "-6% recarga");
 });
 

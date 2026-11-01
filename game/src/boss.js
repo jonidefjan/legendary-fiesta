@@ -8,7 +8,7 @@ import { random } from "./random.js";
 import { emit, log, sound } from "./events.js";
 import { createEnemy, ENEMY_TYPES, waveScales, enemyName } from "./waves.js";
 import { t } from "./i18n.js";
-import { applyDot, enemyAttack, ANIM_MS } from "./combat.js";
+import { applyDot, enemyAttack, slowFactor, ANIM_MS } from "./combat.js";
 
 // Onda de chefe a cada 10 (10, 20, 30... no modo infinito)
 export const BOSS_EVERY = 10;
@@ -29,7 +29,6 @@ export const BOSS_TYPES = {
     abilityInterval: 6000,
     xp: 150,
     fragments: 30,
-    resist: { fire: -0.3, water: 0, ice: 0.5, lightning: 0, physical: 0, shadow: 0.5, holy: -0.3 },
   },
   demon: {
     kind: "demon",
@@ -40,9 +39,33 @@ export const BOSS_TYPES = {
     abilityInterval: 5000,
     xp: 180,
     fragments: 35,
-    resist: { fire: 0.6, water: -0.3, ice: -0.3, lightning: 0, physical: 0.1 },
   },
 };
+
+// Resistências do chefe, sorteadas ao nascer (não vão no save: a onda é refeita ao continuar).
+// Cada elemento resiste 50% ou 80%; no máximo 1 fica imune (resist 1) e 1 é fraco (-0.5 =
+// +50% de dano). O físico fica fora e sempre causa 100%.
+export const BOSS_ELEMENTS = ["fire", "ice", "poison", "lightning", "holy", "shadow", "water"];
+export const BOSS_RESISTS = [0.5, 0.8];
+export const WEAK_RESIST = -0.5;
+
+// O primeiro chefe da run (onda BOSS_EVERY) não tem imune; dos seguintes em diante, sempre 1
+export function rollBossResist(wave = BOSS_EVERY * 2) {
+  const resist = { physical: 0 };
+  for (const el of BOSS_ELEMENTS) resist[el] = BOSS_RESISTS[random() < 0.5 ? 0 : 1];
+  const pick = (list) => list[Math.min(list.length - 1, Math.floor(random() * list.length))];
+  const immune = wave > BOSS_EVERY ? pick(BOSS_ELEMENTS) : null;
+  if (immune) resist[immune] = 1;
+  const weak = pick(BOSS_ELEMENTS.filter((el) => el !== immune));
+  resist[weak] = WEAK_RESIST;
+  return { resist, immune, weak };
+}
+
+// Fogo do chefe no herói: stacks da nova (com a regra nova, 1 de dano por stack por
+// segundo e perda de max(1, ⌊stacks ÷ 10⌋) por segundo): 4 + 1 a cada 5 ondas
+export function novaBurnStacks(wave) {
+  return 4 + Math.floor(wave / 5);
+}
 
 export function isBossWave(wave) {
   return wave > 0 && wave % BOSS_EVERY === 0;
@@ -65,9 +88,12 @@ function createBoss(kind, wave, { width, height, mobile = false, maxX = Infinity
   // No celular os inimigos andam mais devagar (createEnemy faz o mesmo)
   const speedScale = mobile ? 0.7 : 1;
   const hp = Math.round(minion.hp * scales.hp * BOSS_HP_MULT);
+  const { resist, immune, weak } = rollBossResist(wave);
   return {
     ...base,
-    resist: { ...base.resist },
+    resist,
+    immune, // elemento imune (ou null): só item que quebra a imunidade acerta
+    weak, // elemento fraco (+50% de dano)
     speed: base.speed * speedScale,
     isBoss: true,
     wave,
@@ -151,7 +177,7 @@ function fireNova(boss) {
   boss.dmg = dmg;
   // Esquiva e bloqueio perfeito evitam a queimadura; barreira que absorve não
   if (outcome !== "dodged" && outcome !== "blocked" && state.running && p.hp > 0) {
-    applyDot(p, "burning", Math.max(1, Math.round(boss.dmg * 0.25)), 3);
+    applyDot(p, "burning", 1, 0, true, { stacks: novaBurnStacks(boss.wave), sourceId: null });
   }
 }
 
@@ -175,7 +201,7 @@ export function updateBosses(dt) {
     }
     // Congelado: nem a recarga das habilidades avança
     if (boss.frozen > 0) continue;
-    boss.abilityTimer += dt;
+    boss.abilityTimer += dt * slowFactor(boss); // frio também atrasa as habilidades
     if (boss.abilityTimer < boss.abilityInterval) continue;
     boss.abilityTimer = 0;
     if (boss.kind === "lich") {
