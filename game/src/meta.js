@@ -31,7 +31,7 @@ export const UPGRADES = [
 ];
 
 // Itens míticos: compra única na loja do menu (não são melhorias com nível)
-export const MYTHIC_COST = 1000;
+export const MYTHIC_COST = 100;
 export const MYTHIC_IDS = ["elemental_click", "seismic_finger"];
 
 export function isMythicUnlocked(id) {

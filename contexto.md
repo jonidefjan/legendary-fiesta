@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #18 (commit `74780d7`).
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #19 (commit `8bc42cc`).
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -8,10 +8,10 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Tem i18n EN (padrão) e pt-BR, com a chave `lang` no localStorage, e tema claro/escuro.
 - **Reliquary** (`game/`): auto-battler em JS puro, sem build.
   - 3D pixel art com Three.js 0.170, vendorizado em `game/vendor/three`.
-  - Testes: `npm test` na raiz (**352** passando).
+  - Testes: `npm test` na raiz (**411** passando).
 
 ## Estado
-- **Fases concluídas:** 0 a 10, 13 e 14 (PRs #2 a #16).
+- **Fases concluídas:** 0 a 11, 13 e 14 (PRs #2 a #19). Falta a fase 12 (inimigo à distância).
 - **Fase 14 (itens no celular):**
   - No celular, tocar num item abre o painel `#item-panel` embaixo da tela; no desktop, o tooltip de hover continua.
   - Com mais de 6 itens, a caixa de itens rola por dentro (`inv-scroll`, 168 px).
@@ -45,21 +45,24 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
     - `judgment_tome`: acerta todos.
     - `thorn_mail`: espinhos.
   - **Lendário garantido:** depois de 4 telas de recompensa sem nenhum, e nas recompensas de chefe do modo infinito (`state.rewardsSinceLegendary`).
-  - **Lâmina de Brasa:** sem dano direto, queima em todo golpe. Armas com dano base 0 só aplicam efeitos.
-- **Aguardando o usuário: mana.** Ela vai ser descartada. O usuário vai redesenhar o **Manto do Arcano** (`mage_robe`: maxMana, magicBoost não usado, manaFromDamage) e a **Pedra de Mana** (`mana_stone`: mana + transbordamento).
-  - Depois disso, remover a mana do jogo inteiro: a barra MP, `p.mana`/`maxMana`, o save e as traduções.
+  - **Lâmina de Brasa** (hoje): 12 de dano de fogo, +3 por nível, e 1 stack de queimadura por nível em todo golpe. Armas com dano base 0 (como os míticos) só aplicam efeitos.
 
 ## Próximas fases
 Plano de melhorias, pedido pelo usuário em 2026-10-31. A ordem foi escolhida por ele:
-- **11 – Revisão dos efeitos (em andamento):**
-  - Grill-me concluído. As decisões vão para `docs/design/effects-v2.md` (cópia de trabalho em `scratchpad/phase11-decisions.md`).
-  - Implementação em 3 PRs:
-    - **11a (feita, PR #17):** regras globais (níveis por item, armadura decrescente, fogo e veneno novos, frio unificado, resistências de chefe por sorteio, stacks abaixo da barra do chefe, loja nova).
-    - **11b (feita, PR #18):** os 29 itens com N1/N3/N5 e a evolução genérica (`evolution`/`evolvedFrom`/`art`, abates 20 ×1,5, raridade nos marcos). Lâmina do Veterano e Couraça de Batalha. A Pedra de Eco (`echo_stone`) substitui a de Mana. Saíram a mana e a barreira. Efeitos `fixedRate` não aceleram. O frio só decai 3s depois do último stack.
-    - **11c:** os 11 itens novos, 2 itens míticos de clique (Clique Elemental e Dedo Sísmico, desbloqueados na loja por 1000, um por run) e os ícones de pixel art.
-  - Formato por nível: `<chave>PerLevel` ou `perLevel`, e `minLevel: 3|5` nos efeitos (helpers `levelValue` e `perLevelOf` em `items.js`). O encantamento N5 do item vai em `items.<id>.enchantExtra`.
-  - Ao terminar, regerar `docs/items.md`.
-- **12 – Inimigo que ataca de longe:**
+- **11 – Revisão dos efeitos (concluída, PRs #17–#19).** A spec completa fica em `docs/design/effects-v2.md`.
+  - **Níveis:** cada item tem dados próprios por nível, com encantamento no N3 e extra no N5.
+  - **Evolução:** Espada, Colete e Ferradura evoluem no nível 5 e depois sobem sem limite, por recompensas e abates.
+  - **Mana e barreira:** saíram do jogo.
+  - **Itens:** 45 no total, contando os 2 míticos de clique (desbloqueio na loja por 100, um por run, 8 cliques/s em `clicks.js`).
+  - **Balanceamento:**
+    - Os valores de nível 1 dos itens subiram 30%.
+    - Fogo: stacks sem limite, 1 de dano/stack, decai max(1, ⌊stacks/10⌋)/s só depois de 3s sem stack novo.
+    - Veneno: nunca perde stacks.
+    - Frio: 10% de lentidão por stack, congela com 5, decai depois de 3s.
+    - Chefes: resistências sorteadas, com 1 imunidade a partir do 2º chefe.
+    - Loja: 8 melhorias.
+  - **Retaguarda:** distância > 35% entre o herói e a borda visível.
+- **12 – Inimigo que ataca de longe (próxima):** projétil e parada mais distante, com o modelo `Skeleton_Mage` ou `Skeleton_Rogue`. A Cota de Malha e a Couraça podem interagir com projéteis e lentidão. As decisões vão por múltipla escolha.
   - Projétil e posição de parada mais distante.
   - Modelo `Skeleton_Mage` ou `Skeleton_Rogue`, que já estão no repositório.
   - As decisões vão por múltipla escolha.
