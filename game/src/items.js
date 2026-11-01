@@ -48,7 +48,20 @@ export function localizeItems() {
     item.desc = t(`items.${item.id}.desc`);
     item.effect = t(`items.${item.id}.effect`);
     item.enchant = hasKey(`items.${item.id}.enchant`) ? t(`items.${item.id}.enchant`) : null;
+    item.enchantExtra = hasKey(`items.${item.id}.enchantExtra`)
+      ? t(`items.${item.id}.enchantExtra`)
+      : null;
   }
+}
+
+// Encantamentos do item em ordem, com o nível em que cada um libera: o texto base vale
+// do nível `enchantLevel` (padrão 1) e o extra do `enchantExtraLevel` (padrão 5).
+// level: nível a avaliar (o das cartas de recompensa é o nível que o item terá).
+export function enchantTiers(item, level = itemLevel(item.id)) {
+  const tiers = [];
+  if (item.enchant) tiers.push({ text: item.enchant, minLevel: item.enchantLevel ?? 1 });
+  if (item.enchantExtra) tiers.push({ text: item.enchantExtra, minLevel: item.enchantExtraLevel ?? 5 });
+  return tiers.map((tier) => ({ ...tier, unlocked: level >= tier.minLevel }));
 }
 
 export function getItems() {
@@ -60,8 +73,10 @@ export function findItem(id) {
 }
 
 // ─── Efeitos ───
+// Efeito com "minLevel" (encantamentos de nível 3 e 5) só vale depois de o item chegar lá
 export function effectsOf(item, trigger) {
-  return (item.effects || []).filter((e) => e.trigger === trigger);
+  const level = itemLevel(item.id);
+  return (item.effects || []).filter((e) => e.trigger === trigger && (e.minLevel ?? 1) <= level);
 }
 
 // Efeitos de um gatilho em todos os itens do jogador, com o item de origem
@@ -91,8 +106,10 @@ export function starterItems() {
 }
 
 // ─── Níveis ───
-// Pegar um item que já tem sobe o nível dele: +20% no efeito principal e -5% de
-// recarga por nível. No nível máximo ele sai do sorteio.
+// Pegar um item que já tem sobe o nível dele. Regra por item: o JSON declara o que cresce
+// ("damage" + "damagePerLevel", ou perLevel: { damage: 3 }). Quem ainda não declara nada
+// segue a regra genérica: +20% no efeito principal e -5% de recarga por nível.
+// No nível máximo ele sai do sorteio.
 export const MAX_ITEM_LEVEL = 5;
 export const LEVEL_POWER = 0.2;
 export const LEVEL_COOLDOWN = 0.05;
@@ -111,11 +128,29 @@ export function levelMultiplier(id) {
   return 1 + LEVEL_POWER * (itemLevel(id) - 1);
 }
 
-// Recarga com nível do item e bônus permanente de velocidade
+// Crescimento por nível declarado em `obj` (item ou efeito) para `key`; null se não declara
+export function perLevelOf(obj, key) {
+  const v = obj.perLevel?.[key] ?? obj[`${key}PerLevel`];
+  return typeof v === "number" ? v : null;
+}
+
+// Valor de `key` no nível do item: base + crescimento × (nível - 1) quando declarado.
+// Sem declaração: o valor × levelMultiplier (regra genérica), ou fixo com legacy: false.
+export function levelValue(item, obj, key, base = obj[key] ?? 0, { legacy = true } = {}) {
+  const per = perLevelOf(obj, key);
+  if (per != null) return base + per * (itemLevel(item.id) - 1);
+  return legacy ? base * levelMultiplier(item.id) : base;
+}
+
+// Recarga com nível do item e bônus permanente de velocidade. "cooldownPerLevel" (ms,
+// negativo) no item troca o -5% genérico.
 export function effectiveCooldown(item) {
-  const levelFactor = 1 - LEVEL_COOLDOWN * (itemLevel(item.id) - 1);
+  const level = itemLevel(item.id);
+  const per = perLevelOf(item, "cooldown");
+  const levelCooldown =
+    per != null ? item.cooldown + per * (level - 1) : item.cooldown * (1 - LEVEL_COOLDOWN * (level - 1));
   const metaFactor = 1 - (state.player.cooldownBonus || 0);
-  return Math.round(item.cooldown * levelFactor * metaFactor);
+  return Math.max(100, Math.round(levelCooldown * metaFactor));
 }
 
 // Adiciona o item ou, se já existe, sobe o nível. Devolve { leveled, level }.
@@ -132,8 +167,8 @@ export function addItemOrLevel(item) {
   return { leveled: false, level: 1 };
 }
 
-// Evasão não passa disso, por mais itens e níveis que existam
-export const MAX_EVASION = 0.5;
+// Esquiva não passa disso, por mais itens e níveis que existam
+export const MAX_EVASION = 0.4;
 
 // Vida máxima = base (meta.applyUpgrades) × (1 + penalidades dos itens). Idempotente:
 // sempre parte de baseMaxHp, e a vida atual nunca passa do novo máximo.
@@ -152,20 +187,20 @@ export function applyPassives() {
   p.armor = p.baseArmor ?? PLAYER_BASE.armor;
   p.maxMana = PLAYER_BASE.maxMana;
   p.magicBoost = PLAYER_BASE.magicBoost;
-  p.critChance = PLAYER_BASE.critChance;
+  p.critChance = PLAYER_BASE.critChance + (p.critBonus || 0); // Precisão (loja)
   p.evasion = 0;
   p.weaponSpeed = 0;
   p.damageBoost = 0;
   for (const { item, effect } of ownedEffects("passive")) {
     if (effect.type !== "stats") continue;
-    const k = levelMultiplier(item.id);
-    p.armor += Math.round((effect.armor || 0) * k);
-    p.maxMana += Math.round((effect.maxMana || 0) * k);
-    p.magicBoost += (effect.magicBoost || 0) * k;
-    p.critChance += (effect.critChance || 0) * k;
-    p.evasion += (effect.evasion || 0) * k;
-    p.weaponSpeed += (effect.weaponSpeed || 0) * k;
-    p.damageBoost += (effect.damageBoost || 0) * k;
+    const v = (key) => levelValue(item, effect, key, effect[key] || 0);
+    p.armor += Math.round(v("armor"));
+    p.maxMana += Math.round(v("maxMana"));
+    p.magicBoost += v("magicBoost");
+    p.critChance += v("critChance");
+    p.evasion += v("evasion");
+    p.weaponSpeed += v("weaponSpeed");
+    p.damageBoost += v("damageBoost");
   }
   p.critChance = Math.min(1, p.critChance);
   p.evasion = Math.min(MAX_EVASION, p.evasion);
@@ -266,13 +301,18 @@ export function generateRandomItems(
 }
 
 // ─── Recompensa: lendário garantido ───
-// Depois de PITY_SCREENS telas seguidas sem lendário, a próxima garante um.
-// Chefe (a cada 10 ondas) também garante. rewardsSinceLegendary vai na run salva.
+// Depois de PITY_SCREENS telas seguidas sem lendário, a próxima garante um; a melhoria
+// Sorte lendária encurta isso (1 por nível). Chefe (a cada 10 ondas) também garante.
+// rewardsSinceLegendary vai na run salva.
 export const PITY_SCREENS = 4;
 
-export function rewardOptions(count, { boss = false } = {}) {
-  const guaranteeLegendary = boss || state.rewardsSinceLegendary >= PITY_SCREENS;
-  const options = generateRandomItems(count, new Set(), { guaranteeLegendary });
+export function pityScreens(luckLevel = state.meta?.upgrades?.luck || 0) {
+  return Math.max(1, PITY_SCREENS - luckLevel);
+}
+
+export function rewardOptions(count, { boss = false, exclude = new Set() } = {}) {
+  const guaranteeLegendary = boss || state.rewardsSinceLegendary >= pityScreens();
+  const options = generateRandomItems(count, exclude, { guaranteeLegendary });
   // Tela sem opções não existe: não conta
   if (options.length > 0) {
     state.rewardsSinceLegendary = options.some((i) => i.rarity === "legendary")
@@ -280,6 +320,28 @@ export function rewardOptions(count, { boss = false } = {}) {
       : state.rewardsSinceLegendary + 1;
   }
   return options;
+}
+
+// Tela de recompensa com rerrolagem: reroll() gasta uma das state.rerollsLeft e sorteia de novo
+// (devolve null sem rerrolagens). A tela conta uma vez só para o lendário garantido: o
+// sorteio novo parte da contagem de antes da primeira.
+export function rewardOffer(count, { boss = false } = {}) {
+  const pityBefore = state.rewardsSinceLegendary;
+  const draw = (exclude = new Set()) => {
+    state.rewardsSinceLegendary = pityBefore;
+    return rewardOptions(count, { boss, exclude });
+  };
+  const offer = { options: draw() };
+  offer.reroll = () => {
+    if (state.rerollsLeft <= 0) return null;
+    state.rerollsLeft--;
+    // Rerrolar evita as opções atuais; se o sorteio não enche a tela, aceita repetir
+    let next = draw(new Set(offer.options.map((i) => i.id)));
+    if (next.length < count) next = draw();
+    offer.options = next;
+    return offer.options;
+  };
+  return offer;
 }
 
 export function getWeightedRarity(weights) {

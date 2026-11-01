@@ -40,3 +40,12 @@ export const INV_SCROLL_THRESHOLD = 6;
 export function needsInvScroll(count) {
   return count > INV_SCROLL_THRESHOLD;
 }
+
+// Contador de stacks no overlay (×N): números grandes ficam curtos para caber ao lado do ícone
+export function formatStacks(n) {
+  const v = Math.max(0, Math.floor(n));
+  if (v < 1000) return String(v);
+  if (v < 10000) return `${(v / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  if (v < 1000000) return `${Math.floor(v / 1000)}k`;
+  return `${(v / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
+}

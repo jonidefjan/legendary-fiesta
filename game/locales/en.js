@@ -58,6 +58,7 @@ export default {
   "item.close": "Close",
   "card.new": "New",
   "card.upgrade": "⬆️ Level {from} → {to}",
+  "item.unlocksAt": "Unlocks at level {level}",
 
   // Modais de escolha
   "pick.single.title": "⚔️ Choose your weapon",
@@ -70,6 +71,8 @@ export default {
   "reward.title": "🎁 Wave Reward!",
   "reward.sub.one": "Choose 1 of {count} option · Wave {wave} cleared",
   "reward.sub.other": "Choose 1 of {count} options · Wave {wave} cleared",
+  "reward.reroll": "🔄 Reroll ({left} left)",
+  "reward.rerollLabel": "Reroll the options, {left} left",
 
   // Derrota
   "gameover.title": "☠️ Defeated",
@@ -119,13 +122,25 @@ export default {
   "upgrades.might.name": "Might",
   "upgrades.might.desc": "+5% damage per level",
   "upgrades.guard.name": "Guard",
-  "upgrades.guard.desc": "+2 armor per level",
+  "upgrades.guard.desc": "+5 armor per level",
   "upgrades.haste.name": "Haste",
   "upgrades.haste.desc": "Cooldowns 3% faster per level",
   "upgrades.effect.maxHp": "+{n} HP",
   "upgrades.effect.damage": "+{n}% damage",
   "upgrades.effect.armor": "+{n} armor",
   "upgrades.effect.cooldown": "-{n}% cooldown",
+  "upgrades.precision.name": "Precision",
+  "upgrades.precision.desc": "+1% critical chance per level (max 15)",
+  "upgrades.extraOption.name": "One More Option",
+  "upgrades.extraOption.desc": "Reward screens show 4 items instead of 3",
+  "upgrades.reroll.name": "Reroll",
+  "upgrades.reroll.desc": "+1 reward reroll per run, per level (max 3)",
+  "upgrades.luck.name": "Legendary Luck",
+  "upgrades.luck.desc": "The guaranteed legendary comes 1 screen sooner per level (max 2)",
+  "upgrades.effect.crit": "+{n}% crit",
+  "upgrades.effect.options": "{n} options",
+  "upgrades.effect.rerolls": "{n} per run",
+  "upgrades.effect.luck": "after {n} screens without a legendary",
 
   // Inimigos
   "enemies.skeleton": "Skeleton",
@@ -145,6 +160,7 @@ export default {
   "screen.defeatSub": "Wave {wave} · Score: {score}",
   "float.resisted": "RESISTED",
   "float.weak": "WEAK!",
+  "float.immune": "IMMUNE",
   "float.crit": "CRITICAL!",
   "float.dodge": "DODGE",
 
@@ -173,6 +189,9 @@ export default {
   "log.dot": "{icon} {target} {verb}! (DoT stacking)",
   "log.cooldownRefund": "{icon} {item}: cooldown reduced!",
   "log.freeze": "❄️ {target} was frozen for {seconds}s!",
+  "log.freezeMany.one": "❄️ {count} enemy was frozen!",
+  "log.freezeMany.other": "❄️ {count} enemies were frozen!",
+  "log.cold": "{icon} {item}: {target} is getting colder (+{stacks} cold)!",
   "log.sprint": "{icon} {item}: sprint! {weapon} cooldown reset.",
   "log.harvestReady": "{icon} {item}: harvest ready! Next attack deals double damage.",
   "log.critFragment.one": "{icon} {item}: critical kill! +{count} fragment.",

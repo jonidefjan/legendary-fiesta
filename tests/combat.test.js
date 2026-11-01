@@ -35,7 +35,7 @@ test("dano contínuo acumula até 5 vezes e causa dano a cada segundo", () => {
   setupRun();
   const target = enemy({ hp: 100 });
   state.enemies = [target];
-  for (let i = 0; i < 7; i++) applyDot(target, "burning", 3, 4);
+  for (let i = 0; i < 7; i++) applyDot(target, "bleeding", 3, 4);
   assert.equal(target.dots[0].stacks, 5);
 
   processDots(999);
@@ -66,7 +66,7 @@ test("Lâmina de Brasa não causa dano direto e queima em todo golpe", () => {
   assert.equal(target.hp, hp, "golpe sem dano");
   assert.deepEqual(
     target.dots.map((d) => [d.type, d.damage, d.stacks]),
-    [["burning", 3, 1]],
+    [["burning", 1, 1]],
   );
   activateItem(item("ember_blade"));
   assert.equal(target.dots[0].stacks, 2);
@@ -152,12 +152,12 @@ test("barreira absorve dano e reflete 20% do que absorveu", () => {
   assert.equal(state.player.hp, 90);
 });
 
-test("armadura reduz o dano em porcentagem, com mínimo 1", () => {
+test("armadura reduz o dano com retorno decrescente, com mínimo 1", () => {
   setupRun(["leather_vest"]);
-  enemyAttack(enemy({ dmg: 50 }));
-  assert.equal(state.player.hp, 100 - 44);
+  enemyAttack(enemy({ dmg: 50 })); // 12 / (12 + 100) = 10,7%
+  assert.equal(state.player.hp, 100 - 45);
   enemyAttack(enemy({ dmg: 1 }));
-  assert.equal(state.player.hp, 56 - 1);
+  assert.equal(state.player.hp, 55 - 1);
 });
 
 test("Manto do Mago converte 30% do dano recebido em mana", () => {
@@ -339,7 +339,7 @@ test("dano contínuo letal aciona a Pena de Fênix", () => {
   assert.equal(state.player.hp, 40);
 });
 
-test("armadura reduz no máximo 75% do dano", () => {
+test("armadura 300 reduz 75% do dano (a curva não tem teto)", () => {
   setupRun([]);
   state.player.armor = 300;
   enemyAttack(enemy({ dmg: 100 }));

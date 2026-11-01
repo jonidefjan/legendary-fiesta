@@ -28,7 +28,7 @@ import {
   ensureTimers,
   starterItems,
   generateRandomItems,
-  rewardOptions,
+  rewardOffer,
   addItemOrLevel,
 } from "./items.js";
 import { createWave } from "./waves.js";
@@ -53,7 +53,6 @@ import { runResult } from "./share.js";
 const ITEMS_URL = new URL("../assets/items.json", import.meta.url);
 // Começa com 1 arma escolhida entre 3; o resto vem das recompensas
 const STARTING_PICK = { options: 3, max: 1, type: "weapon" };
-const REWARD_OPTIONS = 3;
 const GAME_SPEEDS = [1, 2, 3];
 
 // Cada run (e cada morte) troca o runId: ações agendadas de uma run que já acabou
@@ -267,14 +266,23 @@ function startNextWave() {
 function offerReward({ boss = false } = {}) {
   state.isPaused = true;
   // Itens novos ou que ainda podem subir de nível; chefe e 4 telas sem lendário garantem um
-  const options = rewardOptions(REWARD_OPTIONS, { boss });
+  // (3 ou 2 com Sorte lendária). 3 opções, ou 4 com Mais uma opção.
+  const offer = rewardOffer(meta.rewardOptionCount(), { boss });
+  const options = offer.options;
 
   if (options.length === 0) {
     startNextWave();
     resumeGame();
     return;
   }
-  ui.showRewardPick(options, state.wave, pickReward);
+  ui.showRewardPick(options, state.wave, pickReward, {
+    rerolls: state.rerollsLeft,
+    show: meta.rerollsPerRun() > 0 || state.rerollsLeft > 0,
+    onReroll: () => {
+      const next = offer.reroll();
+      return next && { options: next, rerolls: state.rerollsLeft };
+    },
+  });
 }
 
 function pickReward(item) {
@@ -367,6 +375,7 @@ function prepareRun() {
   resetRun({ x: canvas.width * 0.22, y: canvas.height * 0.55 });
   meta.applyUpgrades(state.player);
   state.player.hp = state.player.maxHp;
+  state.rerollsLeft = meta.rerollsPerRun();
   state.runStats.startTime = performance.now();
   particles.clear();
   feel.reset();

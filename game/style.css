@@ -2168,3 +2168,59 @@ canvas {
     color: #d3a6ff;
   }
 }
+
+/* Fase 11a: encantamento ainda trancado (o nível do item não chegou lá) */
+.tt-enchant.locked,
+.item-choice-enchant.locked,
+.item-panel-enchant.locked {
+  opacity: 0.6;
+  filter: grayscale(0.5);
+}
+.enchant-lock {
+  display: block;
+  font-weight: bold;
+  color: var(--text2);
+  margin-bottom: 2px;
+}
+
+/* Botão de rerrolar da tela de recompensa */
+.reroll-btn {
+  margin-top: 10px;
+  min-height: 44px;
+  padding: 8px 18px;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--gold2);
+  background: var(--bg3);
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.reroll-btn:hover:not(:disabled),
+.reroll-btn:focus-visible {
+  background: var(--gold);
+  color: #1a1408;
+  outline: none;
+}
+.reroll-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* O modal tem max-width de 800px: com 4 cartas ele alarga */
+#item-choice-modal .modal-content:has(.item-choice-card:nth-child(4):last-child) {
+  max-width: 1100px;
+}
+
+/* Mais uma opção: 4 cartas lado a lado no desktop, 2×2 no celular */
+.item-choices:has(.item-choice-card:nth-child(4):last-child) {
+  grid-template-columns: repeat(4, 1fr);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+@media (max-width: 768px) {
+  .item-choices:has(.item-choice-card:nth-child(4):last-child) {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: none;
+  }
+}
