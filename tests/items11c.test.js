@@ -640,21 +640,21 @@ test("míticos: raridade própria com cor e nome, fora do sorteio comum", () => 
   assert.equal(ITEMS.filter((i) => i.rarity === "mythic").length, 2);
 });
 
-test("loja: cada mítico custa 1000 fragmentos, compra única, e fica no save de progresso", () => {
+test("loja: cada mítico custa 100 fragmentos, compra única, e fica no save de progresso", () => {
   resetMeta();
-  state.fragments = 999;
+  state.fragments = 99;
   assert.equal(meta.unlockMythic("elemental_click"), false, "sem fragmentos");
-  state.fragments = 2500;
+  state.fragments = 250;
   assert.equal(meta.unlockMythic("elemental_click"), true);
-  assert.equal(state.fragments, 1500);
+  assert.equal(state.fragments, 150);
   assert.equal(meta.isMythicUnlocked("elemental_click"), true);
   assert.equal(meta.unlockMythic("elemental_click"), false, "não compra duas vezes");
-  assert.equal(state.fragments, 1500);
+  assert.equal(state.fragments, 150);
   assert.equal(meta.unlockMythic("rusted_sword"), false, "só os míticos");
   assert.equal(meta.unlockMythic("seismic_finger"), true);
-  assert.equal(state.fragments, 500);
+  assert.equal(state.fragments, 50);
   assert.deepEqual(meta.MYTHIC_IDS, ["elemental_click", "seismic_finger"]);
-  assert.equal(meta.MYTHIC_COST, 1000);
+  assert.equal(meta.MYTHIC_COST, 100);
 
   const storage = memoryStorage();
   save.setStorage(storage);
@@ -663,7 +663,7 @@ test("loja: cada mítico custa 1000 fragmentos, compra única, e fica no save de
   resetMeta();
   save.loadMeta();
   assert.deepEqual(state.meta.unlockedItems, ["elemental_click", "seismic_finger"]);
-  assert.equal(state.fragments, 500);
+  assert.equal(state.fragments, 50);
   save.setStorage(null);
 });
 

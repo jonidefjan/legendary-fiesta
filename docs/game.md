@@ -83,7 +83,7 @@ Milestones are plain effects with `minLevel`. After the last fixed milestone, ef
 
 Two items of the `mythic` rarity (own frame color, translated name): **Elemental Click** and **Seismic Finger**. They have no levels and no cooldown.
 
-- **Unlock**: bought once in the title screen shop for 1000 fragments each. The purchase is stored in the meta save as `unlockedItems` (a list of ids), not as an upgrade level. Old meta saves load with an empty list.
+- **Unlock**: bought once in the title screen shop for 100 fragments each. The purchase is stored in the meta save as `unlockedItems` (a list of ids), not as an upgrade level. Old meta saves load with an empty list.
 - **One per run**: an unlocked mythic is a guaranteed extra card in the starting pick. If you do not take it, it comes back as an extra card in the wave 1 reward (it survives rerolls). With both unlocked, the run draws one (`state.mythicChoice`, saved with the run) and the other never appears. Once you own one, the other is gone for the run. Mythic items never show up in normal reward rolls.
 - **Activation**: click or tap anywhere on the arena (not on its buttons), only while the run is going and not paused. At most 8 activations per second: `clicks.js` keeps a sliding 1s window over real time (a click leaves the window once a full second has passed), and the excess is ignored. A small counter in the arena shows the current rate.
 - **Elemental Click**: each click applies 1 stack of fire, poison or cold (random) to a random living enemy. Resistances, immunities and the Arcane Robe's extra stack apply as for any other source.

@@ -195,7 +195,7 @@ Requested by the owner because the early game was too hard:
 
 Requested on 2026-11-01. New rarity **mythic**, 2 items with a finger icon, no levels.
 
-- One-time purchase in the title shop, 1000 fragments each. Stored in the meta save as unlocked items.
+- One-time purchase in the title shop, 100 fragments each. Stored in the meta save as unlocked items.
 - Only one per run. If unlocked, it is a guaranteed extra card in the starting pick; if not taken, it appears again in the wave 1 reward. With both unlocked, one is drawn per run; once one is owned, the other never appears.
 - **Activation:** click or tap anywhere on the arena, up to 8 per second; the excess is ignored. A counter shows the rate.
 - **Elemental Click:** each click applies 1 stack of fire, poison or cold (random) to a random enemy, respecting resistance and boss immunity.
