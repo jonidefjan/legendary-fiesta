@@ -23,9 +23,10 @@ export const RARITIES = {
   rare: rarity("rare", "#4488cc"),
   epic: rarity("epic", "#8844cc"),
   legendary: rarity("legendary", "#c9a84c"),
+  mythic: rarity("mythic", "#ff4d8d"), // itens míticos: só vêm da loja, nunca do sorteio comum
 };
 
-// Pesos de raridade no sorteio (maior = mais comum)
+// Pesos de raridade no sorteio (maior = mais comum). Mítico não entra: ver mythicOffer.
 const RARITY_WEIGHTS = {
   common: 40,
   uncommon: 30,
@@ -188,6 +189,20 @@ export function effectiveCooldown(item) {
   return Math.max(100, Math.round(levelCooldown * metaFactor));
 }
 
+// Efeitos "levelUp": acontecem uma vez, no nível em que o item chega (atLevel)
+export const LEVEL_UP_EFFECTS = {
+  // Trevo de Ouro N10: +1 rerrolagem de recompensa na run
+  reroll(effect) {
+    state.rerollsLeft += effect.amount;
+  },
+};
+
+function runLevelUp(item, level) {
+  for (const effect of effectsOf(item, "levelUp")) {
+    if (effect.atLevel === level) LEVEL_UP_EFFECTS[effect.type]?.(effect, item);
+  }
+}
+
 // Adiciona o item ou, se já existe, sobe o nível. Devolve { leveled, level, evolvedTo }.
 export function addItemOrLevel(item) {
   if (state.items.some((i) => i.id === item.id)) {
@@ -201,6 +216,7 @@ export function addItemOrLevel(item) {
     }
     applyPassives();
     ensureTimers();
+    runLevelUp(item, level);
     return { leveled: true, level };
   }
   state.items.push(item);
@@ -243,6 +259,7 @@ function evolveItem(item, into) {
   if (state.player.lastActivated === item.id) state.player.lastActivated = into.id;
   applyPassives();
   ensureTimers();
+  runLevelUp(into, state.itemLevels[into.id]);
   emit("evolved", { from: item.id, to: into.id });
 }
 
@@ -276,6 +293,7 @@ export function levelUpItem(item) {
   state.evolveKills[item.id] = 0;
   applyPassives();
   ensureTimers();
+  runLevelUp(item, level);
   emit("itemLeveled", { id: item.id, level });
 }
 
@@ -321,7 +339,9 @@ export function applyPassives() {
   p.regen = 0; // HP por segundo
   p.dotReduction = 0; // fração do dano contínuo recebido que some
   p.damageReduction = 0; // fração do dano recebido que some (depois da armadura)
+  p.fireImmune = false; // Manto de Cinzas N5: o fogo dos chefes não pega no herói
   for (const { item, effect } of ownedEffects("passive")) {
+    if (effect.type === "immunity" && effect.immune === "fire") p.fireImmune = true;
     if (effect.type !== "stats") continue;
     // Marcos repetidos (every) somam uma vez por repetição
     const v = (key) => levelValue(item, effect, key, effect[key] || 0) * effectCount(item, effect);
@@ -368,6 +388,7 @@ function ownedLevel(id) {
 // Entra no sorteio? A forma evoluída só aparece para quem a tem (como "subir de nível"), e
 // o item base some depois de evoluir
 function offerable(item) {
+  if (item.rarity === "mythic") return false; // míticos só entram por mythicOffer
   if (item.evolvedFrom) return ownedLevel(item.id) > 0;
   if (item.evolution && ownedLevel(item.evolution.into) > 0) return false;
   return ownedLevel(item.id) < maxLevelOf(item);
@@ -451,8 +472,16 @@ export function generateRandomItems(
 // rewardsSinceLegendary vai na run salva.
 export const PITY_SCREENS = 4;
 
-export function pityScreens(luckLevel = state.meta?.upgrades?.luck || 0) {
-  return Math.max(1, PITY_SCREENS - luckLevel);
+// withItems: false ignora os itens (a loja descreve a melhoria sozinha). O Trevo de Ouro N15
+// encurta a espera em 1 (mínimo 1).
+export function pityScreens(luckLevel = state.meta?.upgrades?.luck || 0, withItems = true) {
+  const bonus = withItems
+    ? ownedEffects("passive").reduce(
+        (n, { item, effect }) => (effect.type === "luck" ? n + effect.pity * effectCount(item, effect) : n),
+        0,
+      )
+    : 0;
+  return Math.max(1, PITY_SCREENS - luckLevel - bonus);
 }
 
 export function rewardOptions(count, { boss = false, exclude = new Set() } = {}) {
@@ -470,23 +499,50 @@ export function rewardOptions(count, { boss = false, exclude = new Set() } = {})
 // Tela de recompensa com rerrolagem: reroll() gasta uma das state.rerollsLeft e sorteia de novo
 // (devolve null sem rerrolagens). A tela conta uma vez só para o lendário garantido: o
 // sorteio novo parte da contagem de antes da primeira.
-export function rewardOffer(count, { boss = false } = {}) {
+// extra: carta fora do sorteio (o item mítico da onda 1); fica no fim e sobrevive à rerrolagem
+export function rewardOffer(count, { boss = false, extra = null } = {}) {
   const pityBefore = state.rewardsSinceLegendary;
   const draw = (exclude = new Set()) => {
     state.rewardsSinceLegendary = pityBefore;
     return rewardOptions(count, { boss, exclude });
   };
-  const offer = { options: draw() };
+  const withExtra = (list) => (extra ? [...list, extra] : list);
+  const offer = { options: withExtra(draw()) };
   offer.reroll = () => {
     if (state.rerollsLeft <= 0) return null;
     state.rerollsLeft--;
     // Rerrolar evita as opções atuais; se o sorteio não enche a tela, aceita repetir
     let next = draw(new Set(offer.options.map((i) => i.id)));
     if (next.length < count) next = draw();
-    offer.options = next;
+    offer.options = withExtra(next);
     return offer.options;
   };
   return offer;
+}
+
+// ─── Itens míticos ───
+// Comprados na loja (state.meta.unlockedItems), um só por run: com os dois liberados, a run
+// sorteia qual (state.mythicChoice, salvo na run). Depois de pegar um, o outro some.
+export function isMythic(item) {
+  return item?.rarity === "mythic";
+}
+
+export function ownedMythic() {
+  return state.items.find(isMythic) || null;
+}
+
+// O mítico que esta run oferece (escolha inicial e recompensa da onda 1); null se o jogador
+// não liberou nenhum ou já tem um
+export function mythicOffer() {
+  if (ownedMythic()) return null;
+  const unlocked = catalog.filter(
+    (i) => isMythic(i) && (state.meta?.unlockedItems || []).includes(i.id),
+  );
+  if (unlocked.length === 0) return null;
+  if (!unlocked.some((i) => i.id === state.mythicChoice)) {
+    state.mythicChoice = unlocked[Math.floor(random() * unlocked.length)].id;
+  }
+  return findItem(state.mythicChoice);
 }
 
 export function getWeightedRarity(weights) {

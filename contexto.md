@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #17 (commit `05b14ac`).
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #18 (commit `74780d7`).
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -8,7 +8,7 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Tem i18n EN (padrão) e pt-BR, com a chave `lang` no localStorage, e tema claro/escuro.
 - **Reliquary** (`game/`): auto-battler em JS puro, sem build.
   - 3D pixel art com Three.js 0.170, vendorizado em `game/vendor/three`.
-  - Testes: `npm test` na raiz (**292** passando).
+  - Testes: `npm test` na raiz (**352** passando).
 
 ## Estado
 - **Fases concluídas:** 0 a 10, 13 e 14 (PRs #2 a #16).
@@ -55,7 +55,7 @@ Plano de melhorias, pedido pelo usuário em 2026-10-31. A ordem foi escolhida po
   - Grill-me concluído. As decisões vão para `docs/design/effects-v2.md` (cópia de trabalho em `scratchpad/phase11-decisions.md`).
   - Implementação em 3 PRs:
     - **11a (feita, PR #17):** regras globais (níveis por item, armadura decrescente, fogo e veneno novos, frio unificado, resistências de chefe por sorteio, stacks abaixo da barra do chefe, loja nova).
-    - **11b:** os 29 itens com N1/N3/N5, a evolução dos comuns, e a saída da mana e da barreira.
+    - **11b (feita, PR #18):** os 29 itens com N1/N3/N5 e a evolução genérica (`evolution`/`evolvedFrom`/`art`, abates 20 ×1,5, raridade nos marcos). Lâmina do Veterano e Couraça de Batalha. A Pedra de Eco (`echo_stone`) substitui a de Mana. Saíram a mana e a barreira. Efeitos `fixedRate` não aceleram. O frio só decai 3s depois do último stack.
     - **11c:** os 11 itens novos, 2 itens míticos de clique (Clique Elemental e Dedo Sísmico, desbloqueados na loja por 1000, um por run) e os ícones de pixel art.
   - Formato por nível: `<chave>PerLevel` ou `perLevel`, e `minLevel: 3|5` nos efeitos (helpers `levelValue` e `perLevelOf` em `items.js`). O encantamento N5 do item vai em `items.<id>.enchantExtra`.
   - Ao terminar, regerar `docs/items.md`.

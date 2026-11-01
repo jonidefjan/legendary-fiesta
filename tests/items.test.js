@@ -67,8 +67,8 @@ test("sorteio devolve menos itens quando o catálogo acaba", () => {
 
 test("efeitos passivos somam armadura e o amplificador do Manto do Arcano", () => {
   setupRun(["leather_vest", "chainmail", "mage_robe"]);
-  assert.equal(state.player.armor, 12 + 18);
-  assert.ok(Math.abs(state.player.elementalBoost - 0.1) < 1e-9);
+  assert.equal(state.player.armor, 16 + 23);
+  assert.ok(Math.abs(state.player.elementalBoost - 0.13) < 1e-9);
   assert.equal(state.player.extraStacks, 0, "o Manto só dá +1 stack a partir do nível 3");
 
   state.items = [item("rusted_sword")];

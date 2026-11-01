@@ -7,7 +7,7 @@ This page describes the game as it is now. For the full item list see [items.md]
 ## Run flow
 
 1. **Title screen.** Start a new run, continue a saved one, or spend fragments in the shop (meta upgrades).
-2. **Weapon pick.** Choose 1 of 3 random weapons.
+2. **Weapon pick.** Choose 1 of 3 random weapons. If you unlocked a mythic item in the shop, it appears as an extra card (see "Mythic items"); picking it instead of a weapon also gives you the common weapon, so you never start unarmed.
 3. **Waves.** Each wave spawns a lineup of skeletons (skeleton, rogue, warrior). Enemy HP grows 20% per wave and damage 15% per wave (on mobile, damage is 15% lower).
 4. **Reward.** After each wave clear, choose 1 of 3 items (4 with the One More Option upgrade, and the Reroll upgrade adds a Reroll button). A new item is added; one you already own goes up a level. The next wave starts as soon as you pick.
 5. **Item levels.** Up to level 5. Each item defines what grows per level (see "Level data" below); nothing scales by default. The first enchant unlocks at level 3 and the extra enchant at level 5, and the tooltip shows locked tiers with the level that unlocks them. Items at max level leave the reward pool. Items that cannot scale (for example the Phoenix Feather) declare their own `maxLevel`.
@@ -30,22 +30,31 @@ The run is saved at the start of each wave, so reloading the page repeats the cu
 - Armor has diminishing returns: damage reduction is `armor / (armor + 100)` (100 armor = 50%), with no cap. Dodge is capped at 40%.
 - Resistance reduces damage and also the stacks applied (fire, poison, cold): a deterministic accumulator lets 1 in 5 stacks land at 80%. Weakness raises damage, not stacks. Immunity blocks both, unless the source item has `breaksImmunity` (then that element counts as 100%).
 - Permanent bonuses (Might upgrade, Cursed Ring, Pact) scale weapons, DoTs and explosions alike.
-- A weapon with base damage 0 (Ember Blade) only applies its effects.
+- A weapon with base damage 0 only applies its effects (no item uses this now: the Ember Blade deals 12 fire damage, +3 per level).
+- **Level 1 balance (11c):** every item's level 1 numbers (damage, heal, armor, thorns, steal, crit, dodge, explosion) are 30% higher than the original design, rounded. Growth per level is unchanged, rates and small stack counts were left alone, and the mythics stay at 1 damage / 1 stack per click.
 
 ### Damage over time
 
 | DoT | Tick | Stacking | Cap |
 | --- | --- | --- | --- |
-| Burn | 1 damage per stack per second; each second it loses `max(1, floor(stacks / 10))` stacks (5 -> 1/s, 30 -> 3/s, 100 -> 10/s) | Each hit adds stacks (Ember Blade: 1 per item level); no duration | None |
+| Burn | 1 damage per stack per second; stacks start to fade only after 3s without receiving new ones (`BURN_GRACE_MS`, any source resets the wait), then each second it loses `max(1, floor(stacks / 10))` stacks (5 -> 1/s, 30 -> 3/s, 100 -> 10/s) | Each hit adds stacks (Ember Blade: 1 per item level); no duration | None |
 | Poison | 1 per second, `base + damage x stacks`; base is `1 + 3 x (level - 1)` | Each hit adds a stack; never expires (lasts until the enemy dies) | None |
 
-DoT ticks never count as crits. Burn can spread (contagion); poison cannot yet. The Demon Lord's nova puts `4 + floor(wave / 5)` burn stacks on the hero.
+DoT ticks never count as crits. Burn spreads through Ember Heart; poison spreads only through Detonating Plague. The Demon Lord's nova puts `4 + floor(wave / 5)` burn stacks on the hero.
 
 ### Other effects
 
 - **Cold** (all ice): each stack slows movement and attacks by 10%; at 5 stacks the enemy freezes for 2s and the stacks reset (a frozen enemy gathers no more cold). Cold starts fading 3s after the last application (1 stack, then 1 more every 2s); cold also slows boss abilities. Sources: Frost Bow (+1 stack per hit), Crystal Armor (2 stacks on everything its barrier explosion hits). The enemy tint lerps from normal to frozen with the stacks.
 - **Freeze**: a frozen enemy does not move or attack (a frozen boss does not advance its ability timer).
 - **Contagion**: when a burning enemy dies, from any killing blow, Ember Heart passes ALL its burn stacks to the nearest living enemies (count equals item level), adding to theirs. Targets that die burning spread again, so it chains.
+- **Fire and poison items (11c)**:
+  - Oil Flask and Venom Flask add stacks when any weapon hits a target that already burns or is poisoned (`weaponHit` trigger, which also fires for hits with no damage, like the Ember Blade's). At level 3 they slow that target by 20% / 15%; at level 5 the Flask halves the burn stack loss (the remainder accumulates in `decayAcc`) and the Venom Flask adds +1 base poison damage per level.
+  - Forge Hammer consumes burn stacks for 3 fire damage each, then re-ignites the target with 2 stacks.
+  - Ash Mantle and Basilisk Hide enemy weakening (`enemyDamage` trigger): the attacker deals less damage per stack of its burn / poison, up to a cap. Ash Mantle level 5 sets `player.fireImmune`, which stops the Demon Lord's nova from burning the hero.
+  - Detonating Plague: every 3s each poisoned enemy passes stacks to its nearest neighbours (count = level, never lowering their poison base); a poison tick that would kill the enemy makes it burst (`poisonTick` trigger) and deal that tick's damage to the neighbours; a poisoned enemy that dies passes half its stacks (all at level 5).
+  - Plague Mushroom: a spore cloud around the hero; from level 3 it stays on the ground for 3s (`state.clouds`, not saved, cleared each wave) and poisons everything inside each second.
+  - Poison from several sources keeps the highest base damage (`applyDot`).
+- **Rear line (11c)**: "rear" means farther than `NEAR_RANGE` (200 px) from the hero. The Long Crossbow (`targeting: "farthest"`) shoots the farthest enemy; the Phantom Hunter's Bow (`targeting: "rear"`) shoots every rear enemy and, when there is none, does not spend its cooldown.
 - **Boss stacks**: every stack on the boss (fire, poison, cold...) is shown as icon and count under its health bar.
 - **Area items**: Seismic Hammer (splash around the target), Blast Core (explosion around the hero), Judgment Tome (hits every enemy), Thorn Mail (damages nearby enemies when you are hit), Thunder Staff (chain lightning).
 - **Echo Stone**: every 6s it repeats the last activated weapon or relic (not armor) at 50% of the effect (+10% per level): damage, stacks, healing and duration are scaled. Level 3 repeats twice, level 5 repeats at 100%. The repeat does not touch the cooldown of the repeated item and never becomes the "last item" itself.
@@ -55,12 +64,12 @@ DoT ticks never count as crits. Burn can spread (contagion); poison cannot yet. 
 
 ### Evolution of common items
 
-Common items (Rusted Sword, Leather Vest; the Lucky Horseshoe comes in 11c) declare `evolution: { into, level }`. When the item reaches that level through a reward, it is replaced in the same slot by its evolved form (Veteran's Blade, Battle Cuirass), keeping level and cooldown timer. The evolved form (`evolvedFrom` in the JSON):
+Common items (Rusted Sword, Leather Vest, Lucky Horseshoe) declare `evolution: { into, level }`. When the item reaches that level through a reward, it is replaced in the same slot by its evolved form (Veteran's Blade, Battle Cuirass, Golden Clover), keeping level and cooldown timer. The evolved form (`evolvedFrom` in the JSON):
 
 - has no level cap and stays in the reward pool as a level-up (the base item leaves the pool once its form is owned);
 - also levels up by kills: the next level needs `round(20 x 1.5^(level - 5))` kills (20, 30, 45, 68, 101...). Progress shows in the tooltip and the item panel, is saved in `evolveKills`, and resets on any level-up;
 - changes rarity with its level: uncommon on evolving, rare at 10, epic at 15, legendary at 20. Rewards roll it by its current rarity weight and the inventory frame takes the rarity color. The rarity is a getter, so everything that reads `item.rarity` follows;
-- reuses the sprite of the base item (`art` field) until the 11c icons arrive.
+- has its own sprite (the `art` field is only needed when a form shares another item's icon).
 
 Milestones are plain effects with `minLevel`. After the last fixed milestone, effects with `every` repeat: `effectCount = 1 + floor((level - minLevel) / every)`.
 
@@ -68,6 +77,18 @@ Milestones are plain effects with `minLevel`. After the last fixed milestone, ef
 | --- | --- | --- |
 | Veteran's Blade | +3 damage | 5: double strike. 10: +10% crit chance. 15: execution (a hit that leaves a non-boss enemy at 20% HP or less kills it). After 15, every 5 levels alternately: +1 strike (20, 30, 40...) or +10% crit chance (25, 35, 45...) |
 | Battle Cuirass | +8 armor | 5: regenerates 1 HP/s. 10: damage over time taken -50%. 15: -15% damage taken, on top of armor. After 15, every 5 levels alternately: +1 HP/s of regeneration (20, 30...) or +25 armor (25, 35...) |
+| Golden Clover | Pays `level` fragments every 10 kills of the run (the Horseshoe pays the same before evolving) | 5: +3% crit chance. 10: +1 reroll for the run, granted once (`levelUp` trigger). 15: the guaranteed legendary comes 1 reward screen earlier (never below 1). After 15, every 5 levels alternately: +1 fragment per payout (20, 30...) or +3% crit chance (25, 35...) |
+
+### Mythic items
+
+Two items of the `mythic` rarity (own frame color, translated name): **Elemental Click** and **Seismic Finger**. They have no levels and no cooldown.
+
+- **Unlock**: bought once in the title screen shop for 1000 fragments each. The purchase is stored in the meta save as `unlockedItems` (a list of ids), not as an upgrade level. Old meta saves load with an empty list.
+- **One per run**: an unlocked mythic is a guaranteed extra card in the starting pick. If you do not take it, it comes back as an extra card in the wave 1 reward (it survives rerolls). With both unlocked, the run draws one (`state.mythicChoice`, saved with the run) and the other never appears. Once you own one, the other is gone for the run. Mythic items never show up in normal reward rolls.
+- **Activation**: click or tap anywhere on the arena (not on its buttons), only while the run is going and not paused. At most 8 activations per second: `clicks.js` keeps a sliding 1s window over real time (a click leaves the window once a full second has passed), and the excess is ignored. A small counter in the arena shows the current rate.
+- **Elemental Click**: each click applies 1 stack of fire, poison or cold (random) to a random living enemy. Resistances, immunities and the Arcane Robe's extra stack apply as for any other source.
+- **Seismic Finger**: each click deals 1 physical damage (times the permanent damage bonuses) to every living enemy.
+- Damage and uses are credited to the item id (`damageByItem`, `itemUses`).
 - **Legendary guarantee**: reward screens roll rarity by weight (common 40, uncommon 30, rare 18, epic 9, legendary 3). After 4 screens without a legendary (3, then 2, with the Legendary Luck upgrade), the next one guarantees one; boss rewards in endless mode always do. The counter (`rewardsSinceLegendary`) is saved with the run.
 - **Meta upgrades**: enemies drop fragments, kept across runs and spent in the title shop. The next level costs `round(20 x 1.25^level)`.
 
@@ -91,7 +112,7 @@ There is no keyboard input; everything is on-screen buttons: play, pause, reset,
 | localStorage key | Content |
 | --- | --- |
 | `reliquary_run` | Current run (save v2): wave, items and levels, timers, legendary counter, endless flag, player state |
-| `reliquary_meta_v1` | Fragments, purchased upgrades, best wave/score, bosses beaten |
+| `reliquary_meta_v1` | Fragments, purchased upgrades, unlocked mythic items, best wave/score, bosses beaten |
 | `reliquary_inv_collapsed` | Inventory bar collapsed or open (default open) |
 | `reliquary_prefs` | Screen shake preference |
 | `lang` | Language, shared with the portfolio |
@@ -116,7 +137,8 @@ There is no keyboard input; everything is on-screen buttons: play, pause, reset,
 | `items.js` | Catalog, reward rolls, levels, passives |
 | `combat.js` | Damage, DoTs, all item effect handlers, enemy attacks |
 | `waves.js`, `boss.js` | Enemy and boss creation and scaling, boss abilities |
-| `meta.js` | Permanent upgrades |
+| `meta.js` | Permanent upgrades and the mythic item purchases |
+| `clicks.js` | Click limiter for mythic items (8 per second, sliding window) |
 | `save.js` | Run and meta persistence |
 | `events.js` | Small event bus from logic to UI and renderer (`hit`, `crit`, `dotTick`, `spread`, `explode`, `enemyDied`, `bossAbility`, `sfx`, ...) |
 | `ui.js`, `ui-title.js`, `ui-victory.js` | DOM: inventory, HUD, modals, title and shop, victory |
@@ -137,6 +159,11 @@ There is no keyboard input; everything is on-screen buttons: play, pause, reset,
 | `use` | When an armor or relic cooldown is ready |
 | `hurt`, `block`, `freeze` | Defensive events, and an enemy freezing (any source) |
 | `damage`, `vulnerable`, `lowHp`, `death` | Damage dealt modifier (Frenzy), damage taken modifier on enemies, low-HP reaction, revive and its extras |
+| `weaponHit` | Every weapon hit, even one with no damage, after the weapon's own effects (flasks) |
+| `slow`, `burnDecay`, `dotBase`, `poisonTick` | Slow on burning / poisoned enemies, burn stack loss, extra base poison damage, a poison tick about to kill (Detonating Plague) |
+| `enemyDamage` | Damage the enemies deal to the hero, per stack on the attacker |
+| `click` | A click on the arena that passed the limiter (mythic items) |
+| `levelUp` | Once, when the item reaches `atLevel` (Golden Clover's reroll) |
 
 ### Level data
 
@@ -190,7 +217,7 @@ npm test
 
 ## Known limits
 
-- **Mana and the barrier are gone.** Old saves with mana or barrier fields load fine (the fields are ignored); a saved Mana Stone becomes the Echo Stone.oved from the HUD, state, save and translations.
+- **Mana and the barrier are gone.** Old saves with mana or barrier fields load fine (the fields are ignored); a saved Mana Stone becomes the Echo Stone.
 - **Heavy models**: the KayKit GLB files total about 22 MB.
 - **Water reflection** re-renders the whole scene.
 - **God rays** are faint, and hero contrast against the scene could be better.

@@ -263,4 +263,20 @@ export default {
   "share.img.favorite": "FAVORITE WEAPON",
   "share.img.damage": "{damage} damage",
   "share.img.url": "jm77os.com.br/game",
+
+  // Fase 11c: itens novos, míticos e loja de míticos
+  "type.mythic": "Mythic",
+  "rarity.mythic": "Mythic",
+  "hud.clicks": "👆 {n}/{max} per second",
+  "shop.mythicTitle": "Mythic items",
+  "shop.mythicNote": "One-time purchase. You can carry only one mythic item per run: click or tap the arena to use it (up to 8 times per second).",
+  "shop.unlock": "Unlock · ⚡ {cost}",
+  "shop.unlocked": "Unlocked",
+  "log.forgeBurst": "{icon} {item}: {stacks} burn stacks burst for {damage} fire damage on {count} enemies!",
+  "log.luckFragments": "{icon} {item}: +{count} fragments!",
+  "log.plagueSpread": "{icon} {item}: the plague spreads to {count} enemies.",
+  "log.plagueDeath": "{icon} {item}: the dying enemy passes {stacks} poison stacks to {count} enemies.",
+  "log.detonate": "{icon} {item}: a poisoned enemy bursts and hits {count} neighbours for {damage}!",
+  "log.poisonCloud": "{icon} {item}: a spore cloud poisons {count} enemies.",
+  "log.poisonAttacker": "{icon} {item}: {enemy} is poisoned!"
 };

@@ -81,6 +81,10 @@ function freshRun() {
     rewardsSinceLegendary: 0,
     // Rerrolagens de recompensa que ainda restam nesta run (melhoria Rerrolar; vai no save)
     rerollsLeft: 0,
+    // Item mítico que esta run oferece quando há mais de um liberado (vai no save da run)
+    mythicChoice: null,
+    // Nuvens de veneno no chão (Cogumelo Pestilento N3): { x, radius, ms, tick, stacks, itemId }
+    clouds: [],
     runStats: { totalDamage: 0, itemUses: {}, damageByItem: {}, startTime: 0 },
   };
 }
@@ -89,6 +93,7 @@ function freshRun() {
 function freshMeta() {
   return {
     upgrades: {}, // id -> nível comprado
+    unlockedItems: [], // itens míticos comprados na loja (ids)
     best: { wave: 0, score: 0 },
     bossesBeaten: 0,
   };
@@ -102,6 +107,8 @@ export const state = {
   tick: 0,
   lastTime: 0,
   gameSpeed: 1,
+  // Borda direita visível da arena em px lógicos (main.js define ao criar a onda); define a linha de trás
+  arenaRight: null,
 };
 
 export function resetMeta() {

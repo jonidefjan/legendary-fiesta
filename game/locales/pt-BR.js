@@ -263,4 +263,20 @@ export default {
   "share.img.favorite": "ARMA FAVORITA",
   "share.img.damage": "{damage} de dano",
   "share.img.url": "jm77os.com.br/game",
+
+  // Fase 11c: itens novos, míticos e loja de míticos
+  "type.mythic": "Mítico",
+  "rarity.mythic": "Mítico",
+  "hud.clicks": "👆 {n}/{max} por segundo",
+  "shop.mythicTitle": "Itens míticos",
+  "shop.mythicNote": "Compra única. Só é possível levar um item mítico por run: clique ou toque na arena para usá-lo (até 8 vezes por segundo).",
+  "shop.unlock": "Liberar · ⚡ {cost}",
+  "shop.unlocked": "Liberado",
+  "log.forgeBurst": "{icon} {item}: {stacks} stacks de queimadura estouram em {damage} de dano de fogo em {count} inimigos!",
+  "log.luckFragments": "{icon} {item}: +{count} fragmentos!",
+  "log.plagueSpread": "{icon} {item}: a praga se espalha para {count} inimigos.",
+  "log.plagueDeath": "{icon} {item}: o inimigo moribundo passa {stacks} stacks de veneno para {count} inimigos.",
+  "log.detonate": "{icon} {item}: um inimigo envenenado explode e atinge {count} vizinhos com {damage}!",
+  "log.poisonCloud": "{icon} {item}: uma nuvem de esporos envenena {count} inimigos.",
+  "log.poisonAttacker": "{icon} {item}: {enemy} fica envenenado!"
 };

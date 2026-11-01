@@ -72,6 +72,7 @@ export function serializeRun() {
     victoryShown: state.victoryShown,
     rewardsSinceLegendary: state.rewardsSinceLegendary,
     rerollsLeft: state.rerollsLeft,
+    mythicChoice: state.mythicChoice,
     totalDamage: state.runStats.totalDamage,
     damageByItem: state.runStats.damageByItem,
     player: {
@@ -143,6 +144,7 @@ export function loadRun() {
   state.rewardsSinceLegendary = data.rewardsSinceLegendary || 0;
   // Save antigo (sem o campo) mantém as rerrolagens que a run nova já definiu pela loja
   if (typeof data.rerollsLeft === "number") state.rerollsLeft = data.rerollsLeft;
+  state.mythicChoice = typeof data.mythicChoice === "string" ? data.mythicChoice : null;
   // Saves antigos não têm o dano por item: começa vazio
   state.runStats.totalDamage = data.totalDamage || 0;
   state.runStats.damageByItem = { ...data.damageByItem };
@@ -169,6 +171,7 @@ export function saveMeta() {
     upgrades: state.meta.upgrades,
     best: state.meta.best,
     bossesBeaten: state.meta.bossesBeaten,
+    unlockedItems: state.meta.unlockedItems,
   });
 }
 
@@ -179,6 +182,10 @@ export function loadMeta() {
     state.meta.upgrades = meta.upgrades || {};
     state.meta.best = { wave: 0, score: 0, ...meta.best };
     state.meta.bossesBeaten = meta.bossesBeaten || 0;
+    // Saves anteriores à 11c não têm itens liberados
+    state.meta.unlockedItems = Array.isArray(meta.unlockedItems)
+      ? meta.unlockedItems.filter((id) => typeof id === "string")
+      : [];
     return;
   }
   // Save da versão 1: grava os fragmentos já na chave nova, porque loadRun apaga a antiga

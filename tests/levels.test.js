@@ -48,7 +48,7 @@ test("valor sem declaração de nível é fixo (acabou o +20% genérico)", () =>
   setupRun(["poison_blade"]);
   setLevel("poison_blade", 5);
   const blade = item("poison_blade");
-  assert.equal(levelValue(blade, blade, "baseDmg"), 10);
+  assert.equal(levelValue(blade, blade, "baseDmg"), 13);
   assert.equal(effectiveCooldown(blade), 2500);
 });
 
@@ -66,12 +66,12 @@ test("cura cresce com o nível", () => {
   state.player.maxHp = 1000;
   state.player.hp = 1;
   activateItem(item("health_crystal"));
-  assert.equal(state.player.hp, 1 + 8);
+  assert.equal(state.player.hp, 1 + 10);
   setLevel("health_crystal", 5); // +3 por nível
   state.player.hp = 1;
   state.player.charges = {};
   activateItem(item("health_crystal"));
-  assert.equal(state.player.hp, 1 + 8 + 12);
+  assert.equal(state.player.hp, 1 + 10 + 12);
 });
 
 test("duração do frenesi cresce 0,5 s por nível, bônus de velocidade não", () => {
@@ -79,7 +79,7 @@ test("duração do frenesi cresce 0,5 s por nível, bônus de velocidade não", 
   setLevel("berserker_totem", 3);
   activateItem(item("berserker_totem"));
   assert.equal(state.player.berserkRemaining, 4000);
-  assert.equal(state.player.berserkSpeed, 0.4);
+  assert.equal(state.player.berserkSpeed, 0.52);
 });
 
 test("nível da queimadura sobe os stacks por golpe, não o dano por stack", () => {

@@ -13,7 +13,9 @@ import {
   isActivatable,
   evolutionProgress,
   evolvedRarity,
+  effectsOf,
 } from "./items.js";
+import { clickRate, MAX_CLICKS_PER_SECOND } from "./clicks.js";
 import { t, formatNumber } from "./i18n.js";
 import { defaultCollapsed, usesItemPanel, needsInvScroll } from "./layout.js";
 import { itemIconHTML } from "./sprites.js";
@@ -31,6 +33,7 @@ const levelBadge = (level) => ROMAN[level] || String(level);
 
 // "Nível 3/5", ou só "Nível 8" nas formas evoluídas, que não têm máximo
 function levelText(item, level) {
+  if (item.rarity === "mythic") return ""; // míticos não têm nível
   const max = maxLevelOf(item);
   return Number.isFinite(max) ? t("item.level", { level, max }) : t("item.levelUncapped", { level });
 }
@@ -82,13 +85,18 @@ export function renderInventory() {
   ["weapon", "armor", "relic"].forEach((type) => {
     const el = $("slots-" + type);
     el.innerHTML = "";
-    const typeItems = state.items.filter((i) => i.type === type);
+    // Míticos (clique) ocupam a caixa das relíquias
+    const typeItems = state.items.filter((i) => i.type === type || (type === "relic" && i.type === "mythic"));
     typeItems.forEach((item) => {
       const slot = document.createElement("div");
       slot.className = "item-slot";
       slot.dataset.id = item.id;
       const level = itemLevel(item.id);
       if (level >= maxLevelOf(item) && maxLevelOf(item) > 1) slot.classList.add("max-level");
+      if (item.rarity === "mythic") {
+        slot.classList.add("mythic");
+        slot.style.setProperty("--frame", RARITIES.mythic.color);
+      }
       // Forma evoluída: a moldura acompanha a raridade atual
       if (item.evolvedFrom) {
         slot.classList.add("evolved");
@@ -114,6 +122,19 @@ export function renderInventory() {
     });
   });
   refreshItemPanel();
+}
+
+// Contador de cliques dos itens míticos: aparece só com um deles equipado
+export function updateClickCounter(now = performance.now()) {
+  const el = $("click-counter");
+  if (!el) return;
+  const has = state.items.some((i) => effectsOf(i, "click").length > 0);
+  el.hidden = !has;
+  if (!has) return;
+  const rate = clickRate(now);
+  const text = t("hud.clicks", { n: rate, max: MAX_CLICKS_PER_SECOND });
+  if (el.textContent !== text) el.textContent = text;
+  el.classList.toggle("at-limit", rate >= MAX_CLICKS_PER_SECOND);
 }
 
 export function flashItem(id) {
@@ -233,6 +254,11 @@ function openItemPanel(id) {
   if (!wasOpen) $("item-panel-close").focus({ preventScroll: true });
 }
 
+// O painel de item está aberto? (o toque que o fecha não conta como clique do mítico)
+export function itemPanelOpen() {
+  return !panel.hidden;
+}
+
 export function closeItemPanel() {
   panelItemId = null;
   panel.hidden = true;
@@ -284,6 +310,7 @@ export function updateHUD() {
   $("hdr-kills").textContent = state.kills;
   $("hdr-score").textContent = state.score;
   $("hdr-fragments").textContent = state.fragments;
+  updateClickCounter();
 
   // Wave info bar
   $("inv-wave").textContent = t("hud.wave", { n: state.wave });
@@ -323,6 +350,7 @@ export function updateHUD() {
 function itemCard(item, onClick) {
   const card = document.createElement("div");
   card.className = "item-choice-card";
+  if (item.rarity === "mythic") card.classList.add("mythic");
   card.dataset.itemId = item.id;
   card.onclick = () => onClick(card);
 

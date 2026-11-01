@@ -53,18 +53,18 @@ test("arma ataca o inimigo mais próximo", () => {
   const far = enemy({ x: 400 });
   setupRun(["rusted_sword"], [far, near]);
   activateItem(item("rusted_sword"));
-  assert.equal(near.hp, 1000 - 8);
+  assert.equal(near.hp, 1000 - 10);
   assert.equal(far.hp, 1000);
   assert.equal(state.itemTimers.rusted_sword.elapsed, 0, "recarga reiniciada");
 });
 
-test("Lâmina de Brasa não causa dano direto e queima em todo golpe", () => {
+test("Lâmina de Brasa causa 12 de dano de fogo e queima em todo golpe", () => {
   const target = enemy();
   const hp = target.hp;
   setupRun(["ember_blade"], [target]);
   fixedRandom(0.99); // nem a pior rolagem impede a queimadura (chance 100%)
   activateItem(item("ember_blade"));
-  assert.equal(target.hp, hp, "golpe sem dano");
+  assert.equal(target.hp, hp - 12, "12 de dano direto");
   assert.deepEqual(
     target.dots.map((d) => [d.type, d.damage, d.stacks]),
     [["burning", 1, 1]],
@@ -92,31 +92,31 @@ test("Cajado do Trovão ricocheteia em até 2 outros inimigos com metade do dano
   const others = [enemy({ x: 300 }), enemy({ x: 350 }), enemy({ x: 400 })];
   setupRun(["thunder_staff"], [main, ...others]);
   activateItem(item("thunder_staff"));
-  assert.equal(main.hp, 1000 - 22);
+  assert.equal(main.hp, 1000 - 29);
   assert.deepEqual(
     others.map((e) => 1000 - e.hp),
-    [11, 11, 0],
+    [15, 15, 0],
   );
 });
 
 
 // ─── Itens de uso ───
 // ─── Itens de uso ───
-test("Cristal Vital cura 8; a Ressonância (nível 3) soma +3 a cada 10 cargas", () => {
+test("Cristal Vital cura 10; a Ressonância (nível 3) soma +3 a cada 10 cargas", () => {
   setupRun(["health_crystal"]);
   state.player.hp = 50;
   activateItem(item("health_crystal"));
-  assert.equal(state.player.hp, 58);
+  assert.equal(state.player.hp, 60);
   state.player.charges.health_crystal = 9;
   state.player.hp = 50;
   activateItem(item("health_crystal"));
-  assert.equal(state.player.hp, 58, "nível 1 não tem Ressonância");
+  assert.equal(state.player.hp, 60, "nível 1 não tem Ressonância");
 
-  setLevel("health_crystal", 3); // 8 + 3 por nível
+  setLevel("health_crystal", 3); // 10 + 3 por nível
   state.player.charges.health_crystal = 9;
   state.player.hp = 40;
   activateItem(item("health_crystal"));
-  assert.equal(state.player.hp, 40 + 14 + 3);
+  assert.equal(state.player.hp, 40 + 16 + 3);
 });
 
 test("item de uso não ativa sem inimigos vivos", () => {
@@ -144,19 +144,19 @@ test("Escudo de Ferro bloqueia o próximo ataque; o Aparo (nível 3) devolve 100
 
 test("armadura reduz o dano com retorno decrescente, com mínimo 1", () => {
   setupRun(["leather_vest"]);
-  enemyAttack(enemy({ dmg: 50 })); // 12 / (12 + 100) = 10,7%
-  assert.equal(state.player.hp, 100 - 45);
+  enemyAttack(enemy({ dmg: 50 })); // 16 / (16 + 100) = 13,8%
+  assert.equal(state.player.hp, 100 - 43);
   enemyAttack(enemy({ dmg: 1 }));
-  assert.equal(state.player.hp, 55 - 1);
+  assert.equal(state.player.hp, 57 - 1);
 });
 
-test("Pena de Fênix revive uma vez com 40% de vida; as recargas zeram só a partir do nível 3", () => {
+test("Pena de Fênix revive uma vez com 52% de vida; as recargas zeram só a partir do nível 3", () => {
   setupRun(["phoenix_feather", "rusted_sword"]);
   const events = captureEvents();
   state.itemTimers.rusted_sword.elapsed = 0;
   state.player.hp = 5;
   enemyAttack(enemy({ dmg: 50 }));
-  assert.equal(state.player.hp, 40);
+  assert.equal(state.player.hp, 52);
   assert.equal(state.itemTimers.rusted_sword.elapsed, 0, "nível 1 não zera as recargas");
   assert.equal(state.running, true);
 
@@ -167,25 +167,25 @@ test("Pena de Fênix revive uma vez com 40% de vida; as recargas zeram só a par
   assert.ok(events.some((e) => e.type === "playerDied"));
 });
 
-test("Pena de Fênix (nível 3) revive com 60% e zera as recargas", () => {
+test("Pena de Fênix (nível 3) revive com 72% e zera as recargas", () => {
   setupRun(["phoenix_feather", "rusted_sword"]);
   setLevel("phoenix_feather", 3);
   state.itemTimers.rusted_sword.elapsed = 0;
   state.player.hp = 5;
   enemyAttack(enemy({ dmg: 50 }));
-  assert.equal(state.player.hp, 60, "40% + 10% por nível");
+  assert.equal(state.player.hp, 72, "52% + 10% por nível");
   assert.equal(state.itemTimers.rusted_sword.elapsed, 2200);
 });
 
 // ─── Totem e Frenesi ───
-test("Frenesi acelera a recarga das armas em 40% e termina no tempo de jogo", () => {
+test("Frenesi acelera a recarga das armas em 52% e termina no tempo de jogo", () => {
   setupRun(["berserker_totem", "rusted_sword"]);
   activateItem(item("berserker_totem"));
   assert.equal(state.player.berserking, true);
 
   state.itemTimers.rusted_sword.elapsed = 0;
   updateItemTimers(1000);
-  assert.equal(state.itemTimers.rusted_sword.elapsed, 1400);
+  assert.equal(state.itemTimers.rusted_sword.elapsed, 1520);
 
   updateFrenzy(2999);
   assert.equal(state.player.berserking, true);
@@ -268,7 +268,7 @@ test("golpe emite attack e hit com posição, elemento e dano", () => {
   activateItem(item("frost_bow"));
   const [hit] = eventsOf(events, "hit");
   assert.equal(hit.element, "ice");
-  assert.equal(hit.damage, 20); // (12 + 5) × 1,2 de fraqueza
+  assert.equal(hit.damage, 26); // 22 × 1,2 de fraqueza
   assert.equal(hit.weak, true);
   assert.equal(hit.x, 150);
   const [attack] = eventsOf(events, "attack");
@@ -331,7 +331,7 @@ test("dano contínuo letal aciona a Pena de Fênix", () => {
   applyDot(state.player, "burning", 5, 3);
   processDots(1000);
   assert.equal(state.running, true);
-  assert.equal(state.player.hp, 40);
+  assert.equal(state.player.hp, 52);
 });
 
 test("armadura 300 reduz 75% do dano (a curva não tem teto)", () => {

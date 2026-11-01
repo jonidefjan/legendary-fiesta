@@ -44,14 +44,14 @@ test("crítico causa dano ×1,5 e avisa com o evento crit", () => {
 
   state.player.critChance = 0;
   activateItem(item("rusted_sword"));
-  assert.equal(lost(target), 8);
+  assert.equal(lost(target), 10);
   assert.equal(crits.length, 0);
 
   state.player.critChance = 1;
   activateItem(item("rusted_sword"));
-  assert.equal(lost(target), 8 + Math.round(8 * CRIT_MULT));
+  assert.equal(lost(target), 10 + Math.round(10 * CRIT_MULT));
   assert.equal(crits.length, 1);
-  assert.equal(crits[0].damage, 12);
+  assert.equal(crits[0].damage, 15);
   assert.equal(crits[0].x, target.x);
 });
 
@@ -69,16 +69,16 @@ test("chance base de crítico é 5% e cada golpe rola separado", () => {
     on("crit", (e) => crits.push(e));
     activateItem(item("shadow_dagger"));
     assert.equal(crits.length, 1);
-    assert.equal(lost(target), Math.round(9 * CRIT_MULT) + 9);
+    assert.equal(lost(target), Math.round(12 * CRIT_MULT) + 12);
   } finally {
     PLAYER_BASE.critChance = 0;
   }
 });
 
-test("Moeda da Fortuna: +15% de crítico; ataque extra do nível 3 que não encadeia", () => {
+test("Moeda da Fortuna: +20% de crítico; ataque extra do nível 3 que não encadeia", () => {
   const target = enemy();
   setupRun(["rusted_sword", "lucky_coin"], [target]);
-  assert.ok(Math.abs(state.player.critChance - 0.15) < 1e-9);
+  assert.ok(Math.abs(state.player.critChance - 0.2) < 1e-9);
   let attacks = 0;
   on("attack", () => attacks++);
   fixedRandom(0); // crítico e 25% de ataque extra sempre
@@ -87,11 +87,11 @@ test("Moeda da Fortuna: +15% de crítico; ataque extra do nível 3 que não enca
 
   attacks = 0;
   setLevel("lucky_coin", 3);
-  assert.ok(Math.abs(state.player.critChance - 0.25) < 1e-9);
+  assert.ok(Math.abs(state.player.critChance - 0.3) < 1e-9);
   const before = lost(target);
   activateItem(item("rusted_sword"));
   assert.equal(attacks, 2, "um ataque + um extra, sem encadear");
-  assert.equal(lost(target) - before, 12 * 2);
+  assert.equal(lost(target) - before, 15 * 2);
 });
 
 test("Moeda da Fortuna: abate com golpe crítico dá +1 fragmento", () => {
@@ -163,42 +163,42 @@ test("Lâmina Venenosa acumula veneno sem limite de stacks", () => {
   assert.equal(poison.duration, undefined, "veneno não tem duração");
 });
 
-test("Maça Sagrada cura 5 HP por golpe; +10 nos críticos só a partir do nível 3", () => {
+test("Maça Sagrada cura 7 HP por golpe; +10 nos críticos só a partir do nível 3", () => {
   setupRun(["holy_mace"], [enemy()]);
   fixedRandom(0.5);
   state.player.hp = 50;
   state.player.critChance = 0;
   activateItem(item("holy_mace"));
-  assert.equal(state.player.hp, 55);
+  assert.equal(state.player.hp, 57);
   state.player.critChance = 1;
   activateItem(item("holy_mace"));
-  assert.equal(state.player.hp, 60, "nível 1: crítico não cura a mais");
+  assert.equal(state.player.hp, 64, "nível 1: crítico não cura a mais");
 
-  setLevel("holy_mace", 3); // cura 5 + 2 por nível
+  setLevel("holy_mace", 3); // cura 7 + 1 por nível
   state.player.hp = 40;
   state.player.critChance = 1;
   activateItem(item("holy_mace"));
-  assert.equal(state.player.hp, 40 + 7 + 10);
+  assert.equal(state.player.hp, 40 + 9 + 10);
 });
 
-test("Foice de Sangue rouba 30% do dano causado", () => {
+test("Foice de Sangue rouba 39% do dano causado", () => {
   setupRun(["blood_scythe"], [enemy()]);
   state.player.hp = 50;
   activateItem(item("blood_scythe"));
-  assert.equal(state.player.hp, 56); // 20 de dano × 30%
+  assert.equal(state.player.hp, 60); // 26 de dano × 39% = 10
 });
 
 test("Foice de Sangue: a partir do nível 3, a cada 3 abates o próximo ataque causa dano ×2", () => {
   const dead = [enemy({ hp: 0 }), enemy({ hp: 0 }), enemy({ hp: 0 })];
   const target = enemy({ x: 500 });
   setupRun(["blood_scythe"], [...dead, target]);
-  setLevel("blood_scythe", 3); // 20 + 5 por nível = 30
+  setLevel("blood_scythe", 3); // 26 + 5 por nível = 36
   updateEnemies(16);
   assert.equal(state.kills, 3);
   activateItem(item("blood_scythe"));
-  assert.equal(lost(target), 60);
+  assert.equal(lost(target), 72);
   activateItem(item("blood_scythe"));
-  assert.equal(lost(target), 90, "só o primeiro é duplo");
+  assert.equal(lost(target), 108, "só o primeiro é duplo");
 });
 
 test("Foice de Sangue no nível 1 não colhe: 3 abates não duplicam o ataque", () => {
@@ -207,14 +207,14 @@ test("Foice de Sangue no nível 1 não colhe: 3 abates não duplicam o ataque", 
   setupRun(["blood_scythe"], [...dead, target]);
   updateEnemies(16);
   activateItem(item("blood_scythe"));
-  assert.equal(lost(target), 20);
+  assert.equal(lost(target), 26);
 });
 
 test("Orbe Aquático: Maré (nível 3) acumula no mesmo alvo e zera ao trocar", () => {
   const a = enemy({ x: 200 });
   const b = enemy({ x: 300 });
   setupRun(["water_orb"], [a, b]);
-  setLevel("water_orb", 3); // 15 + 3 por nível = 21
+  setLevel("water_orb", 3); // 20 + 3 por nível = 26
   const orb = item("water_orb");
   const hits = [];
   for (let i = 0; i < 7; i++) {
@@ -222,10 +222,10 @@ test("Orbe Aquático: Maré (nível 3) acumula no mesmo alvo e zera ao trocar", 
     activateItem(orb);
     hits.push(lost(a) - before);
   }
-  assert.deepEqual(hits, [21, 24, 27, 30, 33, 36, 36], "teto de 5 acúmulos");
+  assert.deepEqual(hits, [26, 29, 32, 35, 38, 41, 41], "teto de 5 acúmulos");
   a.x = 400; // agora o alvo mais próximo é b
   activateItem(orb);
-  assert.equal(lost(b), 21);
+  assert.equal(lost(b), 26);
   assert.equal(state.player.tide.target, b);
 });
 
@@ -242,14 +242,14 @@ test("Orbe Aquático adianta 0,3s a recarga dos outros itens, com teto na recarg
 test("Cajado do Trovão: Tempestade (nível 3) no 4º uso (+50%)", () => {
   const target = enemy();
   setupRun(["thunder_staff"], [target]);
-  setLevel("thunder_staff", 3); // 22 + 5 por nível = 32
+  setLevel("thunder_staff", 3); // 29 + 5 por nível = 39
   const dmg = [];
   for (let i = 0; i < 5; i++) {
     const before = lost(target);
     activateItem(item("thunder_staff"));
     dmg.push(lost(target) - before);
   }
-  assert.deepEqual(dmg, [32, 32, 32, 48, 32]);
+  assert.deepEqual(dmg, [39, 39, 39, 59, 39]);
 });
 
 // ─── Armaduras ───
@@ -260,23 +260,23 @@ test("Cota de Malha: Deflexão (nível 3) devolve metade do dano recebido", () =
   enemyAttack(attacker);
   assert.equal(lost(attacker), 0, "nível 1 não tem Deflexão");
 
-  setLevel("chainmail", 3); // 18 + 8×2 = 34 de armadura
+  setLevel("chainmail", 3); // 23 + 8×2 = 39 de armadura
   const hp0 = state.player.hp;
   enemyAttack(attacker);
-  // 20 com 34 de armadura (34 / 134 = 25,4%) = 15; devolve 8
-  assert.equal(hp0 - state.player.hp, 15);
-  assert.equal(lost(attacker), 8);
+  // 20 com 39 de armadura (39 / 139 = 28,1%) = 14; devolve 7
+  assert.equal(hp0 - state.player.hp, 14);
+  assert.equal(lost(attacker), 7);
 
   fixedRandom(0.99);
   enemyAttack(attacker);
-  assert.equal(lost(attacker), 8, "sem reflexo quando a chance falha");
+  assert.equal(lost(attacker), 7, "sem reflexo quando a chance falha");
 });
 
 test("Manto das Sombras: esquiva evita o dano; nível 3 contra-ataca e nível 5 reforça o próximo ataque", () => {
   const attacker = enemy({ dmg: 20 });
   const target = enemy({ x: 500 });
   setupRun(["rusted_sword", "shadow_cloak"], [attacker, target]);
-  assert.ok(Math.abs(state.player.evasion - 0.1) < 1e-9);
+  assert.ok(Math.abs(state.player.evasion - 0.13) < 1e-9);
   const ev = captureEvents();
   const dodges = [];
   on("dodge", (e) => dodges.push(e));
@@ -292,17 +292,17 @@ test("Manto das Sombras: esquiva evita o dano; nível 3 contra-ataca e nível 5 
   setLevel("shadow_cloak", 5);
   state.itemTimers.rusted_sword.elapsed = 0;
   enemyAttack(attacker);
-  assert.equal(lost(attacker), 8, "contra-ataque da espada, na hora");
+  assert.equal(lost(attacker), 10, "contra-ataque da espada, na hora");
   assert.equal(state.itemTimers.rusted_sword.elapsed, 0, "não mexe na recarga");
   assert.equal(state.player.empowered, 1);
 
   fixedRandom(0.5);
   const before = lost(attacker);
   activateItem(item("rusted_sword")); // alvo mais próximo: attacker (x=200)
-  assert.equal(lost(attacker) - before, 16, "+100%");
+  assert.equal(lost(attacker) - before, 20, "+100%");
   assert.equal(state.player.empowered, 0);
   activateItem(item("rusted_sword"));
-  assert.equal(lost(attacker) - before, 16 + 8, "só o primeiro é reforçado");
+  assert.equal(lost(attacker) - before, 20 + 10, "só o primeiro é reforçado");
 
   state.player.evasion = 0;
   enemyAttack(attacker);
@@ -313,7 +313,7 @@ test("esquiva tem teto de 40%", () => {
   setupRun(["shadow_cloak"]);
   state.itemLevels.shadow_cloak = 5;
   applyPassives();
-  assert.ok(Math.abs(state.player.evasion - 0.26) < 1e-9, "10% + 4% por nível");
+  assert.ok(Math.abs(state.player.evasion - 0.29) < 1e-9, "13% + 4% por nível");
   state.player.baseArmor = 0;
   state.items[0] = { ...item("shadow_cloak"), effects: [{ trigger: "passive", type: "stats", evasion: 5 }] };
   applyPassives();
@@ -349,30 +349,30 @@ test("Armadura Cristalina sem inimigo ao alcance não gasta a recarga", () => {
 
 // ─── Relíquias ───
 // ─── Relíquias ───
-test("Amuleto Vampírico: 8% do dano; a Sede (nível 3) dobra o roubo abaixo de 50% de vida", () => {
+test("Amuleto Vampírico: 10% do dano; a Sede (nível 3) dobra o roubo abaixo de 50% de vida", () => {
   setupRun(["thunder_staff", "vampiric_amulet"], [enemy()]);
   state.player.hp = 80;
-  activateItem(item("thunder_staff")); // 22 × 8% = 1,76 -> 2
-  assert.equal(state.player.hp, 82);
-  state.player.hp = 40;
-  activateItem(item("thunder_staff"));
-  assert.equal(state.player.hp, 42, "nível 1: sem Sede");
-
-  setLevel("vampiric_amulet", 3); // 8% + 2% por nível = 12%
-  state.player.hp = 80;
-  activateItem(item("thunder_staff")); // 22 × 12% = 2,64 -> 3
+  activateItem(item("thunder_staff")); // 29 × 10% = 2,9 -> 3
   assert.equal(state.player.hp, 83);
   state.player.hp = 40;
-  activateItem(item("thunder_staff")); // 22 × 24% = 5,28 -> 5
-  assert.equal(state.player.hp, 45);
+  activateItem(item("thunder_staff"));
+  assert.equal(state.player.hp, 43, "nível 1: sem Sede");
+
+  setLevel("vampiric_amulet", 3); // 10% + 2% por nível = 14%
+  state.player.hp = 80;
+  activateItem(item("thunder_staff")); // 29 × 14% = 4,06 -> 4
+  assert.equal(state.player.hp, 84);
+  state.player.hp = 40;
+  activateItem(item("thunder_staff")); // 29 × 28% = 8,12 -> 8
+  assert.equal(state.player.hp, 48);
 });
 
-test("Botas da Velocidade: armas recarregam 15% mais rápido", () => {
+test("Botas da Velocidade: armas recarregam 10% mais rápido", () => {
   setupRun(["rusted_sword", "speed_boots"], [enemy()]);
-  assert.ok(Math.abs(state.player.weaponSpeed - 0.15) < 1e-9);
+  assert.ok(Math.abs(state.player.weaponSpeed - 0.1) < 1e-9);
   state.itemTimers.rusted_sword.elapsed = 0;
   updateItemTimers(1000);
-  assert.ok(Math.abs(state.itemTimers.rusted_sword.elapsed - 1150) < 1e-6);
+  assert.ok(Math.abs(state.itemTimers.rusted_sword.elapsed - 1100) < 1e-6);
 });
 
 test("Botas da Velocidade: Sprint (nível 3) a cada 5 ataques deixa a arma pronta na hora", () => {
@@ -386,7 +386,7 @@ test("Botas da Velocidade: Sprint (nível 3) a cada 5 ataques deixa a arma pront
   assert.equal(timer.elapsed, timer.cooldown);
 });
 
-test("Anel Amaldiçoado: +30% de dano e -20% de vida máxima, sem acumular", () => {
+test("Anel Amaldiçoado: +40% de dano e -20% de vida máxima, sem acumular", () => {
   const target = enemy();
   setupRun(["rusted_sword", "cursed_ring"], [target]);
   assert.equal(state.player.maxHp, 80);
@@ -396,7 +396,7 @@ test("Anel Amaldiçoado: +30% de dano e -20% de vida máxima, sem acumular", () 
   assert.equal(state.player.hp, 80, "vida limitada ao novo máximo");
 
   activateItem(item("rusted_sword"));
-  assert.equal(lost(target), 10); // 8 × 1,3
+  assert.equal(lost(target), 14); // 10 × 1,4
 
   state.meta.upgrades = { vitality: 2 };
   applyUpgrades(state.player);
@@ -410,7 +410,7 @@ test("Anel Amaldiçoado: +30% de dano e -20% de vida máxima, sem acumular", () 
 test("Anel Amaldiçoado: Pacto (nível 3) drena 2 HP por abate, soma 1% até 25% e nunca mata", () => {
   const dead = Array.from({ length: 30 }, () => enemy({ hp: 0 }));
   setupRun(["rusted_sword", "cursed_ring"], dead);
-  setLevel("cursed_ring", 3); // +30% +10% por nível = +50%
+  setLevel("cursed_ring", 3); // +40% +10% por nível = +60%
   state.player.hp = 80;
   updateEnemies(16);
   assert.equal(state.kills, 30);
@@ -424,11 +424,11 @@ test("Anel Amaldiçoado: Pacto (nível 3) drena 2 HP por abate, soma 1% até 25%
   assert.equal(state.player.hp, 1);
   assert.equal(state.running, true);
 
-  // O bônus entra no dano: 8 × (1 + 0,5 + 0,25) = 14
+  // O bônus entra no dano: 10 × (1 + 0,6 + 0,25) = 18,5 -> 19
   const target = enemy();
   state.enemies = [target];
   activateItem(item("rusted_sword"));
-  assert.equal(lost(target), 14);
+  assert.equal(lost(target), 19);
 });
 
 // ─── Save e catálogo ───
@@ -484,8 +484,8 @@ test("itens cortados saem do catálogo e saves antigos com eles carregam sem ele
 
 test("todos os itens do catálogo podem ser sorteados e subir de nível", () => {
   setupRun([]);
-  // As formas evoluídas só aparecem para quem já as tem
-  const sortable = ITEMS.filter((i) => !i.evolvedFrom);
+  // As formas evoluídas só aparecem para quem já as tem; os míticos só vêm da loja (mythicOffer)
+  const sortable = ITEMS.filter((i) => !i.evolvedFrom && i.rarity !== "mythic");
   const all = generateRandomItems(ITEMS.length);
   assert.equal(all.length, sortable.length);
   assert.equal(new Set(all.map((i) => i.id)).size, sortable.length);
@@ -493,7 +493,7 @@ test("todos os itens do catálogo podem ser sorteados e subir de nível", () => 
   setupRun(["lucky_coin"]);
   assert.deepEqual(addItemOrLevel(item("lucky_coin")), { leveled: true, level: 2 });
   applyPassives();
-  assert.ok(Math.abs(state.player.critChance - 0.2) < 1e-9, "15% + 5% por nível");
+  assert.ok(Math.abs(state.player.critChance - 0.25) < 1e-9, "20% + 5% por nível");
 });
 
 // ─── Revisão da fase 4 ───
@@ -536,8 +536,8 @@ test("Relâmpago em cadeia repassa o dano sem o crítico", () => {
   fixedRandom(0.5);
   state.player.critChance = 1;
   activateItem(item("thunder_staff"));
-  assert.equal(lost(main), 33);
-  assert.equal(lost(side), 11, "50% de 22, sem ×1,5");
+  assert.equal(lost(main), 44);
+  assert.equal(lost(side), 15, "50% de 29, sem ×1,5");
 });
 
 test("ataque extra da Moeda não repete Colheita nem Fuga", () => {
@@ -549,16 +549,16 @@ test("ataque extra da Moeda não repete Colheita nem Fuga", () => {
   state.player.critChance = 1;
   state.player.harvestReady = true;
   activateItem(item("blood_scythe"));
-  // golpe: 30 ×2 (colheita) ×1,5 = 90; extra: 30 ×1,5 = 45
-  assert.equal(lost(target), 135);
+  // golpe: 36 ×2 (colheita) ×1,5 = 108; extra: 36 ×1,5 = 54
+  assert.equal(lost(target), 162);
 });
 
 test("veneno usa o bônus de dano do Anel", () => {
   const a = enemy();
   setupRun(["poison_blade", "cursed_ring"], [a]);
   activateItem(item("poison_blade"));
-  assert.equal(a.dots[0].damage, 1.3);
-  assert.equal(a.dots[0].base, 1.3);
+  assert.equal(a.dots[0].damage, 1.4);
+  assert.equal(a.dots[0].base, 1.4);
 });
 
 test("enemyAttack informa o resultado", () => {
