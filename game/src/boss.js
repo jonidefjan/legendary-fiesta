@@ -15,6 +15,20 @@ export const BOSS_EVERY = 10;
 export const MAX_SUMMONS = 6; // esqueletos invocados vivos ao mesmo tempo
 export const ENRAGE_RATIO = 0.33;
 
+// Chefes reforçados (a partir da onda 20): mais vida e dano, duas fases e mecânicas novas.
+// O chefe da onda 10 não muda.
+export const REINFORCED_FROM = 20;
+export const MAX_SUMMONS_REINFORCED = 10;
+const REINFORCED_HP = 1.5;
+const REINFORCED_DMG = 1.25;
+const PHASE_RATIOS = [0.66, 0.33]; // vida (fração) em que cada fase dispara, uma vez cada
+const PHASE_SUMMON = 4; // esqueletos que o Lich invoca a cada fase
+const PHASE_ATK = 0.9; // Demônio: x o intervalo de ataque a cada fase
+const PHASE_ABILITY = 0.85; // Demônio: x o intervalo de habilidade a cada fase
+const ENRAGE_HOLD_MS = 700; // tempo sem fase depois da fúria (reforçados)
+const GUARD_MS = 3000; // Cavaleiro de Ossos: duração da guarda
+const GUARD_BY_PHASE = [0.6, 0.7, 0.8]; // redução de dano da guarda por fase já disparada (teto 0,8)
+
 const BOSS_HP_MULT = 12; // x a vida de um esqueleto comum da onda
 const BOSS_DMG_MULT = 2;
 const SUMMON_COUNT = 2;
@@ -39,6 +53,17 @@ export const BOSS_TYPES = {
     abilityInterval: 5000,
     xp: 180,
     fragments: 35,
+  },
+  // Só a partir da onda 20 (sempre reforçado): levanta a guarda e corta o dano que recebe
+  bone_knight: {
+    kind: "bone_knight",
+    shape: "boneknight",
+    size: 30,
+    speed: 0.2,
+    atkInterval: 2600,
+    abilityInterval: 8000,
+    xp: 200,
+    fragments: 40,
   },
 };
 
@@ -67,6 +92,10 @@ export function novaBurnStacks(wave) {
   return 4 + Math.floor(wave / 5);
 }
 
+export function isReinforcedBoss(wave) {
+  return wave >= REINFORCED_FROM;
+}
+
 export function isBossWave(wave) {
   return wave > 0 && wave % BOSS_EVERY === 0;
 }
@@ -87,7 +116,8 @@ function createBoss(kind, wave, { width, height, mobile = false, maxX = Infinity
   const scales = waveScales(wave, mobile);
   // No celular os inimigos andam mais devagar (createEnemy faz o mesmo)
   const speedScale = mobile ? 0.7 : 1;
-  const hp = Math.round(minion.hp * scales.hp * BOSS_HP_MULT);
+  const reinforced = isReinforcedBoss(wave);
+  const hp = Math.round(minion.hp * scales.hp * BOSS_HP_MULT * (reinforced ? REINFORCED_HP : 1));
   const { resist, immune, weak } = rollBossResist(wave);
   return {
     ...base,
@@ -100,7 +130,9 @@ function createBoss(kind, wave, { width, height, mobile = false, maxX = Infinity
     arena: { width, height, mobile, maxX },
     hp,
     maxHp: hp,
-    dmg: Math.round(minion.dmg * scales.dmg * BOSS_DMG_MULT),
+    dmg: Math.round(minion.dmg * scales.dmg * BOSS_DMG_MULT * (reinforced ? REINFORCED_DMG : 1)),
+    reinforced,
+    phasesDone: 0, // fases de vida já disparadas (0 a 2); "phase" abaixo é só a animação
     x: bossX(width, mobile, maxX),
     y: height * 0.55,
     phase: random() * Math.PI * 2,
@@ -119,7 +151,12 @@ function createBoss(kind, wave, { width, height, mobile = false, maxX = Infinity
 
 // Inimigos da onda de chefe (chefe sorteado + escolta), mesmo formato de createWave
 export function createBossWave(wave, arena) {
-  const kind = random() < 0.5 ? "lich" : "demon";
+  // Onda 10: só Lich e Demônio (sorteio de sempre); da 20 em diante, os três por igual
+  const kind = isReinforcedBoss(wave)
+    ? ["lich", "demon", "bone_knight"][Math.min(2, Math.floor(random() * 3))]
+    : random() < 0.5
+      ? "lich"
+      : "demon";
   const escort = 2 + Math.floor(random() * 3); // 2 a 4
   // A partir da onda 20 a escolta inclui atiradores, que ocupam vagas dela (o chefe da
   // onda 10 não leva atirador)
@@ -144,10 +181,11 @@ function markCast(boss, kind) {
   boss.attackAnim = ANIM_MS.enemyAttack;
 }
 
-// Lich: invoca 2 esqueletos ao lado (respeita o limite de invocados vivos)
-function summon(boss, arena) {
+// Lich: invoca esqueletos ao lado (respeita o limite de invocados vivos)
+function summon(boss, arena, wanted = SUMMON_COUNT) {
   const alive = state.enemies.filter((e) => e.summoned && !e.dead).length;
-  const count = Math.min(SUMMON_COUNT, MAX_SUMMONS - alive);
+  const cap = boss.reinforced ? MAX_SUMMONS_REINFORCED : MAX_SUMMONS;
+  const count = Math.min(wanted, cap - alive);
   markCast(boss, "summon");
   if (count <= 0) return;
   for (let i = 0; i < count; i++) {
@@ -155,7 +193,7 @@ function summon(boss, arena) {
     minion.summoned = true; // enemyName() mostra "Esqueleto Invocado" / "Summoned Skeleton"
     // Invocados também nascem dentro da tela (o chefe pode estar na borda)
     minion.x = Math.min(
-      boss.x + (i === 0 ? -50 : 50) + (random() - 0.5) * 20,
+      boss.x + (i % 2 === 0 ? -1 : 1) * (50 + 25 * Math.floor(i / 2)) + (random() - 0.5) * 20,
       arena.maxX ?? Infinity,
     );
     minion.xp = Math.round(minion.xp / 2);
@@ -188,26 +226,65 @@ function fireNova(boss) {
   }
 }
 
+// Cavaleiro de Ossos: levanta a guarda (dano recebido x (1 - guardReduction) por GUARD_MS)
+function raiseGuard(boss) {
+  boss.guardMs = GUARD_MS;
+  boss.guardReduction = GUARD_BY_PHASE[Math.min(GUARD_BY_PHASE.length - 1, boss.phasesDone)];
+  markCast(boss, "guard");
+  emit("bossAbility", { kind: "guard", x: boss.x, y: boss.y, bossName: enemyName(boss) });
+  sound("block");
+  log(t("log.bossGuard", { boss: enemyName(boss) }), "dmg");
+}
+
 function enrage(boss) {
   boss.enraged = true;
   boss.atkInterval = Math.round(boss.atkInterval * 0.6);
   boss.abilityInterval = Math.round(boss.abilityInterval * 0.75);
   boss.speed *= 1.3;
+  // Reforçados: a próxima fase espera o Taunt da fúria tocar
+  if (boss.reinforced) boss.phaseHoldMs = ENRAGE_HOLD_MS;
   markCast(boss, "enrage");
   emit("bossAbility", { kind: "enrage", x: boss.x, y: boss.y, bossName: enemyName(boss) });
   sound("enrage");
   log(t("log.bossEnrage", { boss: enemyName(boss) }), "dmg");
 }
 
+// Fase de vida do chefe reforçado (uma por atualização, na ordem; golpe que cruza as duas
+// dispara a segunda no quadro seguinte)
+function bossPhase(boss) {
+  if (boss.phasesDone >= PHASE_RATIOS.length) return;
+  if (boss.hp / boss.maxHp >= PHASE_RATIOS[boss.phasesDone]) return;
+  boss.phasesDone++;
+  boss.abilityTimer = 0; // a habilidade normal não cai no mesmo quadro da fase
+  if (boss.kind === "lich") {
+    // Daqui em diante os ataques básicos são projéteis (combat.js), mesmo andando
+    boss.shootsBolts = true;
+    boss.projectile = "orb";
+    summon(boss, boss.arena, PHASE_SUMMON);
+  } else if (boss.kind === "demon") {
+    boss.atkInterval = Math.round(boss.atkInterval * PHASE_ATK);
+    boss.abilityInterval = Math.round(boss.abilityInterval * PHASE_ABILITY);
+    if (state.running) fireNova(boss);
+  } else if (boss.kind === "bone_knight") {
+    raiseGuard(boss); // já com a redução da fase nova
+  }
+}
+
 // Habilidades dos chefes vivos (invocar, área de fogo...); dt em ms de jogo
 export function updateBosses(dt) {
   for (const boss of state.enemies) {
     if (!boss.isBoss || boss.dead || boss.hp <= 0) continue;
-    if (boss.kind === "demon" && !boss.enraged && boss.hp / boss.maxHp < ENRAGE_RATIO) {
+    // Fúria: o Demônio sempre; o Lich só reforçado
+    if ((boss.kind === "demon" || boss.reinforced) && !boss.enraged && boss.hp / boss.maxHp < ENRAGE_RATIO) {
       enrage(boss);
     }
+    // A guarda e o brilho dela descem com o tempo de jogo, até congelado
+    if (boss.guardMs > 0) boss.guardMs = Math.max(0, boss.guardMs - dt);
+    if (boss.guardFx > 0) boss.guardFx = Math.max(0, boss.guardFx - dt);
+    if (boss.phaseHoldMs > 0) boss.phaseHoldMs = Math.max(0, boss.phaseHoldMs - dt);
     // Congelado: nem a recarga das habilidades avança
     if (boss.frozen > 0) continue;
+    if (boss.reinforced && !(boss.phaseHoldMs > 0)) bossPhase(boss);
     boss.abilityTimer += dt * slowFactor(boss); // frio também atrasa as habilidades
     if (boss.abilityTimer < boss.abilityInterval) continue;
     boss.abilityTimer = 0;
@@ -215,6 +292,8 @@ export function updateBosses(dt) {
       summon(boss, boss.arena);
     } else if (boss.kind === "demon" && state.running) {
       fireNova(boss);
+    } else if (boss.kind === "bone_knight") {
+      raiseGuard(boss);
     }
   }
 }

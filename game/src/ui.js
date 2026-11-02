@@ -341,7 +341,7 @@ export function updateHUD() {
 
   // Wave info bar
   $("inv-wave").textContent = t("hud.wave", { n: state.wave });
-  const alive = state.enemies.filter((e) => !e.dead).length;
+  const alive = state.enemies.filter((e) => !e.dead).length + state.spawnQueue.length;
   $("inv-enemies").textContent = t("hud.enemies", { count: alive });
   $("inv-best").textContent = t("hud.best", { wave: state.meta.best.wave });
 

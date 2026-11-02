@@ -157,6 +157,7 @@ export default {
   "enemies.summoned": "Esqueleto Invocado",
   "enemies.lich": "Lich",
   "enemies.demon": "Senhor Demônio",
+  "enemies.bone_knight": "Cavaleiro de Ossos",
 
   // Arena (canvas de texto)
   "overlay.you": "VOCÊ",
@@ -250,6 +251,7 @@ export default {
   "log.bossSummon.one": "💀 {boss} invoca {count} esqueleto!",
   "log.bossSummon.other": "💀 {boss} invoca {count} esqueletos!",
   "log.bossNova": "🔥 {boss} lança uma Nova de Fogo!",
+  "log.bossGuard": "🛡 {boss} levanta a guarda!",
   "log.bossEnrage": "😡 {boss} entra em fúria!",
   "share.button": "📤 Compartilhar resultado",
   "share.title": "Reliquary",

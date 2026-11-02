@@ -12,6 +12,7 @@ import { WORLD, reflectsInWater } from "./world.js";
 import { shareSkeleton, updateOncePerFrame } from "./skeleton.js";
 import { logicToWorldX, arena } from "./view.js";
 import { state } from "../state.js";
+import { rigsLeft } from "../waves.js";
 import { coldTint, slowFactor } from "../combat.js";
 import { on } from "../events.js";
 import { PALETTE } from "../palette.js";
@@ -27,9 +28,9 @@ const MODEL_FILES = {
 };
 
 // Formas sem arquivo próprio reaproveitam o modelo de outra (Senhor Demônio = Warrior + chifres)
-const MODEL_ALIAS = { demonlord: "warrior" };
+const MODEL_ALIAS = { demonlord: "warrior", boneknight: "warrior" };
 // Multiplicador sobre a altura do inimigo (size / 18): chefes ficam ~1,5x e ~1,7x o herói
-const SHAPE_SCALE = { mage: 0.9, demonlord: 1 };
+const SHAPE_SCALE = { mage: 0.9, demonlord: 1, boneknight: 1.1 };
 const KNOWN_SHAPES = new Set([...Object.keys(MODEL_FILES), ...Object.keys(MODEL_ALIAS)]);
 
 const FADE = 0.12; // s, transição entre animações
@@ -94,18 +95,22 @@ const ENEMY_ATTACK = {
   warrior: "1H_Melee_Attack_Chop",
   mage: "Spellcast_Shoot",
   demonlord: "1H_Melee_Attack_Chop",
+  boneknight: "1H_Melee_Attack_Chop",
 };
 
 // Habilidade de chefe (en.castKind) -> clipe, por forma
 const BOSS_CAST = {
   mage: { summon: "Spellcast_Summon", nova: "Spellcast_Shoot", enrage: "Taunt" },
   demonlord: { summon: "Spellcast_Raise", nova: "Spellcast_Raise", enrage: "Taunt" },
+  boneknight: { guard: "Block", enrage: "Taunt" },
 };
 
 // Cores dos chefes: olhos, aura do chão e tinta do corpo (normal e enfurecido)
 const BOSS_LOOK = {
   mage: { eyes: 0xb060ff, aura: 0x8a4cff, tint: 0x6a3a9a, tintAmount: 0.3 },
   demonlord: { eyes: 0xff2a20, aura: 0xe43b44, tint: 0x8a1c24, tintAmount: 0.3 },
+  // Osso claro com olhos e aura azul-gelo (sem chifres), para não lembrar o Demônio
+  boneknight: { eyes: 0x7fd8ff, aura: 0x5fb8ff, tint: 0xe6dcc0, tintAmount: 0.25 },
 };
 const ENRAGE_TINT = { color: 0x7a0a10, amount: 0.55, eyes: 0xff0000, aura: 0xff3a10 };
 
@@ -636,10 +641,22 @@ function disposeEnemyRecord(rec) {
   }
 }
 
+// Rigs criados no quadro atual (zerado em update): evita 30 clones de uma vez
+let rigsCreated = 0;
+
 function attachEnemyModel(rec) {
   if (rec.rig) return;
   const tpl = requestTemplate(MODEL_ALIAS[rec.shape] ?? rec.shape);
   if (!tpl) return;
+  if (rigsLeft(rigsCreated) <= 0) {
+    // Sem vaga neste quadro: espera invisível (sem placeholder piscando) pela vez dele
+    rec.root.visible = false;
+    rec.waiting = true;
+    return;
+  }
+  rigsCreated++;
+  rec.waiting = false;
+  rec.root.visible = true;
   rec.rig = new Rig(tpl, rec.height, { perInstanceMaterials: true });
   rec.root.remove(rec.stub);
   rec.stub.geometry.dispose();
@@ -737,6 +754,7 @@ export function createCharacters(scene) {
   function update(dtMs, { tickHurt = true, allowSpawn = false } = {}) {
     const dtSec = dtMs / 1000;
     skeletonFrame++;
+    rigsCreated = 0;
     updateHero(hero, dtMs);
 
     aliveSet.clear();
@@ -775,6 +793,7 @@ export function createCharacters(scene) {
           rec.sink += dtSec;
           if (rec.sink >= SINK_TIME) {
             rec.gone = true;
+            en.bodyGone = true; // a lista da onda pode soltar o corpo (waves.js)
             rec.root.visible = false;
             // Sai da cena já (a limpeza fica para a troca de onda): invisível, os
             // ~50 ossos de cada morto ainda pesavam na atualização de matrizes
@@ -786,8 +805,10 @@ export function createCharacters(scene) {
         if (!!en.enraged !== rec.enraged) setBossLook(rec, !!en.enraged);
         rec.time += dtSec;
         const pulse = 0.5 + 0.5 * Math.sin(rec.time * (rec.enraged ? 7 : 3));
-        rec.auraMaterial.opacity = en.dead ? 0 : 0.25 + 0.25 * pulse;
-        rec.aura.scale.setScalar(1 + 0.08 * pulse);
+        // Guarda levantada: aura mais forte e larga enquanto durar
+        const guarded = !en.dead && en.guardMs > 0;
+        rec.auraMaterial.opacity = en.dead ? 0 : guarded ? 0.65 + 0.2 * pulse : 0.25 + 0.25 * pulse;
+        rec.aura.scale.setScalar((guarded ? 1.35 : 1) + 0.08 * pulse);
       }
       if (rec.rig) {
         const flash = !en.dead && en.hurtTimer > 0 ? 0.55 * Math.min(1, en.hurtTimer / 12) : 0;
@@ -815,7 +836,7 @@ export function createCharacters(scene) {
   // Ponto acima da cabeça (barra de vida e nome)
   function enemyAnchor(en, out) {
     const rec = enemies.get(en);
-    if (!rec || rec.gone) return null;
+    if (!rec || rec.gone || rec.waiting) return null; // sem rig ainda: sem barra de vida
     return out.set(rec.root.position.x, rec.root.position.y + rec.height + 0.3, rec.root.position.z);
   }
 
