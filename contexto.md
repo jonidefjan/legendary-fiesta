@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #19 (commit `8bc42cc`).
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-10-31, após a PR #20 (commit `02486eb`). Nada pendente de commit além deste arquivo.
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -11,7 +11,7 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Testes: `npm test` na raiz (**411** passando).
 
 ## Estado
-- **Fases concluídas:** 0 a 11, 13 e 14 (PRs #2 a #19). Falta a fase 12 (inimigo à distância).
+- **Fases concluídas:** 0 a 11, 13 e 14 (PRs #2 a #20). Falta a fase 12 (inimigo à distância), que o usuário deixou para depois.
 - **Fase 14 (itens no celular):**
   - No celular, tocar num item abre o painel `#item-panel` embaixo da tela; no desktop, o tooltip de hover continua.
   - Com mais de 6 itens, a caixa de itens rola por dentro (`inv-scroll`, 168 px).
@@ -126,7 +126,7 @@ Plano de melhorias, pedido pelo usuário em 2026-10-31. A ordem foi escolhida po
 ## Ambiente
 - **Windows:** o gh fica em `C:\Program Files\GitHub CLI\gh.exe` (usar pelo PowerShell).
 - **Arquivos CRLF:** editar com um script node que normaliza `\r\n` e grava de volta.
-- **Preview:** `http://localhost:8766/game/` (aba `tab-2`).
+- **Preview:** nenhum servidor fica rodando. Para jogar ou testar, rode `npx http-server -p 8766` na raiz e abra `http://localhost:8766/game/` numa aba própria.
   - Chamar `tabs_select` antes de testar o loop.
   - Para furar o cache do CSS, trocar os `href` com `?v=`.
   - O estado do jogo fica em `await import('/game/src/state.js')`.

@@ -72,6 +72,9 @@ function weaponNodesFor(anim) {
   return ["Knife"];
 }
 
+// Atiradores (en.kind) usam o clipe de tiro da forma, sempre no lugar
+const RANGED_ATTACK = { archer: "1H_Ranged_Shoot" };
+
 const ENEMY_ATTACK = {
   minion: "Unarmed_Melee_Attack_Punch_A",
   rogue: "1H_Melee_Attack_Chop",
@@ -234,6 +237,11 @@ class Rig {
   finished() {
     if (!this.current || !this.once) return true;
     return this.current.time >= this.current.getClip().duration - 1e-3 || !this.current.isRunning();
+  }
+
+  // Golpe no herói: o mesmo emissive, em vermelho
+  setHurtFlash(amount) {
+    for (const m of this.flashMaterials) m.emissive.setRGB(amount, amount * 0.12, amount * 0.12);
   }
 
   // freeze 0..1: brilho azul gelado no mesmo emissive do flash (sem material novo)
@@ -438,7 +446,7 @@ function updateHero(hero, dtMs) {
   hero.berserk = p.berserking;
   hero.lastAnimTimer = p.animTimer;
   hero.lastHp = p.hp;
-  hero.flash = Math.max(0, hero.flash - dtMs / 200);
+  hero.flash = Math.max(0, hero.flash - dtMs / 280);
   rig.update(dtMs / 1000);
 }
 
@@ -547,6 +555,8 @@ function createEnemyRecord(en, group, spawnAllowed) {
   const shape = KNOWN_SHAPES.has(en.shape) ? en.shape : "minion";
   const rec = {
     shape,
+    kind: en.kind,
+    ranged: !!en.ranged, // estacionário: o empurrão visual de separação não o move
     isBoss: !!en.isBoss,
     extras: [], // geometrias e materiais criados só para este inimigo
     lastCast: en.castCount || 0,
@@ -635,7 +645,7 @@ function updateEnemyAnim(rec, en) {
     rig.play(clip, { once: true, restart: true, timeScale: 1 });
     rec.action = "attack";
   } else if (attackStart) {
-    rig.play(ENEMY_ATTACK[rec.shape], { once: true, restart: true, timeScale: ENEMY_ATTACK_SPEED });
+    rig.play(RANGED_ATTACK[rec.kind] ?? ENEMY_ATTACK[rec.shape], { once: true, restart: true, timeScale: ENEMY_ATTACK_SPEED });
     rec.action = "attack";
   } else if (hurtStart && rec.action !== "attack" && rec.action !== "spawn") {
     rig.play("Hit_A", { once: true, restart: true, timeScale: 1.3 });
@@ -669,8 +679,10 @@ function separate(list, dtSec) {
         if (Math.abs(b.z - a.z) < MIN_SEPARATION * 0.9) {
           // Faixa cheia: quem está mais atrás recua
           const back = dx >= 0 ? b : a;
-          back.push = Math.min(MAX_PUSH_BACK, back.push + (MIN_SEPARATION - Math.abs(dx)) * 0.5);
-          back.wx = back.x + back.push;
+          if (!back.ranged) {
+            back.push = Math.min(MAX_PUSH_BACK, back.push + (MIN_SEPARATION - Math.abs(dx)) * 0.5);
+            back.wx = back.x + back.push;
+          }
         }
       }
     }
@@ -766,7 +778,7 @@ export function createCharacters(scene) {
       rec.blob.material.opacity = SHADOW_BLOB.opacity * (1 - Math.min(1, rec.sink / SINK_TIME));
       rec.root.position.set(en.dead ? rec.x + rec.push : rec.wx, WORLD.groundY + sinkY, rec.z);
     }
-    if (hero.rig) hero.rig.setFlash(hero.flash * 0.5);
+    if (hero.rig) hero.rig.setHurtFlash(hero.flash * 0.9);
   }
 
   // Ponto acima da cabeça (barra de vida e nome)

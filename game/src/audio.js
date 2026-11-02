@@ -273,6 +273,19 @@ export const sfx = (() => {
         tone(a, 330, 0.16, "triangle", 0.03, 660);
       });
     },
+    // Atiradores: flecha (estalo de corda + sopro agudo) e orbe (zumbido que sobe); volumes baixos
+    shootArrow() {
+      play("shootArrow", 1, (a) => {
+        tone(a, 520, 0.05, "triangle", 0.02, 200);
+        noise(a, 0.12, 0.015, "bandpass", 1500, 4000, 1.2, 0.02);
+      });
+    },
+    shootOrb() {
+      play("shootOrb", 1, (a) => {
+        tone(a, 280, 0.22, "sine", 0.025, 640, 0, 0.03);
+        tone(a, 284, 0.22, "triangle", 0.012, 650, 0, 0.03, 10);
+      });
+    },
     enemyHit() {
       play("enemyHit", 1, (a) => {
         tone(a, 160, 0.1, "sawtooth", 0.035, 90);

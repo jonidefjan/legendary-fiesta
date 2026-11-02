@@ -137,6 +137,33 @@ export function updateClickCounter(now = performance.now()) {
   el.classList.toggle("at-limit", rate >= MAX_CLICKS_PER_SECOND);
 }
 
+// Vinheta vermelha e piscada da barra de vida ao levar dano. Vários atacantes de uma vez não
+// viram estroboscópio: dispara a menos de 340 ms do anterior só se for bem mais forte.
+const HURT_GAP_MS = 340;
+const HURT_STRONGER = 0.3;
+let lastHurtAt = -Infinity;
+let lastHurtPeak = 0;
+
+export function flashHurt(intensity, now = performance.now()) {
+  try {
+    if (now - lastHurtAt < HURT_GAP_MS && intensity <= lastHurtPeak + HURT_STRONGER) return;
+    lastHurtAt = now;
+    lastHurtPeak = intensity;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    const peak = reduced ? intensity * 0.6 : intensity;
+    document.getElementById("hurt-vignette")?.animate?.(
+      [{ opacity: peak }, { opacity: 0 }],
+      { duration: 350, easing: "ease-out" },
+    );
+    document.querySelector(".bar-track")?.animate?.(
+      [{ boxShadow: "0 0 6px 2px rgba(255, 60, 60, 0.9)" }, { boxShadow: "0 0 0 0 rgba(255, 60, 60, 0)" }],
+      { duration: 200 },
+    );
+  } catch {
+    // sem DOM (testes) ou sem animate: o aviso é opcional
+  }
+}
+
 export function flashItem(id) {
   const slot = document.querySelector(`.item-slot[data-id="${id}"]`);
   if (slot) {

@@ -12,6 +12,8 @@ function callAll() {
   for (const d of [...DOTS, "desconhecido", undefined]) sfx.dot(d);
   sfx.revive();
   sfx.spread();
+  sfx.shootArrow();
+  sfx.shootOrb();
   sfx.enemyHit();
   sfx.block();
   sfx.kill();

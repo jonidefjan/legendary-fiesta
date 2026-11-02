@@ -65,6 +65,8 @@ function freshRun() {
     score: 0,
     enemies: [],
     effects: [],
+    // Projéteis em voo dos atiradores (e o reflexo da Cota de Malha): combat.js
+    projectiles: [],
     items: [],
     // Nível de cada item da run (id -> 1..MAX_ITEM_LEVEL); repetido sobe de nível
     itemLevels: {},

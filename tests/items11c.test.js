@@ -511,19 +511,20 @@ test("Besta Longa: N3 atravessa a fila; N5 a linha de trás leva +50%", () => {
 });
 
 // ─── Arco do Caçador Fantasma ───
-test("Arco do Caçador Fantasma: acerta todos que ainda não chegaram perto; sem alvo não gasta a recarga", () => {
+test("Arco do Caçador Fantasma: acerta todos que ainda não chegaram perto; sem ninguém lá ataca o alvo normal", () => {
   const near = big({ x: 150 });
   run(["phantom_bow"], [near]);
-  assert.equal(activateItem(item("phantom_bow")), false, "ninguém na retaguarda");
-  assert.ok(state.itemTimers.phantom_bow.elapsed >= state.itemTimers.phantom_bow.cooldown);
+  assert.equal(activateItem(item("phantom_bow")), true, "ninguém na retaguarda: cai no alvo mais próximo");
+  assert.ok(lost(near) > 0, "a onda não trava com um inimigo perto");
 
   const a = big({ x: 400 });
   const b = big({ x: 700 });
-  run(["phantom_bow"], [near, a, b]);
+  const near2 = big({ x: 150 });
+  run(["phantom_bow"], [near2, a, b]);
   assert.equal(activateItem(item("phantom_bow")), true);
   assert.equal(lost(a), 23);
   assert.equal(lost(b), 23);
-  assert.equal(lost(near), 0);
+  assert.equal(lost(near2), 0);
   assert.equal(state.itemTimers.phantom_bow.elapsed, 0, "gastou a recarga");
 });
 
@@ -925,10 +926,12 @@ test("linha de trás relativa à arena: vale em telas de 360, 412, 800 e 1280 px
 test("Arco Fantasma num celular: com a arena de 360 px o inimigo a 170 px já está na retaguarda", () => {
   const en = big({ x: 100 + 170 });
   run(["phantom_bow"], [en]);
-  assert.equal(activateItem(item("phantom_bow")), false, "sem arena medida: 170 px ainda é perto");
+  activateItem(item("phantom_bow")); // sem arena medida: 170 px ainda é perto (alvo normal)
+  const normal = lost(en);
   state.arenaRight = 100 + 280; // arena estreita
   try {
     assert.equal(activateItem(item("phantom_bow")), true);
+    assert.ok(lost(en) > normal, "agora a flecha da retaguarda também acerta");
   } finally {
     state.arenaRight = null;
   }

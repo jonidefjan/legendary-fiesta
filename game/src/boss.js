@@ -6,7 +6,7 @@
 import { state } from "./state.js";
 import { random } from "./random.js";
 import { emit, log, sound } from "./events.js";
-import { createEnemy, ENEMY_TYPES, waveScales, enemyName } from "./waves.js";
+import { createEnemy, createRanged, rangedCount, ENEMY_TYPES, waveScales, enemyName } from "./waves.js";
 import { t } from "./i18n.js";
 import { applyDot, enemyAttack, slowFactor, ANIM_MS } from "./combat.js";
 
@@ -121,14 +121,19 @@ function createBoss(kind, wave, { width, height, mobile = false, maxX = Infinity
 export function createBossWave(wave, arena) {
   const kind = random() < 0.5 ? "lich" : "demon";
   const escort = 2 + Math.floor(random() * 3); // 2 a 4
+  // A partir da onda 20 a escolta inclui atiradores, que ocupam vagas dela (o chefe da
+  // onda 10 não leva atirador)
+  const ranged = wave >= 20 ? rangedCount(wave) : 0;
+  const regular = Math.max(0, escort - ranged);
   const enemies = [];
-  for (let i = 0; i < escort; i++) {
+  for (let i = 0; i < regular; i++) {
     const typeIdx = Math.floor(
       random() * Math.min(ENEMY_TYPES.length, Math.ceil(wave / 2)),
     );
     // A escolta divide a fila com o chefe, que fica no fim dela
-    enemies.push(createEnemy(typeIdx, wave, arena, i, escort + 1));
+    enemies.push(createEnemy(typeIdx, wave, arena, i, regular + 1));
   }
+  for (let i = 0; i < ranged; i++) enemies.push(createRanged(wave, arena, i, ranged));
   enemies.push(createBoss(kind, wave, arena));
   return enemies;
 }

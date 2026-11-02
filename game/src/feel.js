@@ -29,6 +29,15 @@ export function hitStop(ms, speed = 1) {
   cooldownMs = freezeMs + HITSTOP_COOLDOWN;
 }
 
+// Aviso de dano no herói: tremida (trauma) e força da vinheta vermelha. A vinheta vai de 0,35
+// (golpe pequeno ainda aparece) a 1 (dano de 25% da vida máxima ou mais).
+export function hurtFeedback(damage, maxHp) {
+  const shake = Math.min(0.5, Math.max(0.15, damage / 40));
+  const ratio = maxHp > 0 ? damage / maxHp : 1;
+  const vignette = Math.min(1, Math.max(0.35, 0.35 + (0.65 * ratio) / 0.25));
+  return { shake, vignette };
+}
+
 export function getTrauma() {
   return trauma;
 }

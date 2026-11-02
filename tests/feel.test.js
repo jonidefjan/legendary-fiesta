@@ -19,6 +19,17 @@ const fakeStorage = (initial) => {
   };
 };
 
+test("hurtFeedback: dano pequeno ainda aparece, teto em 25% da vida e maxHp 0 sem NaN", () => {
+  const small = feel.hurtFeedback(1, 100);
+  assert.ok(small.vignette >= 0.35 && small.vignette < 0.5);
+  assert.equal(feel.hurtFeedback(25, 100).vignette, 1);
+  assert.equal(feel.hurtFeedback(80, 100).vignette, 1);
+  assert.ok(feel.hurtFeedback(10, 100).vignette > small.vignette);
+  const zero = feel.hurtFeedback(10, 0);
+  assert.ok(Number.isFinite(zero.vignette) && Number.isFinite(zero.shake));
+  assert.equal(feel.hurtFeedback(10, 100).shake, Math.min(0.5, Math.max(0.15, 10 / 40)));
+});
+
 test("sem trauma o deslocamento é zero", () => {
   const f = feel.update(16);
   assert.deepEqual(f, { x: 0, y: 0, frozen: false });

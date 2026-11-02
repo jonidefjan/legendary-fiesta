@@ -831,16 +831,24 @@ function dotLifesteal(dmg) {
 
 // trigger "anyAttack": a cada ataque de arma completo, de qualquer item possuído
 const ANY_ATTACK_EFFECTS = {
-  // A cada N ataques, a arma que atacou recarrega na hora (allLevel: todos os itens)
+  // A cada N ataques, a arma que atacou recarrega na hora (extraLevel: mais 1 outra arma
+  // sorteada, no máximo; sem outra elegível, só a que atacou)
   sprint(effect, item, ctx) {
     const counters = state.player.counters;
     counters.sprint = (counters.sprint || 0) + 1;
     if (counters.sprint % effect.every !== 0) return;
     ctx.refund = Infinity;
-    if (itemLevel(item.id) >= (effect.allLevel ?? Infinity)) {
-      for (const other of state.items) {
-        const timer = state.itemTimers[other.id];
-        if (timer && !other.fixedRate && other.type === "weapon") timer.elapsed = timer.cooldown; // só armas
+    if (itemLevel(item.id) >= (effect.extraLevel ?? Infinity)) {
+      const others = state.items.filter(
+        (other) =>
+          other !== ctx.weapon &&
+          other.type === "weapon" && // só armas
+          !other.fixedRate &&
+          state.itemTimers[other.id],
+      );
+      if (others.length > 0) {
+        const pick = others[Math.min(others.length - 1, Math.floor(random() * others.length))];
+        state.itemTimers[pick.id].elapsed = state.itemTimers[pick.id].cooldown;
       }
     }
     log(t("log.sprint", { icon: item.icon, item: item.name, weapon: ctx.weapon.name }), "item");
@@ -1288,7 +1296,19 @@ const DODGE_EFFECTS = {
   },
 };
 
-// trigger "hurt": ao tomar dano de HP. ctx = { enemy, damage }
+// Inimigo morto, ou com vida 0 que o updateEnemies ainda não marcou como morto
+function isGone(en) {
+  return en.dead || en.hp <= 0;
+}
+
+// Cota de Malha: o dano devolvido ao atacante (imediato no corpo a corpo, na chegada do
+// projétil de volta quando o golpe veio de um atirador)
+function applyReflect(enemy, amount, item) {
+  applyElementalDamage(enemy, amount, "physical", "reflect");
+  log(t("log.reflect", { icon: item.icon, item: item.name, amount, enemy: enemyName(enemy) }), "item");
+}
+
+// trigger "hurt": ao tomar dano de HP. ctx = { enemy, damage, projectile }
 const HURT_EFFECTS = {
   // Espinhos: só chega aqui quando o golpe tirou HP (a esquiva e o bloqueio só chamam
   // com o encantamento do nível 5). Fere todos os vivos ao alcance do herói.
@@ -1311,15 +1331,17 @@ const HURT_EFFECTS = {
   reflect(effect, item, ctx) {
     if (random() >= levelValue(item, effect, "chance", effect.chance ?? 1)) return;
     const reflected = Math.round(ctx.damage * levelValue(item, effect, "ratio"));
-    if (reflected <= 0) return;
-    applyElementalDamage(ctx.enemy, reflected, "physical", "reflect");
-    log(
-      t("log.reflect", { icon: item.icon, item: item.name, amount: reflected, enemy: enemyName(ctx.enemy) }),
-      "item",
-    );
+    if (reflected <= 0 || isGone(ctx.enemy)) return;
+    // Golpe de projétil: o dano volta como projétil e é aplicado na chegada ao atirador
+    if (ctx.projectile) {
+      launchReflect(ctx.enemy, reflected, item);
+      return;
+    }
+    applyReflect(ctx.enemy, reflected, item);
   },
   // Couro de Basilisco: quem bate no herói fica envenenado
   poisonAttacker(effect, item, ctx) {
+    if (isGone(ctx.enemy)) return; // atirador morto: sem veneno em cadáver
     const landed = addPoison(ctx.enemy, plusStacks(Math.round(levelValue(item, effect, "stacks"))), item);
     if (landed > 0) {
       log(t("log.poisonAttacker", { icon: item.icon, item: item.name, enemy: enemyName(ctx.enemy) }), "item");
@@ -1327,6 +1349,7 @@ const HURT_EFFECTS = {
   },
   // Escama Dracônica e Manto de Cinzas: quem bate no herói pega fogo
   burnAttacker(effect, item, ctx) {
+    if (isGone(ctx.enemy)) return;
     const landed = igniteWith(item, effect, ctx.enemy, Math.round(levelValue(item, effect, "stacks")));
     if (landed > 0) {
       log(t("log.burnAttacker", { icon: item.icon, item: item.name, enemy: enemyName(ctx.enemy) }), "item");
@@ -1684,11 +1707,12 @@ export function activateItem(item, { echo = false } = {}) {
   // Recarga devolvida por encantamentos; aplicada depois de zerar o timer
   let cooldownRefund = 0;
 
-  if (item.type === "weapon" && item.targeting === "rear") {
-    // Arco do Caçador Fantasma: dispara em toda a linha de trás; sem ninguém lá, não gasta a recarga
-    const refund = rearVolley(item, echo);
-    if (refund === null) return false;
-    cooldownRefund = refund;
+  // Arco do Caçador Fantasma: dispara em toda a linha de trás. Sem ninguém lá, ataca o alvo
+  // normal (o mais próximo): senão, como única arma, deixaria a onda travada com um inimigo
+  // já perto do herói.
+  const rearRefund = item.type === "weapon" && item.targeting === "rear" ? rearVolley(item, echo) : null;
+  if (rearRefund !== null) {
+    cooldownRefund = rearRefund;
     activated = true;
   } else if (item.type === "weapon") {
     cooldownRefund = weaponAttack(item, target, echo ? { extra: true } : null);
@@ -1799,9 +1823,15 @@ export function updatePlayerAnim(dt) {
 // ═══════════════════════════════════════════
 // Devolve o resultado: "dodged" | "blocked" | "hit" (dano em HP)
 export function enemyAttack(en) {
+  en.attackAnim = ANIM_MS.enemyAttack;
+  return resolveEnemyHit(en, false);
+}
+
+// Resolve o golpe (esquiva, bloqueio, armadura, dano). projectile: o golpe veio de um
+// projétil de atirador que acabou de chegar; a animação de ataque já tocou no disparo.
+function resolveEnemyHit(en, projectile) {
   const p = state.player;
   let dmg = Math.round(en.dmg * enemyDamageMult(en));
-  en.attackAnim = ANIM_MS.enemyAttack;
 
   // Esquiva (antes do bloqueio): sem dano e sem gastar o escudo
   if (p.evasion > 0 && random() < p.evasion) {
@@ -1823,7 +1853,8 @@ export function enemyAttack(en) {
     const ratio = ownedEffects("block")
       .filter(({ effect }) => effect.type === "reflect")
       .reduce((sum, { item, effect }) => sum + levelValue(item, effect, "ratio"), 0);
-    const reflected = Math.round(en.dmg * ratio);
+    // Atirador que já morreu com o projétil em voo não sofre o parry
+    const reflected = isGone(en) ? 0 : Math.round(en.dmg * ratio);
     if (reflected > 0) {
       en.hp -= reflected;
       en.lastHitCrit = false;
@@ -1843,7 +1874,7 @@ export function enemyAttack(en) {
   dmg = Math.max(1, Math.round(dmg * (1 - armorReduction(p.armor)) * (1 - (p.damageReduction || 0))));
 
   // Dano recebido volta ao atacante (Cota de Malha), espinhos, fogo na Escama Dracônica...
-  const hurtCtx = { enemy: en, damage: dmg };
+  const hurtCtx = { enemy: en, damage: dmg, projectile };
   for (const { item, effect } of ownedEffects("hurt")) {
     HURT_EFFECTS[effect.type]?.(effect, item, hurtCtx);
   }
@@ -1881,8 +1912,93 @@ export function checkPlayerDeath() {
       log(t("log.defeat", { wave: state.wave }), "kill");
       sound("death");
       state.running = false;
+      clearProjectiles();
       emit("playerDied");
     }
+  }
+}
+
+// ═══════════════════════════════════════════
+//  PROJÉTEIS DOS ATIRADORES
+// ═══════════════════════════════════════════
+// state.projectiles: { kind, x, y, sx, sy, from, reflected, target, damage, item }.
+// Esquiva, bloqueio e dano são resolvidos na chegada. Se o atirador morrer com o projétil
+// em voo, ele continua e acerta (o dano usa o en.dmg do atirador).
+export const PROJECTILE_SPEED = { arrow: 0.9, orb: 0.5 }; // px por ms de jogo
+const PROJECTILE_Y = 30; // altura do projétil acima do chão
+
+export function fireProjectile(en) {
+  en.attackAnim = ANIM_MS.enemyAttack; // o atirador toca o ataque sem sair do lugar
+  const kind = en.projectile || "arrow";
+  state.projectiles.push({
+    kind,
+    x: en.x,
+    y: en.y - PROJECTILE_Y,
+    sx: en.x,
+    sy: en.y - PROJECTILE_Y,
+    from: en,
+    reflected: false,
+    target: null,
+    damage: 0,
+    item: null,
+  });
+  sound(kind === "orb" ? "shootOrb" : "shootArrow");
+}
+
+// Cota de Malha: o golpe de projétil volta até o atirador
+function launchReflect(enemy, damage, item) {
+  const p = state.player;
+  const y = p.y - PROJECTILE_Y;
+  state.projectiles.push({
+    kind: enemy.projectile || "arrow",
+    x: p.x,
+    y,
+    sx: p.x,
+    sy: y,
+    from: null,
+    reflected: true,
+    target: enemy,
+    damage,
+    item,
+  });
+}
+
+// Zera os projéteis (fim da onda, início da run, morte do herói)
+export function clearProjectiles() {
+  state.projectiles.length = 0;
+}
+
+export function updateProjectiles(dt) {
+  const list = state.projectiles;
+  if (!state.running) {
+    list.length = 0;
+    return;
+  }
+  const p = state.player;
+  // De trás para frente, removendo trocando pelo último (sem alocar): resolver o impacto
+  // pode empilhar o reflexo ou zerar a lista
+  for (let i = list.length - 1; i >= 0; i--) {
+    const pr = list[i];
+    if (!pr) continue;
+    const tx = pr.reflected ? pr.target.x : p.x;
+    const ty = (pr.reflected ? pr.target.y : p.y) - PROJECTILE_Y;
+    const step = (PROJECTILE_SPEED[pr.kind] ?? 0.9) * dt;
+    const arrived = pr.reflected ? pr.x + step >= tx : pr.x - step <= tx;
+    if (arrived) {
+      list[i] = list[list.length - 1];
+      list.pop();
+      if (pr.reflected) {
+        if (!isGone(pr.target)) applyReflect(pr.target, pr.damage, pr.item);
+      } else {
+        resolveEnemyHit(pr.from, true);
+      }
+      if (!state.running) return;
+      continue;
+    }
+    pr.x += pr.reflected ? step : -step;
+    const span = pr.sx - tx;
+    const frac = span === 0 ? 1 : Math.min(1, Math.max(0, (pr.sx - pr.x) / span));
+    pr.y = pr.sy + (ty - pr.sy) * frac;
   }
 }
 
@@ -1911,7 +2027,8 @@ export function updateEnemies(dt) {
       en.atkTimer = (en.atkTimer || 0) + dt * slowFactor(en); // frio atrasa o ataque
       if (en.atkTimer >= en.atkInterval) {
         en.atkTimer = 0;
-        enemyAttack(en);
+        if (en.ranged) fireProjectile(en);
+        else enemyAttack(en);
       }
     }
 
