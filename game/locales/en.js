@@ -157,6 +157,7 @@ export default {
   "enemies.summoned": "Summoned Skeleton",
   "enemies.lich": "Lich",
   "enemies.demon": "Demon Lord",
+  "enemies.bone_knight": "Bone Knight",
 
   // Arena (canvas de texto)
   "overlay.you": "YOU",
@@ -250,6 +251,7 @@ export default {
   "log.bossSummon.one": "💀 {boss} summons {count} skeleton!",
   "log.bossSummon.other": "💀 {boss} summons {count} skeletons!",
   "log.bossNova": "🔥 {boss} casts a Fire Nova!",
+  "log.bossGuard": "🛡 {boss} raises its guard!",
   "log.bossEnrage": "😡 {boss} flies into a rage!",
   "share.button": "📤 Share result",
   "share.title": "Reliquary",

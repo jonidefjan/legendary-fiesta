@@ -12,7 +12,7 @@ Everything is vanilla JavaScript, HTML and CSS. There is no build step and no ru
 - Pick a starting weapon, then fight wave after wave; the hero attacks on its own.
 - After each wave choose 1 of 3 items (weapons, armor, relics). Pick one you already own to level it up, to level 5.
 - 45 items with stacking burn and poison, cold and freeze, chain lightning, area damage, lifesteal and more. Common items evolve at level 5 and keep growing with kills. Two mythic items, bought in the shop, are used by clicking the arena.
-- A boss every 10 waves (Lich or Demon Lord), then endless mode.
+- A boss every 10 waves (Lich or Demon Lord; the Bone Knight joins from wave 20), then endless mode.
 - Guaranteed legendary after a streak of reward screens without one.
 - Permanent upgrades bought with fragments between runs.
 - Auto-save, English and Portuguese, desktop and phone layouts (portrait and landscape).

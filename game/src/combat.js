@@ -152,6 +152,11 @@ export function landStacks(target, element, stacks, itemId = null) {
 
 // Multiplicador do dano que o inimigo recebe: Corrosão (veneno), congelado (Armadura
 // Cristalina) e julgado (Tomo do Julgamento) somam bônus. O herói não passa por aqui.
+// Guarda do Cavaleiro de Ossos: fator sobre o dano recebido (1 sem guarda)
+export function guardMult(target) {
+  return target.guardMs > 0 ? 1 - Math.min(0.8, target.guardReduction || 0) : 1;
+}
+
 export function damageTakenMult(target) {
   if (target === state.player) return 1;
   let mult = 1;
@@ -163,6 +168,8 @@ export function damageTakenMult(target) {
     }
   }
   if (target.judged) mult += target.judged.bonus;
+  // Guarda do Cavaleiro de Ossos: corta todo dano que passa por aqui (golpes e dano contínuo)
+  mult *= guardMult(target);
   return mult;
 }
 
@@ -181,6 +188,11 @@ export function applyElementalDamage(target, baseDmg, element, source, crit = fa
 
   target.hp -= finalDmg;
   target.hurtTimer = 15;
+  // Guarda levantada: anel de escudo no chefe, no máximo um a cada 250 ms de jogo
+  if (target.guardMs > 0 && !(target.guardFx > 0)) {
+    target.guardFx = 250;
+    spawnEffect("shield", target.x, target.y - 40, { life: 20 });
+  }
   if (itemId) creditDamage(itemId, finalDmg);
   else if (source === "player") state.runStats.totalDamage += finalDmg;
 
@@ -376,7 +388,9 @@ export function processDots(dt) {
         dmg =
           entity === state.player
             ? Math.max(1, Math.round(dmg * (1 - (entity.dotReduction || 0))))
-            : Math.round(dmg * damageTakenMult(entity));
+            : entity.guardMs > 0 && dmg > 0
+              ? Math.max(1, Math.round(dmg * damageTakenMult(entity))) // sob guarda o tick nunca vira 0
+              : Math.round(dmg * damageTakenMult(entity));
         // Praga Detonante: o tick que mataria o inimigo o faz explodir nos vizinhos
         if (dot.type === "poison" && entity !== state.player) detonatePoison(entity, dmg);
         entity.hp -= dmg;
@@ -1854,7 +1868,8 @@ function resolveEnemyHit(en, projectile) {
       .filter(({ effect }) => effect.type === "reflect")
       .reduce((sum, { item, effect }) => sum + levelValue(item, effect, "ratio"), 0);
     // Atirador que já morreu com o projétil em voo não sofre o parry
-    const reflected = isGone(en) ? 0 : Math.round(en.dmg * ratio);
+    // (a guarda do Cavaleiro de Ossos também corta o parry; sem guarda o fator é 1)
+    const reflected = isGone(en) ? 0 : Math.round(en.dmg * ratio * guardMult(en));
     if (reflected > 0) {
       en.hp -= reflected;
       en.lastHitCrit = false;
@@ -2022,12 +2037,20 @@ export function updateEnemies(dt) {
       en.frozen = Math.max(0, en.frozen - dt);
     } else if (dist > combatDist && en.moving) {
       en.x -= en.speed * dt * 0.06 * slowFactor(en);
+      // Lich reforçado (shootsBolts): o ataque também corre enquanto ele anda
+      if (en.shootsBolts) {
+        en.atkTimer = (en.atkTimer || 0) + dt * slowFactor(en);
+        if (en.atkTimer >= en.atkInterval) {
+          en.atkTimer = 0;
+          fireProjectile(en);
+        }
+      }
     } else {
       en.moving = false;
       en.atkTimer = (en.atkTimer || 0) + dt * slowFactor(en); // frio atrasa o ataque
       if (en.atkTimer >= en.atkInterval) {
         en.atkTimer = 0;
-        if (en.ranged) fireProjectile(en);
+        if (en.ranged || en.shootsBolts) fireProjectile(en);
         else enemyAttack(en);
       }
     }

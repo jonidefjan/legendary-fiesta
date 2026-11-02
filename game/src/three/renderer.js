@@ -149,6 +149,10 @@ export function resizeCanvas() {
   state.enemies.forEach((en) => {
     en.y = logicGroundY();
   });
+  // Quem espera na fila de entrada nasce depois: também no chão novo
+  state.spawnQueue.forEach((en) => {
+    en.y = logicGroundY();
+  });
 }
 
 // ─── Quadro ───

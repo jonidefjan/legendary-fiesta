@@ -110,8 +110,9 @@ test("chefe da onda 20 tem vida e dano da nova escala", () => {
   setRandom(() => 0.1); // Lich
   const boss = createBossWave(20, arena).find((e) => e.isBoss);
   const s = waveScales(20);
-  assert.equal(boss.maxHp, Math.round(35 * s.hp * 12));
-  assert.equal(boss.dmg, Math.round(6 * s.dmg * 2));
+  // Reforçado (fase 15): vida x1,5 e dano x1,25 sobre a escala
+  assert.equal(boss.maxHp, Math.round(35 * s.hp * 12 * 1.5));
+  assert.equal(boss.dmg, Math.round(6 * s.dmg * 2 * 1.25));
   assert.ok(boss.maxHp > Math.round(35 * 4.8 * 12), "maior que sem o late game");
   assert.ok(boss.dmg > Math.round(6 * 3.85 * 2));
 });

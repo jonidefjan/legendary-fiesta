@@ -67,6 +67,9 @@ function freshRun() {
     effects: [],
     // Projéteis em voo dos atiradores (e o reflexo da Cota de Malha): combat.js
     projectiles: [],
+    // Onda grande entra em partes: inimigos que esperam vaga (waves.js) e o tempo desde a última entrada
+    spawnQueue: [],
+    spawnTimer: 0,
     items: [],
     // Nível de cada item da run (id -> 1..MAX_ITEM_LEVEL); repetido sobe de nível
     itemLevels: {},

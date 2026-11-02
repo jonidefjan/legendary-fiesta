@@ -35,7 +35,7 @@ import {
   rearReachOffer,
 } from "./items.js";
 import { resetClicks } from "./clicks.js";
-import { createWave, rangedSpawnX } from "./waves.js";
+import { createWave, rangedSpawnX, splitSpawn, waveCleared, updateSpawnQueue } from "./waves.js";
 import {
   processDots,
   updateItemTimers,
@@ -190,7 +190,10 @@ on("revive", () => {
 
 // Habilidades dos chefes: partículas no chefe e tremida proporcional ao perigo
 on("bossAbility", ({ kind, x, y }) => {
-  if (kind === "summon") {
+  if (kind === "guard") {
+    particles.emit("hit", x, y - 30, { element: "ice", intensity: 1 });
+    feel.addShake(0.15);
+  } else if (kind === "summon") {
     particles.emit("hit", x, y - 30, { element: "shadow", intensity: 1 });
     particles.emit("death", x - 50, y - 10);
     particles.emit("death", x + 50, y - 10);
@@ -215,6 +218,8 @@ on("bossAbility", ({ kind, x, y }) => {
 on("playerDied", () => {
   // A run acaba aqui: recarregar a página não pode trazê-la de volta
   runId++;
+  state.spawnQueue = [];
+  state.spawnTimer = 0;
   save.clearRun();
   recordBest();
   save.saveMeta();
@@ -266,14 +271,19 @@ function spawnWave(waveNum) {
   const arena = currentArena();
   state.arenaRight = render.visibleLogicRight(); // define a linha de trás (Besta, Arco Fantasma)
   clearProjectiles();
-  state.enemies = boss.isBossWave(waveNum)
+  const all = boss.isBossWave(waveNum)
     ? boss.createBossWave(waveNum, arena)
     : createWave(waveNum, arena);
+  // Ondas grandes entram em partes (waves.js); a fila não vai no save: a onda recomeça inteira
+  const { field, queue } = splitSpawn(all);
+  state.enemies = field;
+  state.spawnQueue = queue;
+  state.spawnTimer = 0;
 }
 
 function checkWaveComplete() {
   if (!state.running || state.waveTransition) return;
-  if (!state.enemies.every((e) => e.dead)) return;
+  if (!waveCleared(state.enemies, state.spawnQueue)) return;
   state.waveTransition = true;
   clearProjectiles(); // ninguém leva dano na tela de recompensa
   state.score += state.wave * 50;
@@ -528,6 +538,7 @@ function gameLoop(timestamp) {
     processDots(dt);
     updateClouds(dt);
     updateEnemies(dt);
+    if (state.spawnQueue.length > 0) updateSpawnQueue(dt, currentArena());
     updateProjectiles(dt);
     boss.updateBosses(dt);
     updatePlayerAnim(dt);

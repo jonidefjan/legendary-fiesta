@@ -4,6 +4,7 @@
 import { random } from "./random.js";
 import { t, hasKey } from "./i18n.js";
 import { isRearAt } from "./combat.js";
+import { state } from "./state.js";
 
 // shape = modelo 3D (KayKit Skeletons): minion, rogue, warrior; "mage" é do chefe Lich e do
 // Esqueleto Mago (RANGED_TYPES, abaixo)
@@ -189,6 +190,73 @@ export function createRanged(waveNum, arena, index = 0, count = 1) {
   const en = buildEnemy(base, waveNum, arena, rangedSpawnX(index, count, arena));
   en.moving = false; // nunca anda
   return en;
+}
+
+// ═══ Entrada em partes (ondas muito altas) ═══
+// No máximo MAX_ON_FIELD vivos em campo; o resto espera numa fila e entra em grupos de
+// SPAWN_BATCH, com SPAWN_GAP_MS de intervalo (tempo de jogo), para não criar tudo no mesmo quadro.
+export const MAX_ON_FIELD = 30;
+export const SPAWN_BATCH = 6;
+export const SPAWN_GAP_MS = 1000;
+export const MAX_RIGS_PER_FRAME = 3; // clones de modelo 3D criados por quadro (characters.js)
+
+// Separa a onda em { field, queue }. Chefes e atiradores (poucos, com posição própria) vão
+// sempre para o campo; o excesso de comuns vai para a fila, na ordem do sorteio. Com
+// enemies.length <= limit a fila fica vazia e a onda não muda.
+export function splitSpawn(enemies, limit = MAX_ON_FIELD) {
+  if (enemies.length <= limit) return { field: enemies, queue: [] };
+  const fixed = enemies.filter((e) => e.isBoss || e.ranged).length;
+  let room = Math.max(0, limit - fixed);
+  const field = [];
+  const queue = [];
+  for (const en of enemies) {
+    if (en.isBoss || en.ranged || room-- > 0) field.push(en);
+    else queue.push(en);
+  }
+  return { field, queue };
+}
+
+// Quantos da fila entram agora: 0 antes do intervalo; depois, o menor entre o grupo, as
+// vagas livres em campo e o que resta na fila (nunca negativo)
+export function spawnBatchSize(queueLength, alive, sinceLastMs) {
+  // Campo vazio com fila: o próximo grupo entra na hora, sem esperar o intervalo
+  if (sinceLastMs < SPAWN_GAP_MS && !(alive === 0 && queueLength > 0)) return 0;
+  return Math.max(0, Math.min(SPAWN_BATCH, MAX_ON_FIELD - alive, queueLength));
+}
+
+// Corpo que o visual já terminou de afundar (characters.js marca bodyGone)
+export function corpseGone(en) {
+  return !!en.dead && !!en.bodyGone;
+}
+
+// A onda só termina com a fila vazia e todos mortos
+export function waveCleared(enemies, queue) {
+  return queue.length === 0 && enemies.every((e) => e.dead);
+}
+
+// Quantos clones de modelo ainda cabem neste quadro, dado quantos já foram criados
+export function rigsLeft(created, max = MAX_RIGS_PER_FRAME) {
+  return Math.max(0, max - created);
+}
+
+// Chamada a cada quadro de jogo (dt em ms de jogo). arena: currentArena() de quem chama,
+// só usada quando um grupo entra. Os novos nascem na borda direita visível.
+export function updateSpawnQueue(dt, arena) {
+  const queue = state.spawnQueue;
+  if (!queue || queue.length === 0) return;
+  state.spawnTimer += dt;
+  const alive = state.enemies.filter((e) => !e.dead).length;
+  const n = spawnBatchSize(queue.length, alive, state.spawnTimer);
+  if (n <= 0) return;
+  state.spawnTimer = 0;
+  // Corpos que o renderer já fez sumir (bodyGone) saem da lista: characters.js libera os rigs
+  state.enemies = state.enemies.filter((e) => !corpseGone(e));
+  const edge = Number.isFinite(arena.maxX) ? arena.maxX - LINEUP_JITTER : lineupX(0, 1, arena);
+  for (const en of queue.splice(0, n)) {
+    en.x = edge + random() * LINEUP_JITTER;
+    en.moving = true;
+    state.enemies.push(en);
+  }
 }
 
 // Cria os inimigos de uma onda. mobile: começam mais longe, mais lentos e batem menos.
