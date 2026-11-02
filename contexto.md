@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-11-01, após a PR #21 (commit `4ade0a5`). Nada pendente de commit além deste arquivo.
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-11-01, após as PRs #22 e #23 (commit `40375c9`). Nada pendente de commit além deste arquivo.
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -8,10 +8,14 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Tem i18n EN (padrão) e pt-BR, com a chave `lang` no localStorage, e tema claro/escuro.
 - **Reliquary** (`game/`): auto-battler em JS puro, sem build.
   - 3D pixel art com Three.js 0.170, vendorizado em `game/vendor/three`.
-  - Testes: `npm test` na raiz (**436** passando).
+  - Testes: `npm test` na raiz (**446** passando).
 
 ## Estado
 - **Fases concluídas:** 0 a 14 (PRs #2 a #21). O plano de fases terminou; restam só os opcionais.
+- **Arma na mão (PR #22):** `game/src/held-weapon.js` monta blocos a partir do ícone 16×16 da primeira arma. `HELD_POSES` define grip, direção e escala de cada ícone; um teste exige pose para toda arma. `characters.js` prende a malha em `handslotr` (o GLTFLoader tira o ponto do nome) e esconde as armas do modelo.
+  - Só a espada e o martelo foram vistos na tela. Faltam as outras 14 armas e a arma durante o golpe.
+  - A Espada Enferrujada se destaca pouco no caminho marrom.
+- **Loja (PR #23):** `render` em `ui-title.js` mantém a rolagem de `.title-content` ao redesenhar. Testado com DOM simulado, não no navegador.
 - **Fase 12 (atiradores e late game):**
   - `RANGED_TYPES` em `waves.js`, separado de `ENEMY_TYPES`: arqueiro a partir da onda 11, mago a partir da 13.
   - `rangedCount`: 2 nas ondas 11–20, 3 nas 21–30, 4 da 31 em diante. Ocupam vagas do total `2 + onda`; ondas de chefe têm atiradores a partir da 20.
