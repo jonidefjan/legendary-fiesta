@@ -111,6 +111,8 @@ function render(keepLangFocus = false) {
     )
     .join("");
 
+  // O painel que rola é recriado abaixo: a compra não pode jogar a tela de volta para o topo
+  const scrollTop = el.querySelector(".title-content")?.scrollTop ?? 0;
   el.innerHTML = `
     <div class="modal-content title-content">
       <div class="lang-toggle title-lang" role="group" aria-label="${esc(t("lang.label"))}">${langs}</div>
@@ -131,6 +133,8 @@ function render(keepLangFocus = false) {
         <div class="shop-grid">${MYTHIC_IDS.map(mythicCard).join("")}</div>
       </div>
     </div>`;
+  const scroller = el.querySelector(".title-content");
+  if (scroller) scroller.scrollTop = scrollTop;
   lastBought = null;
   // Ao trocar de idioma o foco volta para o botão EN/PT que o tinha
   const focus = keepLangFocus
