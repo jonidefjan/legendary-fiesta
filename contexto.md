@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-11-01, após a PR #24 (commit `0451271`). Nada pendente de commit além deste arquivo.
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-11-01, após a PR #25 (commit `fdfbc61`). Nada pendente de commit além deste arquivo.
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -8,13 +8,22 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
   - Tem i18n EN (padrão) e pt-BR, com a chave `lang` no localStorage, e tema claro/escuro.
 - **Reliquary** (`game/`): auto-battler em JS puro, sem build.
   - 3D pixel art com Three.js 0.170, vendorizado em `game/vendor/three`.
-  - Testes: `npm test` na raiz (**446** passando).
+  - Testes: `npm test` na raiz (**474** passando).
 
 ## Estado
-- **Fases concluídas:** 0 a 14 (PRs #2 a #21). O plano de fases terminou; restam só os opcionais.
+- **Fases concluídas:** 0 a 15 (PRs #2 a #25). O plano de fases terminou; restam só os opcionais.
+- **Fase 15 (spawn e chefes):**
+  - `waves.js`: no máximo 30 vivos em campo (`MAX_ON_FIELD`). O resto fica em `state.spawnQueue` e entra em grupos de até 6, a cada 1 s ou na hora com o campo vazio. Chefes e atiradores nunca entram na fila. `waveCleared` exige fila vazia.
+  - `characters.js`: no máximo 3 rigs por quadro. Quem espera fica invisível, sem barra de vida. `en.bodyGone` marca o corpo que já saiu da tela, e só então ele sai de `state.enemies`.
+  - Medido na onda 201: 19 fps na `main` antiga, 103 fps com a fila. Resta um quadro de ~110 ms no começo da onda, sem causa confirmada.
+  - `boss.js`, a partir da onda 20 (`isReinforcedBoss`): vida ×1,5, dano ×1,25, fases em 66% e 33% e fúria em 33%. A fase de 33% espera a fúria (`phaseHoldMs`). A onda 10 não muda.
+  - Lich reforçado: invoca 4 em cada fase, com limite de 10 vivos, e atira (`shootsBolts`, não `ranged`). Demônio reforçado: nova em cada fase e mais ritmo.
+  - **Cavaleiro de Ossos** (`bone_knight`, só a partir da onda 20): guarda de 3 s a cada 8 s, com redução de 60%, 70% e 80%. `guardMult` entra em `damageTakenMult` e no parry.
+  - **Sem conferir:** Lich e Demônio reforçados na tela, celular e o equilíbrio dos chefes jogando.
 - **Arma na mão (PR #22):** `game/src/held-weapon.js` monta blocos a partir do ícone 16×16 da primeira arma. `HELD_POSES` define grip, direção e escala de cada ícone; um teste exige pose para toda arma. `characters.js` prende a malha em `handslotr` (o GLTFLoader tira o ponto do nome) e esconde as armas do modelo.
   - Só a espada e o martelo foram vistos na tela. Faltam as outras 14 armas e a arma durante o golpe.
   - A Espada Enferrujada se destaca pouco no caminho marrom.
+- **Analytics:** Vercel Web Analytics, por script em `index.html` e `game/index.html`, sem npm (o site não tem build). Localmente o script dá 404, o que é esperado. Só funciona com o Analytics ativado no painel do Vercel.
 - **Publicação (PR #24):** o site está no Vercel, e `vercel.json` redireciona `/game` para `/game/`. A prévia das PRs exige login, então só dá para testar com curl em produção.
   - **Pendente com o usuário:** `www.jm77os.com.br` redireciona para `legendary-fiesta-alpha.vercel.app`. Isso se ajusta no painel do Vercel, não no repositório.
 - **Loja (PR #23):** `render` em `ui-title.js` mantém a rolagem de `.title-content` ao redesenhar. Testado com DOM simulado, não no navegador.
@@ -138,7 +147,9 @@ Plano de melhorias, pedido pelo usuário em 2026-10-31. A ordem foi escolhida po
 ## Ambiente
 - **Windows:** o gh fica em `C:\Program Files\GitHub CLI\gh.exe` (usar pelo PowerShell).
 - **Arquivos CRLF:** editar com um script node que normaliza `\r\n` e grava de volta.
-- **Preview:** nenhum servidor fica rodando. Para jogar ou testar, rode `npx http-server -p 8766` na raiz e abra `http://localhost:8766/game/` numa aba própria.
+- **Preview:** nenhum servidor fica rodando. Use `preview_start` com o nome `reliquary` (porta 8765) e navegue até `http://localhost:8765/game/`.
+  - Na escolha inicial, clique na carta e depois em `#confirm-selection-btn`, que é um `div`.
+  - Para testar uma onda alta, injete em `state.enemies` e `state.spawnQueue` e reponha a vida do herói a cada quadro: o dano das ondas altas passa de 1e7.
   - Chamar `tabs_select` antes de testar o loop.
   - Para furar o cache do CSS, trocar os `href` com `?v=`.
   - O estado do jogo fica em `await import('/game/src/state.js')`.
