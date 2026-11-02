@@ -32,9 +32,10 @@ import {
   rewardOffer,
   addItemOrLevel,
   mythicOffer,
+  rearReachOffer,
 } from "./items.js";
 import { resetClicks } from "./clicks.js";
-import { createWave } from "./waves.js";
+import { createWave, rangedSpawnX } from "./waves.js";
 import {
   processDots,
   updateItemTimers,
@@ -42,6 +43,8 @@ import {
   updateRegen,
   updatePlayerAnim,
   updateEnemies,
+  updateProjectiles,
+  clearProjectiles,
   updateClouds,
   arenaClick,
   beginFrame,
@@ -164,9 +167,12 @@ on("enemyDied", () => {
   feel.addShake(0.3);
   feel.hitStop(60, state.gameSpeed);
 });
+// Sem hit-stop ao levar dano: congelar o jogo pararia também as recargas e os golpes do herói.
+// O aviso é a tremida, o herói em vermelho e a vinheta.
 on("playerHurt", ({ damage }) => {
-  feel.addShake(Math.min(0.5, Math.max(0.15, damage / 40)));
-  feel.hitStop(45, state.gameSpeed);
+  const { shake, vignette } = feel.hurtFeedback(damage, state.player.maxHp);
+  feel.addShake(shake);
+  ui.flashHurt(vignette);
 });
 on("blocked", () => feel.addShake(0.15));
 on("crit", () => {
@@ -231,16 +237,35 @@ function recordBest() {
   best.score = Math.max(best.score, state.score);
 }
 
-function spawnWave(waveNum) {
+function currentArena() {
   const canvas = render.getCanvas();
-  const arena = {
+  return {
     width: canvas.width,
     height: canvas.height,
     mobile: ui.isMobile,
     // Ninguém nasce fora da tela: o herói ataca o mais próximo, visível ou não
     maxX: render.visibleLogicRight(),
+    playerX: state.player.x,
   };
+}
+
+// A arena mudou de tamanho: atualiza a linha de trás e recoloca os atiradores vivos (eles
+// nunca andam, então ficariam fora da tela numa arena mais estreita)
+function handleResize() {
+  render.resizeCanvas();
+  state.arenaRight = render.visibleLogicRight();
+  const ranged = state.enemies.filter((e) => e.ranged);
+  if (ranged.length === 0) return;
+  const arena = currentArena();
+  ranged.forEach((en, i) => {
+    if (!en.dead) en.x = rangedSpawnX(i, ranged.length, arena);
+  });
+}
+
+function spawnWave(waveNum) {
+  const arena = currentArena();
   state.arenaRight = render.visibleLogicRight(); // define a linha de trás (Besta, Arco Fantasma)
+  clearProjectiles();
   state.enemies = boss.isBossWave(waveNum)
     ? boss.createBossWave(waveNum, arena)
     : createWave(waveNum, arena);
@@ -250,6 +275,7 @@ function checkWaveComplete() {
   if (!state.running || state.waveTransition) return;
   if (!state.enemies.every((e) => e.dead)) return;
   state.waveTransition = true;
+  clearProjectiles(); // ninguém leva dano na tela de recompensa
   state.score += state.wave * 50;
   sfx.waveClear();
 
@@ -297,7 +323,8 @@ function offerReward({ boss = false } = {}) {
   // Itens novos ou que ainda podem subir de nível; chefe e 4 telas sem lendário garantem um
   // (3 ou 2 com Sorte lendária). 3 opções, ou 4 com Mais uma opção.
   // Na recompensa da onda 1 o mítico que o jogador liberou e não pegou volta como carta extra
-  const extra = state.wave === 1 && !boss ? mythicOffer() : null;
+  // Na da onda 10 (depois de continuar a run), sem item que alcança o fundo, vem uma carta dele
+  const extra = state.wave === 1 && !boss ? mythicOffer() : boss ? rearReachOffer() : null;
   const offer = rewardOffer(meta.rewardOptionCount(), { boss, extra });
   const options = offer.options;
 
@@ -501,6 +528,7 @@ function gameLoop(timestamp) {
     processDots(dt);
     updateClouds(dt);
     updateEnemies(dt);
+    updateProjectiles(dt);
     boss.updateBosses(dt);
     updatePlayerAnim(dt);
 
@@ -539,14 +567,14 @@ function init() {
     document.getElementById("combat-canvas"),
     document.getElementById("overlay-canvas"),
   );
-  render.resizeCanvas();
+  handleResize();
   // A arena muda de altura quando a barra de itens abre ou fecha, não só com a janela
   if (typeof ResizeObserver === "function") {
-    new ResizeObserver(() => render.resizeCanvas()).observe(
+    new ResizeObserver(() => handleResize()).observe(
       document.getElementById("arena"),
     );
   } else {
-    window.addEventListener("resize", render.resizeCanvas);
+    window.addEventListener("resize", handleResize);
   }
 
   const canvas = render.getCanvas();

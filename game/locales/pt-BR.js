@@ -152,6 +152,8 @@ export default {
   "enemies.skeleton": "Esqueleto",
   "enemies.rogue": "Esqueleto Ladino",
   "enemies.warrior": "Esqueleto Guerreiro",
+  "enemies.archer": "Esqueleto Arqueiro",
+  "enemies.mage": "Esqueleto Mago",
   "enemies.summoned": "Esqueleto Invocado",
   "enemies.lich": "Lich",
   "enemies.demon": "Senhor Demônio",

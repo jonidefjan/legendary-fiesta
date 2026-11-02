@@ -612,15 +612,46 @@ test("Cristal Vital: abaixo de 30% de vida a recarga cai pela metade (N5)", () =
   assert.equal(state.itemTimers.health_crystal.elapsed, 2000);
 });
 
-test("Botas da Velocidade: Sprint recarrega todas as armas (só armas) no N5", () => {
+test("Botas da Velocidade: Sprint recarrega 1 outra arma sorteada (só armas) no N5", () => {
   run(["rusted_sword", "frost_bow", "health_crystal", "speed_boots"], [big()], { speed_boots: 5 });
   state.itemTimers.frost_bow.elapsed = 0;
   state.itemTimers.health_crystal.elapsed = 0;
   state.player.counters.sprint = 4;
   activateItem(item("rusted_sword"));
   assert.equal(state.itemTimers.rusted_sword.elapsed, state.itemTimers.rusted_sword.cooldown);
-  assert.equal(state.itemTimers.frost_bow.elapsed, state.itemTimers.frost_bow.cooldown, "as outras armas também");
+  assert.equal(state.itemTimers.frost_bow.elapsed, state.itemTimers.frost_bow.cooldown, "a outra arma também");
   assert.equal(state.itemTimers.health_crystal.elapsed, 0, "relíquia e armadura não");
+
+  // 3 ou mais armas: só 1 outra recarrega
+  run(["rusted_sword", "frost_bow", "poison_blade", "speed_boots"], [big()], { speed_boots: 5 });
+  for (const id of ["frost_bow", "poison_blade"]) state.itemTimers[id].elapsed = 0;
+  state.player.counters.sprint = 4;
+  activateItem(item("rusted_sword"));
+  const ready = ["frost_bow", "poison_blade"].filter(
+    (id) => state.itemTimers[id].elapsed === state.itemTimers[id].cooldown,
+  );
+  assert.equal(ready.length, 1, "no máximo 1 outra arma");
+
+  // Arma só: recarrega apenas ela
+  run(["rusted_sword", "speed_boots"], [big()], { speed_boots: 5 });
+  state.player.counters.sprint = 4;
+  assert.doesNotThrow(() => activateItem(item("rusted_sword")));
+  assert.equal(state.itemTimers.rusted_sword.elapsed, state.itemTimers.rusted_sword.cooldown);
+
+  // fixedRate e não armas nunca são sorteados (arma de taxa fixa criada aqui: o catálogo não tem)
+  run(["rusted_sword", "frost_bow", "crystal_armor", "health_crystal", "speed_boots"], [big()], { speed_boots: 5 });
+  const bowAt = state.items.findIndex((i) => i.id === "frost_bow");
+  state.items[bowAt] = { ...state.items[bowAt], fixedRate: true };
+  state.itemTimers.frost_bow.elapsed = 0;
+  state.itemTimers.crystal_armor.elapsed = 0;
+  state.itemTimers.health_crystal.elapsed = 0;
+  for (let i = 0; i < 20; i++) {
+    state.player.counters.sprint = 4;
+    activateItem(item("rusted_sword"));
+  }
+  assert.equal(state.itemTimers.frost_bow.elapsed, 0, "arma fixedRate nunca é sorteada");
+  assert.equal(state.itemTimers.crystal_armor.elapsed, 0);
+  assert.equal(state.itemTimers.health_crystal.elapsed, 0);
 
   run(["rusted_sword", "health_crystal", "speed_boots"], [big()], { speed_boots: 3 });
   state.itemTimers.health_crystal.elapsed = 0;

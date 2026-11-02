@@ -186,6 +186,33 @@ function particleProxy(zAt) {
   };
 }
 
+// Projéteis dos atiradores (state.projectiles): flecha fina clara e esfera roxa com brilho;
+// o reflexo da Cota de Malha volta em ciano. Sem alocação: só lê o estado e desenha.
+function drawProjectile(pr, minW) {
+  if (pr.kind === "orb") {
+    ctx.fillStyle = pr.reflected ? "#2c9fb5" : "#6a3a9c";
+    ctx.globalAlpha = 0.45;
+    dot(pr.x, pr.y, 8);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = pr.reflected ? "#2ce8f5" : "#a45be0";
+    dot(pr.x, pr.y, 5);
+    ctx.fillStyle = "#f0e4ff";
+    dot(pr.x - 1, pr.y - 1, 2);
+    return;
+  }
+  // Flecha: haste fina apontando para onde voa (o tronco fica para trás)
+  const dir = pr.reflected ? 1 : -1;
+  ctx.strokeStyle = pr.reflected ? "#2ce8f5" : "#e8e0c0";
+  ctx.lineWidth = Math.max(1.5, minW);
+  ctx.lineCap = "butt";
+  ctx.beginPath();
+  ctx.moveTo(pr.x - dir * 14, pr.y);
+  ctx.lineTo(pr.x, pr.y);
+  ctx.stroke();
+  ctx.fillStyle = pr.reflected ? "#ffffff" : "#c8c8d8";
+  ctx.fillRect(dir > 0 ? pr.x : pr.x - 3, pr.y - 2, 3, 4);
+}
+
 // Redesenha o canvas de efeitos
 export function drawFx(zAt) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -198,6 +225,12 @@ export function drawFx(zAt) {
     ctx.globalAlpha = a;
     drawEffect(ef, a, 1 / s);
     ctx.restore();
+  }
+  const shots = state.projectiles;
+  for (let i = 0; i < shots.length; i++) {
+    const pr = shots[i];
+    const s = setLogicTransform(pr.x, pr.y, zAt(pr.x));
+    drawProjectile(pr, 1 / s);
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   particles.draw(particleProxy(zAt));

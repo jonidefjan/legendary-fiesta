@@ -152,6 +152,8 @@ export default {
   "enemies.skeleton": "Skeleton",
   "enemies.rogue": "Skeleton Rogue",
   "enemies.warrior": "Skeleton Warrior",
+  "enemies.archer": "Skeleton Archer",
+  "enemies.mage": "Skeleton Mage",
   "enemies.summoned": "Summoned Skeleton",
   "enemies.lich": "Lich",
   "enemies.demon": "Demon Lord",

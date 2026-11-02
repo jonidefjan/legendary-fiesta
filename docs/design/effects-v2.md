@@ -150,7 +150,7 @@ Unless noted, the whole entry is implemented in 11b. Item-specific pieces that d
 - **Shadow Cloak:** +10% dodge, +4% per level (global cap of 40%). N3: when dodging, the weapon attacks at once. N5: Escape gives +100% on the next attack.
 - **Mana Stone -> Echo Stone:** every 6s it repeats the last activated item (weapon or relic) at 50% of the effect, +10% per level. N3: 2 repeats. N5: 100% of the effect.
 - **Vital Crystal:** heals 8, +3 per level. N3, Resonance: every 10 charges the heal gains a permanent +3 in the run. N5: below 30% health, the cooldown is halved.
-- **Speed Boots:** weapons recharge 10% faster, +4% per level (N5 = 26%; was 15% +5%). N3, Sprint: every 5 attacks, the weapon that attacked is ready. N5: Sprint applies to all weapons (not relics or armor).
+- **Speed Boots:** weapons recharge 10% faster, +4% per level (N5 = 26%; was 15% +5%). N3, Sprint: every 5 attacks, the weapon that attacked is ready. N5: Sprint also recharges 1 other random weapon (not relics or armor).
 - **Vampiric Amulet:** steals 8% of each hit, +2% per level. N3, Thirst: below 50% health the steal doubles. N5: the steal also applies to damage over time.
 - **Berserker Totem:** +40% speed for 3s every 7s, +0.5s of duration per level. N3, Frenzy: below 25% health it activates by itself. N5: during the frenzy, +20% damage.
 - **Lucky Coin:** +15% crit, +5% per level; a critical kill gives +1 fragment. N3, Big Luck: 25% chance of an extra attack on a crit. N5: crits deal x2 instead of x1.5.
@@ -187,7 +187,7 @@ Requested by the owner because the early game was too hard:
 
 - **Level 1 +30%:** every item's level 1 values grew 30% (rounded): weapon damage (Rusted Sword 10, Veteran's Blade 10, Shadow Dagger 12, Thunder Staff 29, Frost Bow 22, Poison Blade 13, Holy Mace 23, Blood Scythe 26, Water Orb 20, Seismic Hammer 18, Judgment Tome 12, Forge Hammer 18, Serpent Dagger 7, Long Crossbow 16, Phantom Bow 23), armor (Leather Vest and Battle Cuirass 16, Chainmail 23, Thorn Mail 10 plus 8 thorns), Holy Mace heal 7, Health Crystal 10, Blast Core 13, Arcane Robe +13%, Echo Stone 65%, Berserker Totem +52% speed, Phoenix Feather 52% HP, Blood Scythe steal 39%, Vampiric Amulet 10%, Shadow Cloak 13% dodge, Lucky Coin 20% crit, Cursed Ring +40% damage. Growth per level is unchanged (so level 5 is also higher by the same amount).
 - **Left alone:** cooldowns and every-X rates, stack counts of 1 to 3, threshold percentages, enchant-tier values (level 3 and 5 effects), the Cursed Ring health penalty. Mythics stay at 1 damage and 1 stack per click.
-- **Speed Boots:** +10% and +4% per level (N5 26%); Sprint at N5 recharges only weapons.
+- **Speed Boots:** +10% and +4% per level (N5 26%); Sprint at N5 recharges 1 other random weapon, never relics or armor.
 - **Ember Blade:** 12 fire damage +3 per level (not part of the 30% change), still 1 burn stack per level per hit.
 - **Burn decay:** stacks only start fading after 3s without new stacks, then `max(1, floor(stacks / 10))` per second as before. Poison never loses stacks.
 
@@ -219,7 +219,7 @@ Numbers the design did not give, chosen while implementing:
 - **Serpent Dagger:** no damage growth per level (only stacks), as the design says. Poison base is 1.
 - **Basilisk Hide N5:** 3s, fixed pace, heals 1 HP per poisoned enemy.
 - **Plague Mushroom:** cloud radius 200 px. The ground cloud applies 1 stack per item level each second for 3s (half of the first burst); the N5 doubling applies to both. The cloud stays where the hero stood and disappears when the wave ends.
-- **Rear line:** see the revised rule below. The Phantom Hunter's Bow has a 4s cooldown and +3 damage per level; with no rear enemy it does not fire. The first arrow is the normal attack, the other arrows count as extra attacks. The N5 refund is 1s per kill of an enemy that was in the rear when the volley started.
+- **Rear line:** see the revised rule below. The Phantom Hunter's Bow has a 4s cooldown and +3 damage per level; with no rear enemy it attacks the nearest enemy, so it can never stall a wave as the only weapon. The first arrow is the normal attack, the other arrows count as extra attacks. The N5 refund is 1s per kill of an enemy that was in the rear when the volley started.
 - **Long Crossbow N5:** the +50% applies to any target in the rear, including the pierced ones.
 - **Lucky Horseshoe / Golden Clover:** the payout is `level` fragments every 10 kills of the run (counted by `state.kills`). N10 gives the reroll once, when the level is reached; N15 lowers the legendary guarantee by 1 (minimum 1, on top of the Legendary Luck upgrade). After 15: N20, 30, 40... +1 fragment per payout; N25, 35, 45... +3% crit.
 - **Mythic frame color:** #ff4d8d. A mythic picked in the starting pick replaces the weapon choice, and the common weapon is added so the run does not start unarmed. Mythic damage is 1 times the permanent damage bonuses. The 8 per second limit counts any click that passes the checks (running, not paused, mythic equipped), whether or not an enemy was hit.

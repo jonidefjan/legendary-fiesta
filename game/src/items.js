@@ -504,7 +504,9 @@ export function rewardOffer(count, { boss = false, extra = null } = {}) {
   const pityBefore = state.rewardsSinceLegendary;
   const draw = (exclude = new Set()) => {
     state.rewardsSinceLegendary = pityBefore;
-    return rewardOptions(count, { boss, exclude });
+    // A carta extra não pode sair também no sorteio normal (nem depois de rerrolar)
+    const skip = extra ? new Set([...exclude, extra.id]) : exclude;
+    return rewardOptions(count, { boss, exclude: skip });
   };
   const withExtra = (list) => (extra ? [...list, extra] : list);
   const offer = { options: withExtra(draw()) };
@@ -518,6 +520,22 @@ export function rewardOffer(count, { boss = false, extra = null } = {}) {
     return offer.options;
   };
   return offer;
+}
+
+// ─── Alcance ao fundo (onda 10) ───
+// Atiradores estacionários nascem no fundo da arena (late game). Itens que alcançam o fundo:
+// as duas armas de longo alcance, o Tomo do Julgamento (acerta todos) e o mítico Dedo Sísmico.
+export const REAR_REACH_IDS = ["long_crossbow", "phantom_bow", "judgment_tome", "seismic_finger"];
+// Dos que a recompensa pode oferecer (o mítico nunca é oferecido)
+export const REAR_REACH_OFFERS = ["long_crossbow", "phantom_bow", "judgment_tome"];
+
+// Carta extra da recompensa da onda 10: um item que alcança o fundo, se o jogador não tem
+// nenhum dos quatro. Sorteia com random(); null em outra onda ou se já tem um deles.
+export function rearReachOffer() {
+  if (state.wave !== 10) return null;
+  if (state.items.some((i) => REAR_REACH_IDS.includes(i.id))) return null;
+  const id = REAR_REACH_OFFERS[Math.floor(random() * REAR_REACH_OFFERS.length)];
+  return findItem(id) || null;
 }
 
 // ─── Itens míticos ───

@@ -740,7 +740,7 @@
         "trigger": "anyAttack",
         "type": "sprint",
         "every": 5,
-        "allLevel": 5,
+        "extraLevel": 5,
         "minLevel": 3
       }
     ]
