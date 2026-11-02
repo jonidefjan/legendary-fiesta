@@ -1,6 +1,6 @@
 # Contexto do projeto (para retomar o trabalho)
 
-Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-11-01, após as PRs #22 e #23 (commit `40375c9`). Nada pendente de commit além deste arquivo.
+Reescrito depois de cada merge de fase na `main`. Última atualização: 2026-11-01, após a PR #24 (commit `0451271`). Nada pendente de commit além deste arquivo.
 
 ## O que é
 O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
@@ -15,6 +15,8 @@ O repositório `jonidefjan/legendary-fiesta` (público) tem duas partes:
 - **Arma na mão (PR #22):** `game/src/held-weapon.js` monta blocos a partir do ícone 16×16 da primeira arma. `HELD_POSES` define grip, direção e escala de cada ícone; um teste exige pose para toda arma. `characters.js` prende a malha em `handslotr` (o GLTFLoader tira o ponto do nome) e esconde as armas do modelo.
   - Só a espada e o martelo foram vistos na tela. Faltam as outras 14 armas e a arma durante o golpe.
   - A Espada Enferrujada se destaca pouco no caminho marrom.
+- **Publicação (PR #24):** o site está no Vercel, e `vercel.json` redireciona `/game` para `/game/`. A prévia das PRs exige login, então só dá para testar com curl em produção.
+  - **Pendente com o usuário:** `www.jm77os.com.br` redireciona para `legendary-fiesta-alpha.vercel.app`. Isso se ajusta no painel do Vercel, não no repositório.
 - **Loja (PR #23):** `render` em `ui-title.js` mantém a rolagem de `.title-content` ao redesenhar. Testado com DOM simulado, não no navegador.
 - **Fase 12 (atiradores e late game):**
   - `RANGED_TYPES` em `waves.js`, separado de `ENEMY_TYPES`: arqueiro a partir da onda 11, mago a partir da 13.
