@@ -16,6 +16,7 @@ import { coldTint, slowFactor } from "../combat.js";
 import { on } from "../events.js";
 import { PALETTE } from "../palette.js";
 import { LAYERS } from "./layers.js";
+import { HELD_POSES, heldAngle, heldArtId, heldVoxelsFor } from "../held-weapon.js";
 
 const MODEL_FILES = {
   hero: "Rogue_Hooded.glb",
@@ -62,14 +63,26 @@ const HERO_ACTIONS = {
   berserk: "Cheer",
 };
 
-// Arma visível conforme o anim da primeira arma
+// Armas que vêm no modelo: ficam escondidas, a mão mostra a arma de blocos
 const WEAPON_NODES = ["Knife", "Knife_Offhand", "1H_Crossbow", "2H_Crossbow", "Throwable"];
-function weaponNodesFor(anim) {
-  if (!anim) return [];
-  if (anim === "double_slash") return ["Knife", "Knife_Offhand"];
-  if (anim === "arrow") return ["1H_Crossbow"];
-  if (anim === "lightning" || anim === "water_blast") return [];
-  return ["Knife"];
+
+// Geometria da arma na mão, uma por ícone (no máximo uma por arma do catálogo; dura o jogo todo)
+const heldGeometries = new Map();
+function heldGeometry(artId) {
+  if (heldGeometries.has(artId)) return heldGeometries.get(artId);
+  const voxels = heldVoxelsFor(artId);
+  let geometry = null;
+  if (voxels) {
+    const color = new THREE.Color();
+    const colors = voxels.colors.flatMap((hex) => color.set(hex).toArray());
+    geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(voxels.positions, 3));
+    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(voxels.normals, 3));
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setIndex(voxels.indices);
+  }
+  heldGeometries.set(artId, geometry);
+  return geometry;
 }
 
 // Atiradores (en.kind) usam o clipe de tiro da forma, sempre no lugar
@@ -345,7 +358,8 @@ function createHero(group) {
     lastAnimTimer: 0,
     lastHp: 0,
     action: null, // null | "action" | "hit" | "death"
-    weaponAnim: undefined,
+    heldArt: undefined,
+    heldMesh: null,
     pendingAnim: null,
     berserk: false,
     flash: 0,
@@ -373,19 +387,36 @@ function attachHeroModel(hero) {
   hero.root.remove(hero.stub);
   hero.root.add(hero.rig.model);
   hero.rig.play("Idle");
-  hero.weaponAnim = undefined; // força atualizar as armas
+  // As armas do modelo saem: a mão mostra a primeira arma do jogador
+  for (const name of WEAPON_NODES) {
+    const node = hero.rig.model.getObjectByName(name);
+    if (node) node.visible = false;
+  }
+  hero.heldArt = undefined; // força montar a arma
 }
 
 function updateHeroWeapons(hero) {
-  const weapon = state.items.find((i) => i.type === "weapon");
-  const anim = weapon?.anim ?? null;
-  if (anim === hero.weaponAnim) return;
-  hero.weaponAnim = anim;
-  const show = new Set(weaponNodesFor(anim));
-  for (const name of WEAPON_NODES) {
-    const node = hero.rig.model.getObjectByName(name);
-    if (node) node.visible = show.has(name);
+  const artId = heldArtId(state.items);
+  if (artId === hero.heldArt) return;
+  hero.heldArt = artId;
+  const geometry = artId && heldGeometry(artId);
+  if (!hero.heldMesh) {
+    // O GLTFLoader tira o ponto do nome do nó
+    const hand = hero.rig.model.getObjectByName("handslotr");
+    if (!hand) return;
+    const material = toonMaterial(0xffffff, CHAR_MAT);
+    material.vertexColors = true;
+    hero.rig.flashMaterials.push(material); // pisca com o herói e sai com ele
+    hero.heldMesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
+    hero.heldMesh.castShadow = true;
+    hero.heldMesh.frustumCulled = false; // acompanha a animação
+    hero.heldMesh.layers.set(LAYERS.character);
+    hand.add(hero.heldMesh);
   }
+  hero.heldMesh.visible = Boolean(geometry);
+  if (!geometry) return;
+  hero.heldMesh.geometry = geometry;
+  hero.heldMesh.rotation.z = heldAngle(HELD_POSES[artId]);
 }
 
 function updateHero(hero, dtMs) {

@@ -199,7 +199,7 @@ Files: `view.js` (camera, fit), `pipeline.js`, `lighting.js`, `characters.js` (K
 
 ## Adding an item
 
-1. **`game/assets/items.json`**: add an entry with `id`, `type` (`weapon`, `armor`, `relic`), `icon` (emoji fallback), `rarity`, `cooldown` (ms, 0 for passive), and for weapons `baseDmg`, `dmgType`, `anim`, `fx`. Describe behavior in `effects`. If no existing effect type fits, add a handler in `combat.js` under the right trigger.
+1. **`game/assets/items.json`**: add an entry with `id`, `type` (`weapon`, `armor`, `relic`), `icon` (emoji fallback), `rarity`, `cooldown` (ms, 0 for passive), and for weapons `baseDmg`, `dmgType`, `anim`, `fx` (a new weapon also needs an entry in `HELD_POSES` in `game/src/held-weapon.js`, which sets how the hero holds it). Describe behavior in `effects`. If no existing effect type fits, add a handler in `combat.js` under the right trigger.
 2. **Locales**: add `items.<id>.name`, `.desc`, `.effect` and optionally `.enchant` and `.enchantExtra` to both `game/locales/items.en.js` and `items.pt-BR.js`.
 3. **Art**: add a 16x16 grid under the id in `ITEM_ART` in `game/src/item-art.js`. If the item has an element, add it to `ITEM_ELEMENTS`. Preview all icons at `/game/dev/item-art.html`.
 4. **Tests**: add cases in `tests/` for any new handler (see `tests/items2.test.js`). Existing tests already check the catalog, art coverage and locale parity.
